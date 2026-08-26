@@ -1,0 +1,41 @@
+// Root stack-ის route-ების სია. ეტაპობრივად დაემატება ყველა ეკრანი
+// product-spec.md-ის "ეკრანების სრული სია" მიხედვით.
+export type Role = 'customer' | 'provider';
+
+export type RootStackParamList = {
+  Welcome: undefined;
+  RoleSelect: undefined;
+  Register: { role: Role };
+  Login: undefined;
+  ForgotPassword: undefined;
+  GoogleComplete: { role: Role };
+  CustomerSetup: { userName: string };
+  ProviderSetup: undefined;
+  CustomerHome: undefined;
+  ProviderHome: undefined;
+  ProviderJobDetail: { id: string; mode?: 'browse' | 'selected' };
+  PostJob: undefined;
+  CustomerJobDetail: { jobId: string };
+  ChatConversation: { chatId: string; name: string; initials: string; color: string; role: Role };
+};
+
+// Bottom Tab-ების route-ები (Home/ჩატები/პროფილი) — თითო tab navigator
+// როლის მიხედვით, RootStack-ის "CustomerHome"/"ProviderHome" route-ების
+// ქვეშ ჩალაგებული (product-spec.md: "Bottom navigation, 3 ჩანართი").
+export type CustomerTabParamList = {
+  Home: undefined;
+  Chats: undefined;
+  Profile: undefined;
+};
+
+export type ProviderTabParamList = {
+  Home: undefined;
+  Chats: undefined;
+  Profile: undefined;
+};
+
+declare global {
+  namespace ReactNavigation {
+    interface RootParamList extends RootStackParamList {}
+  }
+}
