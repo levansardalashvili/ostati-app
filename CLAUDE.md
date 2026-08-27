@@ -53,7 +53,7 @@
 ## მთავარი არქიტექტურული/პროდუქტული გადაწყვეტილებები
 
 1. **კატეგორიის ფილტრი Browse-ზე — მრავალარჩევანი (multi-select).** დაფიქსირებული წესი `product-spec.md`-დან, ზედმეტდება დიზაინის რეფერენსის (single-select) ვერსიაზე. Implementiert `CustomerHomeScreen`-ში `Set<string>` state-ით.
-2. **ფასის შეთანხმება ჩატში — სტრუქტურირებული ბარათი**, არა თავისუფალი ტექსტი. Provider აგზავნის რიცხვს ცალკე card-ის სახით, Customer ეთანხმება/უარყოფს. დათანხმებული ფასი ინახება job-ის ჩანაწერში დათარიღებული. **ჯერ არ არის implementiert** — Chat ეკრანი (D2) უკვე აშენებულია, მაგრამ ეს კონკრეტული ფუნქცია დიზაინის რეფერენსშიც არ არსებობდა (მხოლოდ product-spec.md-ის მოთხოვნაა), ამიტომ struktura თავიდან დაგეგმვას საჭიროებს.
+2. **ფასის შეთანხმება ჩატში — სტრუქტურირებული ბარათი**, არა თავისუფალი ტექსტი. Provider აგზავნის რიცხვს ცალკე card-ის სახით (`ChatConversationScreen`-ის კომპოზერში ცალკე Wallet ღილაკით, provider-ისთვის მხოლოდ), Customer ეთანხმება/უარყოფს პირდაპირ ბარათიდან (`დათანხმება`/`უარყოფა` ღილაკები, ჩანს მხოლოდ `role==='customer' && !isMe && offerStatus==='pending'`-ზე). **D3 Implementiert** — ზიპში რეფერენსი არ არსებობდა, დიზაინი თავიდან შემუშავდა (`ChatMsg`-ის ახალი `type: 'offer'`, `src/data/mockChats.ts`). დათანხმებული ფასის შენახვა job-ის ჩანაწერში (Firestore) **ჯერ არ არის დაკავშირებული** — ამჟამად მხოლოდ ჩატის ლოკალურ state-ში ცვლის სტატუსს (`TODO: Firestore`-ის კომენტარი `respondToOffer`-ში).
 3. **ფოტოს ატვირთვის ლიმიტი job post-ში — 1-3 ფოტო**, არა 5 (დიზაინის რეფერენსზე override).
 4. **ერთ ანგარიშს ერთი როლი.** არა role-switch UI.
 5. **ერთი აქცენტის ფერი მთელ აპში** (`#2563EB`) — დიზაინის რეფერენსში RoleSelect-ის ბარათებს ჰქონდა ლურჯი/იისფერი split, მაგრამ ეს override-ავს `product-spec.md`-ის ზოგადი დიზაინის წესით (`src/theme/colors.ts`).
@@ -71,7 +71,7 @@
 
 Root არის ერთი `native-stack` (`src/navigation/RootNavigator.tsx`), ტიპიზირებული `RootStackParamList`-ით (`src/navigation/types.ts`). Onboarding-იდან Home-ზე გადასვლისას `navigation.reset()` გამოიყენება (არა `navigate`/`replace`) — მომხმარებელს არ შეუძლია უკან დაბრუნება რეგისტრაციაში ავტორიზაციის შემდეგ.
 
-**Bottom Tabs** (`CustomerTabs`/`ProviderTabs`, `src/navigation/CustomerTabs.tsx` და `ProviderTabs.tsx`) — თითო ცალკე Tab Navigator როლის მიხედვით (არა ერთი საერთო + role param, იმავე პრინციპით რითიც CustomerHome/ProviderHome ცალკეა). ორივე ჩალაგებულია RootStack-ის **იგივე** `"CustomerHome"`/`"ProviderHome"` route-ების ქვეშ — ეს route-ის სახელები არ შეცვლილა განზრახ, რომ ყველა არსებული `navigation.reset({routes:[{name:'CustomerHome'}]})` გამოძახება უცვლელად იმუშაოს. თითო ტაბ-ნავიგატორს 3 ტაბი აქვს: **Home** (CustomerHomeScreen/ProviderHomeScreen), **Chats** (`ChatsListScreen`, role prop-ით გადაცემული children render prop-ის საშუალებით — ერთი საერთო კომპონენტი ორივე როლისთვის), **Profile** (`ProfilePlaceholderScreen` — დროებითი, სანამ E1/E2 არ აშენდება).
+**Bottom Tabs** (`CustomerTabs`/`ProviderTabs`, `src/navigation/CustomerTabs.tsx` და `ProviderTabs.tsx`) — თითო ცალკე Tab Navigator როლის მიხედვით (არა ერთი საერთო + role param, იმავე პრინციპით რითიც CustomerHome/ProviderHome ცალკეა). ორივე ჩალაგებულია RootStack-ის **იგივე** `"CustomerHome"`/`"ProviderHome"` route-ების ქვეშ — ეს route-ის სახელები არ შეცვლილა განზრახ, რომ ყველა არსებული `navigation.reset({routes:[{name:'CustomerHome'}]})` გამოძახება უცვლელად იმუშაოს. თითო ტაბ-ნავიგატორს 3 ტაბი აქვს: **Home** (CustomerHomeScreen/ProviderHomeScreen), **Chats** (`ChatsListScreen`, role prop-ით გადაცემული children render prop-ის საშუალებით — ერთი საერთო კომპონენტი ორივე როლისთვის), **Profile** (`ProviderProfileScreen`/`CustomerProfileScreen` — E1/E2, `role`-ის მიხედვით ცალკე კომპონენტი თითო ტაბ-ნავიგატორში).
 
 Tab-ის შიგნით მდებარე ეკრანების (`CustomerHomeScreen` და ა.შ.) navigation prop ტიპია `CompositeScreenProps<BottomTabScreenProps<...>, NativeStackScreenProps<RootStackParamList>>` — საჭიროა root-stack route-ებზე (`PostJob`, `ChatConversation` და ა.შ.) ნავიგაციისთვის ტაბის შიგნიდან. **Parent stack-ის action-ები** (მაგ. `reset`) ტაბის შიგნიდან უნდა გამოიძახოს `navigation.getParent()?.reset(...)`-ით, არა პირდაპირ `navigation.reset(...)`-ით — TypeScript-ის composite ტიპი `reset`-ს ტაბ-navigator-ზე resolve-ავს.
 
@@ -98,8 +98,8 @@ docs/
 **A — Onboarding:** Welcome, RoleSelect, Register, Login, ForgotPassword, GoogleComplete, CustomerSetup, ProviderSetup — **დასრულებული**
 **B — Provider:** ProviderHome (B1), ProviderJobDetail (B2, browse/selected mode) — **დასრულებული**
 **C — Customer:** CustomerHome/Browse (C1), PostJob (C2, ფოტო-ლიმიტი 3-ზე override), CustomerJobDetail (C3+C4 — ერთი ეკრანი, ორივე state, დიზაინის რეფერენსის მსგავსად) — **დასრულებული**
-**D — Chat:** ChatsList (D1), ChatConversation (D2) — **დასრულებული**. D3 (ფასის სტრუქტურირებული შეთავაზება) — **არ არის implementiert**, იხ. არქიტექტურული გადაწყვეტილება #2
-**E — პროფილები:** **არ არის აშენებული** (ორივე ტაბ-ნავიგატორში დროებითი placeholder ტაბია, "გასვლა" ღილაკით)
+**D — Chat:** ChatsList (D1), ChatConversation (D2), ფასის შეთავაზების ბარათი (D3) — **დასრულებული**, იხ. არქიტექტურული გადაწყვეტილება #2
+**E — პროფილები:** ProviderProfile (E1), CustomerProfile (E2) — **დასრულებული**. ორივეს აქვს "გასვლა" ღილაკი გადამოწმების BottomSheet-ით (`navigation.getParent()?.reset()` Welcome-ზე). მენიუს პუნქტების დანიშნულების ეკრანები (რედაქტირება, ჩემი მოთხოვნები, დაფარვის რაიონები და ა.შ.) ჯერ TODO placeholder-ებია.
 **სამუშაოს დასრულება/შეფასება** (product-spec.md პუნქტი #14, Rating screen) — **არ არის აშენებული**. Job Detail-ის ეკრანებში (B2/C3-C4) ეს ნაწილი შეგნებულად გამოტოვებულია.
 **Notifications** — **არ არის აშენებული** (Bell ღილაკები ყველგან TODO placeholder-ია)
 

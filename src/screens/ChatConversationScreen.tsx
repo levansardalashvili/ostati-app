@@ -11,10 +11,22 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AlertCircle, ArrowLeft, Camera, Check, Image as ImageIcon, MoreVertical, Send, X } from 'lucide-react-native';
+import {
+  AlertCircle,
+  ArrowLeft,
+  Camera,
+  Check,
+  Clock,
+  Image as ImageIcon,
+  MoreVertical,
+  Send,
+  Wallet,
+  X,
+} from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BottomSheet } from '../components/BottomSheet';
+import { Button } from '../components/Button';
 import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
@@ -24,9 +36,13 @@ import type { RootStackParamList } from '../navigation/types';
 type Props = NativeStackScreenProps<RootStackParamList, 'ChatConversation'>;
 
 // D2 — საუბრის ეკრანი (product-spec.md; დიზაინის რეფერენსის
-// ChatConversation-ის მიხედვით). ფასის შეთავაზების სტრუქტურირებული
-// ბარათი (D3, product-spec.md-ის დაფიქსირებული წესი) ჯერ არ არის
-// implementiert — ზიპშიც არ არსებობდა სამისამძღვრებლოდ.
+// ChatConversation-ის მიხედვით). D3 — ფასის შეთანხმების სტრუქტურირებული
+// ბარათი (product-spec.md-ის დაფიქსირებული წესი #2) — ზიპში რეფერენსი არ
+// არსებობდა, აქედან გამომდინარე დიზაინი თავიდან შემუშავდა. Provider
+// აგზავნის შეთავაზებას ცალკე ბარათის სახით (არა თავისუფალი ტექსტით),
+// Customer ეთანხმება/უარყოფს პირდაპირ ბარათიდან. დათანხმებული ფასის
+// შენახვა job-ის ჩანაწერში (Firestore) ჯერ არ არის დაკავშირებული —
+// ეს ცვლილება ამ ეტაპზე მხოლოდ ჩატის ლოკალურ state-შია.
 export function ChatConversationScreen({ navigation, route }: Props) {
   const { chatId, name, initials, color, role } = route.params;
   const chatEntry = CHATS_LIST.find((c) => c.id === chatId);
@@ -36,6 +52,9 @@ export function ChatConversationScreen({ navigation, route }: Props) {
   const [msgText, setMsgText] = useState('');
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [imgPreview, setImgPreview] = useState<string | null>(null);
+  const [offerSheetOpen, setOfferSheetOpen] = useState(false);
+  const [offerAmount, setOfferAmount] = useState('');
+  const [offerComment, setOfferComment] = useState('');
   const scrollRef = useRef<ScrollView>(null);
 
   const jobDetailScreen = role === 'provider' ? 'ProviderJobDetail' : 'CustomerJobDetail';
@@ -65,6 +84,36 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     setTimeout(() => {
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'sent' } : m)));
     }, 900);
+  };
+
+  const sendOffer = () => {
+    const amount = parseInt(offerAmount, 10);
+    if (!amount || amount <= 0) return;
+    const id = `offer-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id,
+        type: 'offer',
+        from: 'me',
+        t: 'ახლა',
+        state: 'sending',
+        amount,
+        comment: offerComment.trim() || undefined,
+        offerStatus: 'pending',
+      },
+    ]);
+    setOfferSheetOpen(false);
+    setOfferAmount('');
+    setOfferComment('');
+    setTimeout(() => {
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'sent' } : m)));
+    }, 800);
+  };
+
+  const respondToOffer = (id: string, offerStatus: 'accepted' | 'declined') => {
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, offerStatus } : m)));
+    // TODO: დათანხმებული ფასის შენახვა job-ის ჩანაწერში (Firestore) — job status/price ველი ჯერ არ არსებობს.
   };
 
   const handleOpenJobDetail = () => {
@@ -141,6 +190,64 @@ export function ChatConversationScreen({ navigation, route }: Props) {
             const prevMsg = messages[idx - 1];
             const showSpacing = prevMsg && prevMsg.type !== 'date' && prevMsg.from !== m.from;
 
+            if (m.type === 'offer') {
+              const canRespond = role === 'customer' && !isMe && m.offerStatus === 'pending';
+              return (
+                <View key={m.id} style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther, showSpacing && styles.msgSpacing]}>
+                  <View style={styles.offerCardWrap}>
+                    <View style={styles.offerCard}>
+                      <View style={styles.offerHeaderRow}>
+                        <View style={styles.offerIcon}>
+                          <Wallet size={15} color={colors.primary} />
+                        </View>
+                        <Text style={styles.offerLabel}>ფასის შეთავაზება</Text>
+                      </View>
+                      <Text style={styles.offerAmount}>{m.amount} ₾</Text>
+                      {m.comment && <Text style={styles.offerComment}>{m.comment}</Text>}
+
+                      {canRespond ? (
+                        <View style={styles.offerActionsRow}>
+                          <Pressable style={styles.offerDeclineButton} onPress={() => respondToOffer(m.id, 'declined')}>
+                            <Text style={styles.offerDeclineText}>უარყოფა</Text>
+                          </Pressable>
+                          <Pressable style={styles.offerAcceptButton} onPress={() => respondToOffer(m.id, 'accepted')}>
+                            <Text style={styles.offerAcceptText}>დათანხმება</Text>
+                          </Pressable>
+                        </View>
+                      ) : (
+                        <View
+                          style={[
+                            styles.offerStatusBadge,
+                            m.offerStatus === 'accepted' && styles.offerStatusBadgeAccepted,
+                            m.offerStatus === 'declined' && styles.offerStatusBadgeDeclined,
+                          ]}
+                        >
+                          {m.offerStatus === 'accepted' && <Check size={12} color={colors.success} strokeWidth={2.5} />}
+                          {m.offerStatus === 'declined' && <X size={12} color={colors.destructive} strokeWidth={2.5} />}
+                          {m.offerStatus === 'pending' && <Clock size={12} color={colors.mutedForeground} />}
+                          <Text
+                            style={[
+                              styles.offerStatusText,
+                              m.offerStatus === 'accepted' && styles.offerStatusTextAccepted,
+                              m.offerStatus === 'declined' && styles.offerStatusTextDeclined,
+                            ]}
+                          >
+                            {m.offerStatus === 'accepted' && 'ფასი დათანხმებულია'}
+                            {m.offerStatus === 'declined' && 'ფასი უარყოფილია'}
+                            {m.offerStatus === 'pending' && 'ელოდება პასუხს'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={[styles.msgFooter, isMe ? styles.msgFooterMe : styles.msgFooterOther]}>
+                      <Text style={styles.msgTime}>{m.t}</Text>
+                      <MessageStateIcon state={m.state} isMine={isMe} />
+                    </View>
+                  </View>
+                </View>
+              );
+            }
+
             if (m.type === 'image') {
               return (
                 <View key={m.id} style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther, showSpacing && styles.msgSpacing]}>
@@ -185,6 +292,11 @@ export function ChatConversationScreen({ navigation, route }: Props) {
           <Pressable style={styles.attachButton} onPress={() => setAttachSheetOpen(true)}>
             <Camera size={17} color={colors.mutedForeground} />
           </Pressable>
+          {role === 'provider' && (
+            <Pressable style={styles.attachButton} onPress={() => setOfferSheetOpen(true)}>
+              <Wallet size={17} color={colors.mutedForeground} />
+            </Pressable>
+          )}
           <View style={styles.textInputWrap}>
             <TextInput
               value={msgText}
@@ -218,6 +330,42 @@ export function ChatConversationScreen({ navigation, route }: Props) {
           </View>
           <Text style={styles.attachOptionText}>გალერეიდან არჩევა</Text>
         </Pressable>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={offerSheetOpen}
+        onClose={() => {
+          setOfferSheetOpen(false);
+          setOfferAmount('');
+          setOfferComment('');
+        }}
+      >
+        <Text style={styles.sheetTitle}>ფასის შეთავაზება</Text>
+        <Text style={styles.sheetSubtitle}>Customer-მა უნდა დაადასტუროს, სანამ ფასი ძალაში შევა.</Text>
+        <View style={styles.offerAmountInputWrap}>
+          <TextInput
+            value={offerAmount}
+            onChangeText={(t) => setOfferAmount(t.replace(/[^0-9]/g, ''))}
+            placeholder="0"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="number-pad"
+            style={styles.offerAmountInput}
+          />
+          <Text style={styles.offerAmountSuffix}>₾</Text>
+        </View>
+        <TextInput
+          value={offerComment}
+          onChangeText={setOfferComment}
+          placeholder="კომენტარი (არასავალდებულო)"
+          placeholderTextColor={colors.mutedForeground}
+          style={styles.offerCommentInput}
+          multiline
+        />
+        <Button
+          label="გაგზავნა"
+          onPress={sendOffer}
+          disabled={!offerAmount || parseInt(offerAmount, 10) <= 0}
+        />
       </BottomSheet>
 
       {imgPreview && (
@@ -408,6 +556,145 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  offerCardWrap: {
+    maxWidth: '85%',
+    minWidth: 220,
+  },
+  offerCard: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  offerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  offerIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.full,
+    backgroundColor: colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offerLabel: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    fontWeight: '700',
+  },
+  offerAmount: {
+    ...typography.h2,
+    color: colors.foreground,
+    marginBottom: spacing.xs,
+  },
+  offerComment: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    marginBottom: spacing.sm + 2,
+  },
+  offerActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  offerDeclineButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.muted,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  offerDeclineText: {
+    ...typography.small,
+    color: colors.foreground,
+    fontWeight: '700',
+  },
+  offerAcceptButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  offerAcceptText: {
+    ...typography.small,
+    color: colors.primaryForeground,
+    fontWeight: '700',
+  },
+  offerStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.muted,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
+    marginTop: spacing.xs,
+  },
+  offerStatusBadgeAccepted: {
+    backgroundColor: colors.successBackground,
+  },
+  offerStatusBadgeDeclined: {
+    backgroundColor: colors.dangerBackground,
+  },
+  offerStatusText: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    fontWeight: '700',
+  },
+  offerStatusTextAccepted: {
+    color: colors.success,
+  },
+  offerStatusTextDeclined: {
+    color: colors.destructive,
+  },
+  sheetTitle: {
+    ...typography.h3,
+    color: colors.foreground,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  sheetSubtitle: {
+    ...typography.caption,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  offerAmountInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  offerAmountInput: {
+    ...typography.h1,
+    color: colors.foreground,
+    textAlign: 'center',
+    minWidth: 80,
+    padding: 0,
+  },
+  offerAmountSuffix: {
+    ...typography.h2,
+    color: colors.mutedForeground,
+  },
+  offerCommentInput: {
+    ...typography.caption,
+    color: colors.foreground,
+    backgroundColor: colors.muted,
+    borderRadius: radius.md,
+    padding: spacing.sm + 2,
+    minHeight: 60,
+    textAlignVertical: 'top',
+    marginBottom: spacing.lg,
   },
   composer: {
     flexDirection: 'row',

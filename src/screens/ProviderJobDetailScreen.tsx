@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CheckCircle, Clock, MapPin, MessageCircle, MoreVertical, Star, ThumbsUp } from 'lucide-react-native';
+import { Award, CheckCircle, Clock, MapPin, MessageCircle, MoreVertical, Star, ThumbsUp } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
 import { CategoryIcon } from '../components/CategoryIcon';
@@ -18,6 +18,11 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   const { id, mode = 'browse' } = route.params;
   const job = PROVIDER_FEED.find((j) => j.id === id) ?? PROVIDER_FEED[0];
   const [expressed, setExpressed] = useState(false);
+
+  const receivedRating =
+    mode === 'completed'
+      ? { stars: 5, review: 'ძალიან კარგი სამუშაო, მადლობა!', chips: ['დროულად მოვიდა', 'ხარისხიანი სამუშაო'] }
+      : null;
 
   const handleChat = () => {
     navigation.navigate('ChatConversation', {
@@ -54,6 +59,35 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
             <Text style={styles.selectedBannerText}>
               ველოდებით მომხმარებლის დადასტურებას სამუშაოს დასრულების შესახებ.
             </Text>
+          </View>
+        )}
+
+        {mode === 'completed' && (
+          <View style={styles.completedBanner}>
+            <View style={styles.bannerHeaderRow}>
+              <Award size={16} color={colors.primary} />
+              <Text style={styles.completedBannerTitle}>სამუშაო დასრულებულად დადასტურდა</Text>
+            </View>
+            {receivedRating && (
+              <>
+                <View style={styles.completedStarsRow}>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star key={s} size={15} color="#FBBF24" fill={receivedRating.stars >= s ? '#FBBF24' : 'transparent'} />
+                  ))}
+                  <Text style={styles.completedStarsLabel}>{receivedRating.stars}.0</Text>
+                </View>
+                {receivedRating.chips.length > 0 && (
+                  <View style={styles.completedChipsRow}>
+                    {receivedRating.chips.map((c) => (
+                      <View key={c} style={styles.completedChip}>
+                        <Text style={styles.completedChipText}>{c}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                <Text style={styles.completedReviewText}>"{receivedRating.review}"</Text>
+              </>
+            )}
           </View>
         )}
 
@@ -144,6 +178,14 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               <Text style={styles.chatButtonText}>ჩატი</Text>
             </Pressable>
           </View>
+        </View>
+      )}
+      {mode === 'completed' && (
+        <View style={styles.footer}>
+          <Pressable style={styles.reviewsButton} onPress={() => navigation.navigate('ProviderReviews')}>
+            <Award size={17} color={colors.primary} />
+            <Text style={styles.reviewsButtonText}>ჩემი შეფასებები</Text>
+          </Pressable>
         </View>
       )}
     </SafeAreaView>
@@ -365,5 +407,69 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     textAlign: 'center',
     marginBottom: spacing.sm + 2,
+  },
+  completedBanner: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: colors.secondary,
+    padding: spacing.md,
+  },
+  completedBannerTitle: {
+    ...typography.captionMedium,
+    color: colors.secondaryForeground,
+    fontWeight: '700',
+  },
+  completedStarsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginBottom: spacing.xs + 2,
+  },
+  completedStarsLabel: {
+    ...typography.small,
+    color: colors.secondaryForeground,
+    fontWeight: '700',
+    marginLeft: spacing.xs + 2,
+  },
+  completedChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs + 2,
+    marginBottom: spacing.xs + 2,
+  },
+  completedChip: {
+    backgroundColor: '#BFDBFE',
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs,
+  },
+  completedChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.secondaryForeground,
+  },
+  completedReviewText: {
+    ...typography.small,
+    color: colors.primary,
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  reviewsButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.secondary,
+    borderRadius: radius.md,
+    minHeight: 52,
+  },
+  reviewsButtonText: {
+    ...typography.bodyMedium,
+    color: colors.secondaryForeground,
+    fontWeight: '700',
   },
 });

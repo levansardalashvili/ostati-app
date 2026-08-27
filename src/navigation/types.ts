@@ -1,5 +1,7 @@
 // Root stack-ის route-ების სია. ეტაპობრივად დაემატება ყველა ეკრანი
 // product-spec.md-ის "ეკრანების სრული სია" მიხედვით.
+import type { RatingData } from '../data/mockHomeData';
+
 export type Role = 'customer' | 'provider';
 
 export type RootStackParamList = {
@@ -13,10 +15,28 @@ export type RootStackParamList = {
   ProviderSetup: undefined;
   CustomerHome: undefined;
   ProviderHome: undefined;
-  ProviderJobDetail: { id: string; mode?: 'browse' | 'selected' };
+  ProviderJobDetail: { id: string; mode?: 'browse' | 'selected' | 'completed' };
   PostJob: undefined;
   CustomerJobDetail: { jobId: string };
   ChatConversation: { chatId: string; name: string; initials: string; color: string; role: Role };
+  Notifications: { role: Role };
+  NotificationSettings: { role: Role };
+  ProfileSettings: undefined;
+  CustomerEditProfile: undefined;
+  ProviderEditProfile: undefined;
+  ProviderServiceAreas: undefined;
+  ProviderCompletedJobs: undefined;
+  ProviderReviews: undefined;
+  ProviderMyJobs: undefined;
+  CustomerJobs: undefined;
+  ViewProviderProfile: { id: string };
+  RatingScreen: {
+    jobId: string;
+    providerName: string;
+    providerInitials: string;
+    providerColor: string;
+    onRate?: (data: RatingData) => void;
+  };
 };
 
 // Bottom Tab-ების route-ები (Home/ჩატები/პროფილი) — თითო tab navigator

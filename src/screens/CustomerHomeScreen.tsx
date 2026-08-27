@@ -21,6 +21,7 @@ import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
 import { TBILISI_AREAS as DISTRICTS } from '../data/districts';
 import { PROVIDERS, Provider } from '../data/mockHomeData';
+import { getUnreadCount } from '../data/mockNotifications';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -28,8 +29,7 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-// TODO: notifications backend არ არსებობს ჯერ — placeholder რიცხვი
-const MOCK_UNREAD_COUNT = 2;
+const MOCK_UNREAD_COUNT = getUnreadCount('customer');
 
 const SPEC_CATS = [
   { id: 'plumbing', label: 'სანტექნიკოსი', icon: '🔧' },
@@ -79,10 +79,10 @@ export function CustomerHomeScreen({ navigation }: Props) {
   };
 
   const handleNotifications = () => {
-    // TODO: Notifications ეკრანი ჯერ არ არსებობს
+    navigation.navigate('Notifications', { role: 'customer' });
   };
-  const handleOpenProvider = (_id: string) => {
-    // TODO: Provider Profile ეკრანი ჯერ არ არსებობს
+  const handleOpenProvider = (id: string) => {
+    navigation.navigate('ViewProviderProfile', { id });
   };
   const handleOpenChat = (provider: Provider) => {
     navigation.navigate('ChatConversation', {

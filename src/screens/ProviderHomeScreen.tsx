@@ -23,6 +23,7 @@ import { Switch } from '../components/Switch';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
 import { FeedJob, PROVIDER_FEED } from '../data/mockHomeData';
+import { getUnreadCount } from '../data/mockNotifications';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -30,8 +31,7 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-// TODO: notifications backend არ არსებობს ჯერ — placeholder რიცხვი
-const MOCK_UNREAD_COUNT = 3;
+const MOCK_UNREAD_COUNT = getUnreadCount('provider');
 // TODO: რეალური სტატისტიკა Firestore-დან — ჯერჯერობით mock
 const MOCK_STATS = [
   { value: '14', label: 'სამ.' },
@@ -75,7 +75,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
   }, [activeCat, activeArea, activeTime]);
 
   const handleNotifications = () => {
-    // TODO: Notifications ეკრანი ჯერ არ არსებობს
+    navigation.navigate('Notifications', { role: 'provider' });
   };
   const handleJobDetail = (id: string) => {
     navigation.navigate('ProviderJobDetail', { id });
@@ -149,12 +149,19 @@ export function ProviderHomeScreen({ navigation }: Props) {
           >
             <Text style={styles.statsLabel}>ამ თვის სტატისტიკა</Text>
             <View style={styles.statsRow}>
-              {MOCK_STATS.map((s) => (
-                <View key={s.label} style={styles.statBox}>
-                  <Text style={styles.statValue}>{s.value}</Text>
-                  <Text style={styles.statLabel}>{s.label}</Text>
-                </View>
-              ))}
+              {MOCK_STATS.map((s) =>
+                s.label === 'სამ.' ? (
+                  <Pressable key={s.label} style={styles.statBox} onPress={() => navigation.navigate('ProviderMyJobs')}>
+                    <Text style={styles.statValue}>{s.value}</Text>
+                    <Text style={styles.statLabel}>{s.label}</Text>
+                  </Pressable>
+                ) : (
+                  <View key={s.label} style={styles.statBox}>
+                    <Text style={styles.statValue}>{s.value}</Text>
+                    <Text style={styles.statLabel}>{s.label}</Text>
+                  </View>
+                ),
+              )}
             </View>
           </LinearGradient>
         </View>

@@ -4,15 +4,20 @@ import type { JobStatus } from '../components/StatusPill';
 
 export type MsgState = 'sending' | 'sent' | 'read' | 'failed';
 
+export type OfferStatus = 'pending' | 'accepted' | 'declined';
+
 export type ChatMsg = {
   id: string;
-  type: 'text' | 'image' | 'date';
+  type: 'text' | 'image' | 'date' | 'offer';
   from: 'me' | 'other';
   text?: string;
   imgColor?: string;
   t?: string;
   state?: MsgState;
   label?: string;
+  amount?: number;
+  comment?: string;
+  offerStatus?: OfferStatus;
 };
 
 export type ChatEntry = {
@@ -100,6 +105,16 @@ export const CHAT_MESSAGES: Record<string, ChatMsg[]> = {
     { id: 'm6', type: 'text', from: 'me', text: 'შესანიშნავია! 16:00 სრულიად შესაფერისია.', t: '10:36', state: 'read' },
     { id: 'm7', type: 'text', from: 'other', text: 'გავიგე. ვიქნები 15:55-ზე. ღირებულება დაახლ. 80–120₾.', t: '10:37', state: 'read' },
     { id: 'm8', type: 'text', from: 'me', text: 'ძალიან კარგი! გელოდებით.', t: '10:38', state: 'sent' },
+    {
+      id: 'offer1',
+      type: 'offer',
+      from: 'other',
+      t: '10:39',
+      state: 'read',
+      amount: 100,
+      comment: 'ონკანის ჩასანაცვლებელი ნაწილი ცალკე ჯდება.',
+      offerStatus: 'pending',
+    },
   ],
   p2: [
     { id: 'd0', type: 'date', from: 'other', label: 'გუშინ' },

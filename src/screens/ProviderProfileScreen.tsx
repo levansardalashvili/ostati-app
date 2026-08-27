@@ -23,6 +23,7 @@ import { Button } from '../components/Button';
 import { ProfileMenuRow } from '../components/ProfileMenuRow';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
+import { getUnreadCount } from '../data/mockNotifications';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -35,7 +36,7 @@ const MENU = [
   { icon: MapPin, label: 'დაფარვის რაიონები', bg: '#ECFDF5', color: '#059669', badge: 0 },
   { icon: Briefcase, label: 'შესრულებული სამუშაოები', bg: '#F5F3FF', color: '#7C3AED', badge: 312 },
   { icon: Star, label: 'შეფასებები', bg: '#FFFBEB', color: '#D97706', badge: 127 },
-  { icon: Bell, label: 'შეტყობინებები', bg: colors.muted, color: colors.mutedForeground, badge: 3 },
+  { icon: Bell, label: 'შეტყობინებები', bg: colors.muted, color: colors.mutedForeground, badge: getUnreadCount('provider') },
   { icon: HelpCircle, label: 'დახმარება', bg: '#ECFEFF', color: '#0891B2', badge: 0 },
   { icon: Settings, label: 'ანგარიშის პარამეტრები', bg: colors.muted, color: colors.mutedForeground, badge: 0 },
 ];
@@ -51,8 +52,23 @@ const STATS = [
 export function ProviderProfileScreen({ navigation }: Props) {
   const [logoutSheetOpen, setLogoutSheetOpen] = useState(false);
 
-  const handleMenuPress = (_label: string) => {
-    // TODO: ამ მენიუს პუნქტების ეკრანები ჯერ არ არსებობს
+  const handleMenuPress = (label: string) => {
+    if (label === 'preview') {
+      navigation.navigate('ViewProviderProfile', { id: 'p1' });
+    } else if (label === 'პროფილის რედაქტირება' || label === 'photo') {
+      navigation.navigate('ProviderEditProfile');
+    } else if (label === 'დაფარვის რაიონები') {
+      navigation.navigate('ProviderServiceAreas');
+    } else if (label === 'შესრულებული სამუშაოები') {
+      navigation.navigate('ProviderCompletedJobs');
+    } else if (label === 'შეფასებები') {
+      navigation.navigate('ProviderReviews');
+    } else if (label === 'შეტყობინებები') {
+      navigation.navigate('Notifications', { role: 'provider' });
+    } else if (label === 'ანგარიშის პარამეტრები') {
+      navigation.navigate('ProfileSettings');
+    }
+    // "დახმარება" — TODO: ეს ეკრანი ზიპშივე არ არსებობდა (screen: null)
   };
 
   const confirmLogout = () => {

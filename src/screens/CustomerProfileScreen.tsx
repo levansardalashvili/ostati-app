@@ -10,6 +10,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { ProfileMenuRow } from '../components/ProfileMenuRow';
 import { colors, radius, spacing, typography } from '../theme';
+import { getUnreadCount } from '../data/mockNotifications';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -20,7 +21,7 @@ type Props = CompositeScreenProps<
 const MENU = [
   { icon: Briefcase, label: 'ჩემი მოთხოვნები', bg: '#EFF6FF', color: '#2563EB', badge: 3 },
   { icon: Pencil, label: 'პროფილის რედაქტირება', bg: '#F5F3FF', color: '#7C3AED', badge: 0 },
-  { icon: Bell, label: 'შეტყობინებები', bg: '#FFFBEB', color: '#D97706', badge: 2 },
+  { icon: Bell, label: 'შეტყობინებები', bg: '#FFFBEB', color: '#D97706', badge: getUnreadCount('customer') },
   { icon: HelpCircle, label: 'დახმარება', bg: '#ECFDF5', color: '#059669', badge: 0 },
   { icon: Settings, label: 'ანგარიშის პარამეტრები', bg: colors.muted, color: colors.mutedForeground, badge: 0 },
 ];
@@ -30,8 +31,17 @@ const MENU = [
 export function CustomerProfileScreen({ navigation }: Props) {
   const [logoutSheetOpen, setLogoutSheetOpen] = useState(false);
 
-  const handleMenuPress = (_label: string) => {
-    // TODO: ამ მენიუს პუნქტების ეკრანები ჯერ არ არსებობს
+  const handleMenuPress = (label: string) => {
+    if (label === 'ჩემი მოთხოვნები') {
+      navigation.navigate('CustomerJobs');
+    } else if (label === 'პროფილის რედაქტირება' || label === 'edit') {
+      navigation.navigate('CustomerEditProfile');
+    } else if (label === 'შეტყობინებები') {
+      navigation.navigate('Notifications', { role: 'customer' });
+    } else if (label === 'ანგარიშის პარამეტრები') {
+      navigation.navigate('ProfileSettings');
+    }
+    // "დახმარება" — TODO: ეს ეკრანი ზიპშივე არ არსებობდა (screen: null)
   };
 
   const confirmLogout = () => {

@@ -1,7 +1,20 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Briefcase, Check, Clock, MapPin, MessageCircle, MoreVertical, Pencil, Star, X, Zap, Image as ImageIcon } from 'lucide-react-native';
+import {
+  Briefcase,
+  Check,
+  CheckCircle2,
+  Clock,
+  MapPin,
+  MessageCircle,
+  MoreVertical,
+  Pencil,
+  Star,
+  X,
+  Zap,
+  Image as ImageIcon,
+} from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
@@ -12,16 +25,18 @@ import { StatusPill, type JobStatus } from '../components/StatusPill';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
-import { CUSTOMER_JOBS, INTERESTED_PROVIDERS, PHOTO_COLORS, Provider } from '../data/mockHomeData';
+import { CUSTOMER_JOBS, INTERESTED_PROVIDERS, PHOTO_COLORS, Provider, RatingData, SUBMITTED_RATINGS } from '../data/mockHomeData';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerJobDetail'>;
 
+const PROBLEM_OPTIONS = ['ოსტატი ჯერ არ მოსულა', 'სამუშაო ჯერ არ დასრულებულა', 'სამუშაოს ხარისხი დაბალია', 'სხვა'];
+
 // C3 — Job-ის დეტალი + დაინტერესებული ოსტატების სია, და C4 — ოსტატის
 // არჩევის დადასტურება (product-spec.md; დიზაინის რეფერენსში ეს ორივე ერთი
 // და იმავე CustomerJobDetail კომპონენტის ორი მდგომარეობაა — ჩვენც ასე
-// ავაშენეთ). სამუშაოს დასრულების/შეფასების ნაკადი (product-spec.md-ის
-// ცალკე პუნქტი #14) ამ ეტაპზე გამოტოვებულია.
+// ავაშენეთ). სამუშაოს დასრულების დადასტურება/შეფასების ნაკადი (product-spec.md
+// პუნქტი #14) — ზუსტად ზიპის App.tsx-ის CustomerJobDetail-ის მიხედვით.
 export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const job = useMemo(
     () => CUSTOMER_JOBS.find((j) => j.id === route.params.jobId) ?? CUSTOMER_JOBS[1],
@@ -37,12 +52,22 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     () => interestedList.find((p) => p.name === job.provider) ?? null,
   );
 
-  const effectiveStatus: JobStatus = cancelled ? 'cancelled' : selectedProvider ? 'active' : job.status;
+  // დასრულების/პრობლემის/შეფასების ნაკადი
+  const [jobCompleted, setJobCompleted] = useState(job.status === 'completed');
+  const [completionSheetOpen, setCompletionSheetOpen] = useState(false);
+  const [problemSheetOpen, setProblemSheetOpen] = useState(false);
+  const [problemOption, setProblemOption] = useState<string | null>(null);
+  const [problemOther, setProblemOther] = useState('');
+  const [problemSubmitted, setProblemSubmitted] = useState(false);
+  const [ratingData, setRatingData] = useState<RatingData | null>(() => SUBMITTED_RATINGS[job.id] ?? null);
+
+  const effectiveStatus: JobStatus = cancelled ? 'cancelled' : jobCompleted ? 'completed' : selectedProvider ? 'active' : job.status;
+  const showCompletionCard = effectiveStatus === 'active' && !!selectedProvider && !jobCompleted && !problemSubmitted;
 
   const progressSteps = [
     { label: 'მოთხოვნა გამოქვეყნდა', done: true },
     { label: 'ოსტატი შეირჩა', done: !!selectedProvider },
-    { label: 'სამუშაო დასრულდა', done: false },
+    { label: 'სამუშაო დასრულდა', done: jobCompleted },
   ];
 
   const handleEdit = () => {
@@ -58,8 +83,8 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       role: 'customer',
     });
   };
-  const handleOpenProfile = (_provider: Provider) => {
-    // TODO: Provider Profile ეკრანი ჯერ არ არსებობს
+  const handleOpenProfile = (provider: Provider) => {
+    navigation.navigate('ViewProviderProfile', { id: provider.id });
   };
   const confirmSelection = () => {
     if (!confirmProvider) return;
@@ -69,6 +94,24 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const confirmCancel = () => {
     setCancelled(true);
     setCancelSheetOpen(false);
+  };
+  const markCompleted = () => {
+    setJobCompleted(true);
+    setCompletionSheetOpen(true);
+  };
+  const openRating = () => {
+    navigation.navigate('RatingScreen', {
+      jobId: job.id,
+      providerName: selectedProvider?.name ?? 'გიორგი ბერიძე',
+      providerInitials: selectedProvider?.initials ?? 'გბ',
+      providerColor: selectedProvider?.color ?? colors.primary,
+      onRate: (data) => setRatingData(data),
+    });
+  };
+  const submitProblem = () => {
+    if (!problemOption || (problemOption === 'სხვა' && !problemOther.trim())) return;
+    setProblemSheetOpen(false);
+    setProblemSubmitted(true);
   };
 
   return (
@@ -160,6 +203,83 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
                 </View>
               </View>
             ))}
+          </View>
+        )}
+
+        {showCompletionCard && (
+          <View style={styles.completionCard}>
+            <View style={styles.completionHeaderRow}>
+              <Clock size={15} color={colors.warning} />
+              <Text style={styles.completionTitle}>სამუშაო დასრულდა?</Text>
+            </View>
+            <Text style={styles.completionSubtitle}>დაადასტურე, შესრულდა თუ არა სამუშაო.</Text>
+            {selectedProvider && (
+              <View style={styles.completionProviderRow}>
+                <Avatar initials={selectedProvider.initials} color={selectedProvider.color} size={38} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.completionProviderName}>{selectedProvider.name}</Text>
+                  <View style={styles.providerStat}>
+                    <Star size={11} color="#FBBF24" fill="#FBBF24" />
+                    <Text style={styles.providerStatMuted}>{selectedProvider.rating}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+            <View style={styles.completionActionsRow}>
+              <Pressable style={styles.problemButton} onPress={() => setProblemSheetOpen(true)}>
+                <Text style={styles.problemButtonText}>პრობლემა მაქვს</Text>
+              </Pressable>
+              <Pressable style={styles.completeButton} onPress={markCompleted}>
+                <Text style={styles.completeButtonText}>დიახ, დასრულდა</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {problemSubmitted && !jobCompleted && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>მოთხოვნა ჯერ არ არის დასრულებული</Text>
+            <Text style={styles.problemSubmittedText}>შეგიძლია გააგრძელო საუბარი ოსტატთან ჩატში.</Text>
+            {selectedProvider && (
+              <Pressable style={styles.chatOpenButton} onPress={() => handleOpenChat(selectedProvider)}>
+                <MessageCircle size={14} color={colors.primaryForeground} />
+                <Text style={styles.chatOpenButtonText}>ჩატის გახსნა</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {jobCompleted && (
+          <View style={styles.section}>
+            {ratingData ? (
+              <>
+                <Text style={styles.sectionTitle}>შენი შეფასება</Text>
+                <View style={styles.ratingStarsRow}>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star key={s} size={20} color="#FBBF24" fill={ratingData.stars >= s ? '#FBBF24' : 'transparent'} />
+                  ))}
+                  <Text style={styles.ratingStarsLabel}>{ratingData.stars}.0</Text>
+                </View>
+                {ratingData.chips.length > 0 && (
+                  <View style={styles.ratingChipsRow}>
+                    {ratingData.chips.map((c) => (
+                      <View key={c} style={styles.ratingChip}>
+                        <Text style={styles.ratingChipText}>{c}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {!!ratingData.review && <Text style={styles.ratingReviewText}>"{ratingData.review}"</Text>}
+              </>
+            ) : (
+              <>
+                <Text style={styles.problemSubmittedText}>სამუშაო დასრულდა. შეგიძლია შეაფასო ოსტატი.</Text>
+                <Pressable style={styles.rateButton} onPress={openRating}>
+                  <Star size={15} color={colors.primaryForeground} fill={colors.primaryForeground} />
+                  <Text style={styles.rateButtonText}>ოსტატის შეფასება</Text>
+                </Pressable>
+              </>
+            )}
           </View>
         )}
 
@@ -294,6 +414,62 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
         <Pressable style={styles.sheetCancelLink} onPress={() => setCancelSheetOpen(false)}>
           <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
         </Pressable>
+      </BottomSheet>
+
+      <BottomSheet visible={completionSheetOpen} onClose={() => setCompletionSheetOpen(false)}>
+        <View style={styles.completionSheetIcon}>
+          <CheckCircle2 size={28} color={colors.success} />
+        </View>
+        <Text style={styles.sheetTitle}>სამუშაო დასრულებულად მოინიშნა</Text>
+        <Text style={styles.sheetSubtitle}>შეგიძლია ახლა შეაფასო ოსტატი.</Text>
+        <Button
+          label="ოსტატის შეფასება"
+          onPress={() => {
+            setCompletionSheetOpen(false);
+            openRating();
+          }}
+        />
+        <Pressable style={styles.sheetCancelLink} onPress={() => setCompletionSheetOpen(false)}>
+          <Text style={styles.sheetCancelLinkText}>მოგვიანებით</Text>
+        </Pressable>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={problemSheetOpen}
+        onClose={() => {
+          setProblemSheetOpen(false);
+          setProblemOption(null);
+          setProblemOther('');
+        }}
+      >
+        <Text style={styles.sheetTitle}>რა პრობლემა გაქვს?</Text>
+        <Text style={styles.problemIntro}>აირჩიე სიტუაცია, რომელიც შენი სიტუაციის შესაბამისია.</Text>
+        {PROBLEM_OPTIONS.map((opt) => {
+          const on = problemOption === opt;
+          return (
+            <Pressable key={opt} style={[styles.problemOption, on && styles.problemOptionOn]} onPress={() => setProblemOption(opt)}>
+              <View style={[styles.radioOuter, on && styles.radioOuterOn]}>{on && <View style={styles.radioInner} />}</View>
+              <Text style={[styles.problemOptionText, on && styles.problemOptionTextOn]}>{opt}</Text>
+            </Pressable>
+          );
+        })}
+        {problemOption === 'სხვა' && (
+          <TextInput
+            value={problemOther}
+            onChangeText={setProblemOther}
+            placeholder="აღწერე პრობლემა..."
+            placeholderTextColor={colors.mutedForeground}
+            multiline
+            numberOfLines={3}
+            style={styles.problemTextarea}
+          />
+        )}
+        <Button
+          label="გაგზავნა"
+          onPress={submitProblem}
+          disabled={!problemOption || (problemOption === 'სხვა' && !problemOther.trim())}
+          style={{ marginTop: spacing.sm }}
+        />
       </BottomSheet>
     </SafeAreaView>
   );
@@ -669,5 +845,215 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'center',
     marginBottom: spacing.sm + 2,
+  },
+  completionCard: {
+    backgroundColor: colors.warningBackground,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+  },
+  completionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+    marginBottom: spacing.xs,
+  },
+  completionTitle: {
+    ...typography.captionMedium,
+    color: colors.warning,
+    fontWeight: '700',
+  },
+  completionSubtitle: {
+    ...typography.small,
+    color: colors.warning,
+    marginBottom: spacing.sm + 2,
+    lineHeight: 18,
+  },
+  completionProviderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: radius.md,
+    padding: spacing.sm + 4,
+    marginBottom: spacing.sm + 2,
+  },
+  completionProviderName: {
+    ...typography.captionMedium,
+    color: colors.foreground,
+    fontWeight: '600',
+  },
+  completionActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  problemButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  problemButtonText: {
+    ...typography.small,
+    color: colors.foreground,
+    fontWeight: '600',
+  },
+  completeButton: {
+    flex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.success,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  completeButtonText: {
+    ...typography.small,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  problemSubmittedText: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    marginBottom: spacing.sm + 2,
+    lineHeight: 18,
+  },
+  chatOpenButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  chatOpenButtonText: {
+    ...typography.small,
+    color: colors.primaryForeground,
+    fontWeight: '700',
+  },
+  ratingStarsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginBottom: spacing.sm,
+  },
+  ratingStarsLabel: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    fontWeight: '700',
+    marginLeft: spacing.xs + 2,
+  },
+  ratingChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs + 2,
+    marginBottom: spacing.sm,
+  },
+  ratingChip: {
+    backgroundColor: colors.secondary,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs,
+  },
+  ratingChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.secondaryForeground,
+  },
+  ratingReviewText: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  rateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 6,
+  },
+  rateButtonText: {
+    ...typography.captionMedium,
+    color: colors.primaryForeground,
+    fontWeight: '700',
+  },
+  completionSheetIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.full,
+    backgroundColor: colors.successBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: spacing.sm + 2,
+  },
+  problemIntro: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    marginBottom: spacing.md,
+  },
+  problemOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 6,
+    marginBottom: spacing.sm,
+  },
+  problemOptionOn: {
+    borderColor: colors.primary,
+    backgroundColor: colors.secondary,
+  },
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioOuterOn: {
+    borderColor: colors.primary,
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+  },
+  problemOptionText: {
+    ...typography.caption,
+    color: colors.foreground,
+    fontWeight: '500',
+  },
+  problemOptionTextOn: {
+    color: colors.secondaryForeground,
+  },
+  problemTextarea: {
+    ...typography.caption,
+    color: colors.foreground,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.sm + 6,
+    minHeight: 72,
+    textAlignVertical: 'top',
+    marginBottom: spacing.sm,
   },
 });

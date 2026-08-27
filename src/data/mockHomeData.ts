@@ -227,3 +227,15 @@ export const INTERESTED_PROVIDERS: Record<string, Provider[]> = {
 };
 
 export const PHOTO_COLORS = ['#DBEAFE', '#D1FAE5', '#FEF3C7', '#FCE7F3'];
+
+export type RatingData = { stars: number; review: string; chips: string[] };
+
+// job-ისთვის უკვე გაგზავნილი შეფასება — j3 წინასწარ შეფასებულია (ზიპის
+// SUBMITTED_RATINGS-ის მიხედვით), დანარჩენებისთვის ცარიელია.
+export const SUBMITTED_RATINGS: Record<string, RatingData> = {
+  j3: {
+    stars: 5,
+    review: 'ძალიან კარგი სამუშაო! დროულად მოვიდა და პრობლემა სწრაფად მოაგვარა.',
+    chips: ['დროულად მოვიდა', 'ხარისხიანი სამუშაო'],
+  },
+};
