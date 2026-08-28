@@ -9,16 +9,20 @@ import { Button } from '../components/Button';
 import { InlineBanner } from '../components/InlineBanner';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
+import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerEditProfile'>;
 
 // CustomerEditProfile — ზუსტად ზიპის App.tsx-ის CustomerEditProfile-ის
 // მიხედვით. პირველი შენახვა შეგნებულად ვარდება (საცდელი error-state
-// დემონსტრირებისთვის), მეორე ცდაზე წარმატებული.
+// დემონსტრირებისთვის), მეორე ცდაზე წარმატებული. წარმატებულ შენახვაზე
+// მონაცემები რეალურად იწერება CustomerProfileContext-ში (მანამდე
+// უბრალოდ იკარგებოდა navigation.goBack()-ზე).
 export function CustomerEditProfileScreen({ navigation }: Props) {
-  const [name, setName] = useState('ნინო სულაბერიძე');
-  const [location, setLocation] = useState('ვაკე, თბილისი');
+  const { profile, setProfile } = useCustomerProfile();
+  const [name, setName] = useState(`${profile.firstName} ${profile.lastName}`.trim());
+  const [address, setAddress] = useState(profile.defaultAddress);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const attemptRef = useRef(0);
@@ -35,6 +39,8 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
         setSaveError(true);
         attemptRef.current += 1;
       } else {
+        const [firstName, ...lastNameParts] = name.trim().split(' ');
+        setProfile({ firstName, lastName: lastNameParts.join(' '), defaultAddress: address.trim() });
         navigation.goBack();
       }
     }, 1000);
@@ -46,7 +52,7 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         <View style={styles.avatarRow}>
           <View style={styles.avatarWrap}>
-            <Avatar initials="ნს" color={colors.primary} size={88} />
+            <Avatar initials={`${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`} color={colors.primary} size={88} />
             <Pressable style={styles.cameraBadge}>
               <Camera size={14} color={colors.primaryForeground} />
             </Pressable>
@@ -55,12 +61,12 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
 
         <View style={{ gap: spacing.md }}>
           <TextField label="სახელი და გვარი" value={name} onChangeText={setName} error={nameErr} />
-          <TextField label="ადგილმდებარეობა" value={location} onChangeText={setLocation} placeholder="ქ., რაიონი" />
+          <TextField label="მისამართი" value={address} onChangeText={setAddress} placeholder="ქ., რაიონი" />
           <View>
             <Text style={styles.infoLabel}>ანგარიშის ინფორმაცია</Text>
             <View style={styles.infoCard}>
               <Text style={styles.infoCardLabel}>ელ. ფოსტა</Text>
-              <Text style={styles.infoCardValue}>nino.sulaberidze@gmail.com</Text>
+              <Text style={styles.infoCardValue}>{profile.email}</Text>
             </View>
             <Text style={styles.infoNote}>ელ. ფოსტის შეცვლისთვის დაგვიკავშირდით.</Text>
           </View>

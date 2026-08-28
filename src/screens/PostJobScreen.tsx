@@ -25,6 +25,7 @@ import { Button } from '../components/Button';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTIES } from '../data/specialties';
 import { TBILISI_AREAS } from '../data/districts';
+import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PostJob'>;
@@ -42,10 +43,15 @@ const DESCRIPTION_MIN = 20;
 // C2 — Post a Job ფორმა (product-spec.md; დიზაინის რეფერენსის PostJob-ის
 // მიხედვით, ფოტოს ლიმიტის override-ით 5-დან 3-მდე)
 export function PostJobScreen({ navigation }: Props) {
+  const { profile } = useCustomerProfile();
   const [category, setCategory] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<number[]>([]);
+  // მისამართი წინასწარ ივსება პროფილის default address-ით, მაგრამ აქ
+  // ცვლილება არასდროს არ სცვლის თავად default address-ს (მხოლოდ ამ
+  // კონკრეტული job post-ის მისამართია) — მომხმარებლის მოთხოვნით.
+  const [address, setAddress] = useState(profile.defaultAddress);
   const [district, setDistrict] = useState('');
   const [districtOpen, setDistrictOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
@@ -192,6 +198,18 @@ export function PostJobScreen({ navigation }: Props) {
               </>
             )}
           </View>
+        </View>
+
+        <View style={styles.field}>
+          <FieldLabel text="მისამართი" />
+          <TextInput
+            value={address}
+            onChangeText={setAddress}
+            placeholder="მაგ. ვაკე, ჭავჭავაძის 45"
+            placeholderTextColor={colors.mutedForeground}
+            style={styles.input}
+          />
+          <Text style={styles.hint}>ავტომატურად შეივსო შენი მისამართით — შეგიძლია შეცვალო ამ მოთხოვნისთვის.</Text>
         </View>
 
         <View style={styles.field}>

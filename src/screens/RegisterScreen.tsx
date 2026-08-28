@@ -16,6 +16,7 @@ import { GoogleButton } from '../components/GoogleButton';
 import { ProgressBar } from '../components/ProgressBar';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
+import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
@@ -25,10 +26,15 @@ const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 // A3 — რეგისტრაცია (product-spec.md, create-account-form.md).
 // მისამართის ველი customer-ისთვისაც ემატება — დიზაინის რეფერენსის
 // მიხედვით, პრიორიტეტის წესის თანახმად (ზიპი კონფლიქტში იმარჯვებს).
+// Customer-ისთვის "სახელი და გვარი" გაყოფილია ცალკე ველებად (მომხმარებლის
+// მოთხოვნით) — Provider-ისთვის ერთი ველი უცვლელად რჩება.
 export function RegisterScreen({ navigation, route }: Props) {
   const { role } = route.params;
+  const { setProfile } = useCustomerProfile();
 
   const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [pass, setPass] = useState('');
@@ -42,6 +48,8 @@ export function RegisterScreen({ navigation, route }: Props) {
 
   const errors = {
     name: touched.name && !name.trim() ? 'ეს ველი სავალდებულოა' : '',
+    firstName: touched.firstName && !firstName.trim() ? 'ეს ველი სავალდებულოა' : '',
+    lastName: touched.lastName && !lastName.trim() ? 'ეს ველი სავალდებულოა' : '',
     email:
       touched.email && !email
         ? 'ეს ველი სავალდებულოა'
@@ -63,11 +71,11 @@ export function RegisterScreen({ navigation, route }: Props) {
           : '',
   };
 
-  const allValid =
-    name.trim() && isEmail(email) && address.trim() && pass.length >= 8 && pass === confirm && agreed;
+  const nameValid = role === 'provider' ? !!name.trim() : !!firstName.trim() && !!lastName.trim();
+  const allValid = nameValid && isEmail(email) && address.trim() && pass.length >= 8 && pass === confirm && agreed;
 
   const handleSubmit = () => {
-    setTouched({ name: true, email: true, address: true, pass: true, confirm: true });
+    setTouched({ name: true, firstName: true, lastName: true, email: true, address: true, pass: true, confirm: true });
     if (!allValid) return;
     setLoading(true);
     // TODO: Firebase Auth (createUserWithEmailAndPassword) დაემატება ავთენტიფიკაციის ეტაპზე
@@ -76,7 +84,13 @@ export function RegisterScreen({ navigation, route }: Props) {
       if (role === 'provider') {
         navigation.replace('ProviderSetup');
       } else {
-        navigation.replace('CustomerSetup', { userName: name.trim() });
+        setProfile({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim(),
+          defaultAddress: address.trim(),
+        });
+        navigation.replace('CustomerSetup', { userName: `${firstName.trim()} ${lastName.trim()}` });
       }
     }, 1200);
   };
@@ -111,14 +125,39 @@ export function RegisterScreen({ navigation, route }: Props) {
           <Text style={styles.subtitle}>შეიყვანე შენი მონაცემები რეგისტრაციის გასაგრძელებლად.</Text>
 
           <View style={styles.fields}>
-            <TextField
-              label="სახელი და გვარი"
-              value={name}
-              onChangeText={setName}
-              onBlur={() => touch('name')}
-              placeholder="მაგ. გიორგი ბერიძე"
-              error={errors.name}
-            />
+            {role === 'provider' ? (
+              <TextField
+                label="სახელი და გვარი"
+                value={name}
+                onChangeText={setName}
+                onBlur={() => touch('name')}
+                placeholder="მაგ. გიორგი ბერიძე"
+                error={errors.name}
+              />
+            ) : (
+              <View style={styles.nameRow}>
+                <View style={{ flex: 1 }}>
+                  <TextField
+                    label="სახელი"
+                    value={firstName}
+                    onChangeText={setFirstName}
+                    onBlur={() => touch('firstName')}
+                    placeholder="მაგ. ნინო"
+                    error={errors.firstName}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <TextField
+                    label="გვარი"
+                    value={lastName}
+                    onChangeText={setLastName}
+                    onBlur={() => touch('lastName')}
+                    placeholder="მაგ. სულაბერიძე"
+                    error={errors.lastName}
+                  />
+                </View>
+              </View>
+            )}
             <TextField
               label="ელ. ფოსტა"
               value={email}
@@ -239,6 +278,10 @@ const styles = StyleSheet.create({
   },
   fields: {
     gap: spacing.md,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    gap: spacing.sm + 2,
   },
   termsRow: {
     flexDirection: 'row',

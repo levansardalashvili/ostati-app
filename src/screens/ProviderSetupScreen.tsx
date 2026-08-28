@@ -8,14 +8,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, Check, User } from 'lucide-react-native';
+import { Camera, ChevronRight, MapPin, User } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
-import { Chip } from '../components/Chip';
 import { ProgressBar } from '../components/ProgressBar';
+import { SpecialtyPickerField, type SelectedSpecialty } from '../components/SpecialtyPickerField';
 import { colors, radius, spacing, typography } from '../theme';
-import { TBILISI_AREAS } from '../data/districts';
-import { SPECIALTIES } from '../data/specialties';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderSetup'>;
@@ -25,20 +23,21 @@ const ABOUT_MAX = 300;
 // A4 — პროფილის შევსება (Provider) (product-spec.md; დიზაინის რეფერენსის
 // ProviderSetupScreen-ის მიხედვით)
 export function ProviderSetupScreen({ navigation }: Props) {
-  const [specs, setSpecs] = useState<string[]>([]);
+  const [specialty, setSpecialty] = useState<SelectedSpecialty>(null);
   const [years, setYears] = useState(3);
   const [areas, setAreas] = useState<string[]>([]);
   const [about, setAbout] = useState('');
   const [loading, setLoading] = useState(false);
   const [hasPhoto, setHasPhoto] = useState(false);
 
-  const toggleSpec = (id: string) =>
-    setSpecs((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const canSave = !!specialty && areas.length > 0;
 
-  const toggleArea = (area: string) =>
-    setAreas((s) => (s.includes(area) ? s.filter((x) => x !== area) : [...s, area]));
-
-  const canSave = specs.length > 0 && areas.length > 0;
+  const openAreaPicker = () => {
+    navigation.navigate('RegionAreaPicker', {
+      selected: areas,
+      onSave: (next) => setAreas(next),
+    });
+  };
 
   const handleContinue = () => {
     if (!canSave) return;
@@ -97,25 +96,8 @@ export function ProviderSetupScreen({ navigation }: Props) {
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>სპეციალიზაცია</Text>
-          <Text style={styles.sectionHint}>შეარჩიე ერთი ან მეტი</Text>
-          <View style={styles.specialtyList}>
-            {SPECIALTIES.map((sp) => {
-              const on = specs.includes(sp.id);
-              return (
-                <Pressable
-                  key={sp.id}
-                  onPress={() => toggleSpec(sp.id)}
-                  style={[styles.specialtyOption, on && styles.specialtyOptionSelected]}
-                >
-                  <Text style={styles.specialtyIcon}>{sp.icon}</Text>
-                  <Text style={[styles.specialtyLabel, on && styles.specialtyLabelSelected]}>
-                    {sp.label}
-                  </Text>
-                  {on && <Check size={16} color={colors.primary} strokeWidth={3} />}
-                </Pressable>
-              );
-            })}
-          </View>
+          <Text style={styles.sectionHint}>აირჩიე შენი ძირითადი პროფესია</Text>
+          <SpecialtyPickerField value={specialty} onChange={setSpecialty} />
         </View>
 
         <View style={styles.section}>
@@ -143,16 +125,13 @@ export function ProviderSetupScreen({ navigation }: Props) {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>სამუშაო რაიონები</Text>
           <Text style={styles.sectionHint}>სად გინდა მუშაობა?</Text>
-          <View style={styles.chipRow}>
-            {TBILISI_AREAS.map((area) => (
-              <Chip
-                key={area}
-                label={area}
-                selected={areas.includes(area)}
-                onPress={() => toggleArea(area)}
-              />
-            ))}
-          </View>
+          <Pressable style={styles.areaPickerButton} onPress={openAreaPicker}>
+            <MapPin size={16} color={colors.mutedForeground} />
+            <Text style={styles.areaPickerButtonText} numberOfLines={1}>
+              {areas.length > 0 ? areas.join(', ') : 'აირჩიე რაიონები'}
+            </Text>
+            <ChevronRight size={16} color={colors.mutedForeground} />
+          </Pressable>
         </View>
 
         <View style={styles.section}>
@@ -292,36 +271,6 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     marginBottom: spacing.sm,
   },
-  specialtyList: {
-    gap: spacing.sm,
-  },
-  specialtyOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  specialtyOptionSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.secondary,
-  },
-  specialtyIcon: {
-    fontSize: 20,
-    width: 28,
-    textAlign: 'center',
-  },
-  specialtyLabel: {
-    ...typography.captionMedium,
-    color: colors.foreground,
-    flex: 1,
-  },
-  specialtyLabelSelected: {
-    color: colors.secondaryForeground,
-  },
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -357,10 +306,21 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
   },
-  chipRow: {
+  areaPickerButton: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: spacing.sm,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  areaPickerButtonText: {
+    ...typography.caption,
+    color: colors.foreground,
+    flex: 1,
   },
   textarea: {
     ...typography.body,

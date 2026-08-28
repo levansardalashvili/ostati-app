@@ -9,14 +9,14 @@ import { colors, spacing, typography } from '../theme';
 import { GEORGIA_REGIONS } from '../data/georgiaRegions';
 import type { RootStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'ProviderServiceAreas'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'RegionAreaPicker'>;
 
-// ProviderServiceAreas — "დაფარვის რაიონები" პროფილის მენიუდან. იგივე
-// მხარეების/რაიონების accordion, რაც რეგისტრაციის RegionAreaPicker-ში
-// (RegionAreaAccordion კომპონენტი გაზიარებულია ორივეს შორის).
-export function ProviderServiceAreasScreen({ navigation }: Props) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(['ვაკე', 'საბურთალო', 'ვერა']));
-  const [saved, setSaved] = useState(false);
+// RegionAreaPicker — საქართველოს მხარეების/რაიონების არჩევა (ოსტატის
+// სამუშაო ტერიტორია), გამოძახებული ProviderSetup-ის რეგისტრაციის
+// ფორმიდან callback-ის საშუალებით (myhome.ge-ის მდებარეობის picker-ის
+// მსგავსი ინტერაქციით — მომხმარებლის მოწოდებული screenshot-ების მიხედვით).
+export function RegionAreaPickerScreen({ navigation, route }: Props) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(route.params.selected));
 
   const toggleDistrict = (district: string) => {
     setSelected((prev) => {
@@ -38,27 +38,22 @@ export function ProviderServiceAreasScreen({ navigation }: Props) {
   };
 
   const handleSave = () => {
-    if (selected.size === 0 || saved) return;
-    setSaved(true);
-    setTimeout(() => {
-      setSaved(false);
-      navigation.goBack();
-    }, 700);
+    route.params.onSave([...selected]);
+    navigation.goBack();
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <BackHeader title="დაფარვის რაიონები" onBack={() => navigation.goBack()} />
+      <BackHeader title="სამუშაო რაიონები" onBack={() => navigation.goBack()} />
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-        <Text style={styles.intro}>აირჩიე რაიონები, სადაც სამუშაოს შესრულება შეგიძლია.</Text>
         <RegionAreaAccordion selected={selected} onToggleDistrict={toggleDistrict} onToggleAllInRegion={toggleAllInRegion} />
       </ScrollView>
 
       <View style={styles.footer}>
         <Text style={styles.footerNote}>
-          {selected.size > 0 ? `${selected.size} რაიონი შერჩეულია` : 'რაიონი არ არის შერჩეული'}
+          {selected.size > 0 ? `არჩეულია ${selected.size} რაიონი` : 'რაიონი არ არის შერჩეული'}
         </Text>
-        <Button label={saved ? 'შენახულია!' : 'შენახვა'} onPress={handleSave} disabled={selected.size === 0 || saved} />
+        <Button label="შენახვა" onPress={handleSave} disabled={selected.size === 0} />
       </View>
     </SafeAreaView>
   );
@@ -75,12 +70,6 @@ const styles = StyleSheet.create({
   bodyContent: {
     padding: spacing.lg,
     paddingBottom: spacing.xxl * 2,
-  },
-  intro: {
-    ...typography.caption,
-    color: colors.mutedForeground,
-    marginBottom: spacing.md,
-    lineHeight: 20,
   },
   footer: {
     position: 'absolute',
@@ -99,6 +88,5 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
     textAlign: 'center',
-    marginBottom: spacing.xs,
   },
 });

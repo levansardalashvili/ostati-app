@@ -11,6 +11,7 @@ import { Button } from '../components/Button';
 import { ProfileMenuRow } from '../components/ProfileMenuRow';
 import { colors, radius, spacing, typography } from '../theme';
 import { getUnreadCount } from '../data/mockNotifications';
+import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -29,6 +30,8 @@ const MENU = [
 // E2 — Customer-ის პროფილის ეკრანი (product-spec.md; დიზაინის რეფერენსის
 // CustomerProfile-ის მიხედვით)
 export function CustomerProfileScreen({ navigation }: Props) {
+  const { profile } = useCustomerProfile();
+  const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`;
   const [logoutSheetOpen, setLogoutSheetOpen] = useState(false);
 
   const handleMenuPress = (label: string) => {
@@ -55,16 +58,18 @@ export function CustomerProfileScreen({ navigation }: Props) {
         <Text style={styles.title}>პროფილი</Text>
         <View style={styles.profileRow}>
           <View style={styles.avatarWrap}>
-            <Avatar initials="ნს" color={colors.primary} size={72} />
+            <Avatar initials={initials} color={colors.primary} size={72} />
             <Pressable style={styles.cameraBadge} onPress={() => handleMenuPress('photo')}>
               <Camera size={10} color={colors.primaryForeground} />
             </Pressable>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.name}>ნინო სულაბერიძე</Text>
+            <Text style={styles.name}>
+              {profile.firstName} {profile.lastName}
+            </Text>
             <View style={styles.locationRow}>
               <MapPin size={12} color={colors.mutedForeground} />
-              <Text style={styles.locationText}>თბილისი, ვაკე</Text>
+              <Text style={styles.locationText}>{profile.defaultAddress}</Text>
             </View>
             <Pressable style={styles.editButton} onPress={() => handleMenuPress('edit')}>
               <Pencil size={11} color={colors.primary} />

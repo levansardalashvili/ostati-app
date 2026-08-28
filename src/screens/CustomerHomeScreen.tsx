@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, FileText, MapPin, MessageCircle, Plus, Search, Star, X } from 'lucide-react-native';
+import { Bell, FileText, LayoutGrid, MapPin, MessageCircle, Plus, Search, Star, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
@@ -22,6 +22,7 @@ import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
 import { TBILISI_AREAS as DISTRICTS } from '../data/districts';
 import { PROVIDERS, Provider } from '../data/mockHomeData';
 import { getUnreadCount } from '../data/mockNotifications';
+import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -31,17 +32,15 @@ type Props = CompositeScreenProps<
 
 const MOCK_UNREAD_COUNT = getUnreadCount('customer');
 
-const SPEC_CATS = [
-  { id: 'plumbing', label: 'სანტექნიკოსი', icon: '🔧' },
-  { id: 'electrical', label: 'ელექტრიკოსი', icon: '⚡' },
-  { id: 'painting', label: 'მღებავი', icon: '🖌️' },
-  { id: 'furniture', label: 'ავეჯის სპეც.', icon: '🪑' },
-  { id: 'ac', label: 'კონდ. სპეც.', icon: '❄️' },
-];
+// 3 ყველაზე მოთხოვნადი სერვისი, რომლებიც პირდაპირ Home-ის ეკრანზე ჩანს
+// (დანარჩენი 12 კატეგორია "ყველა სერვისი" ღილაკის მიღმაა)
+const TOP_CATEGORY_IDS = ['plumbing', 'electrical', 'cleaning'];
 
 // C1 — Customer Home / Browse (product-spec.md; დიზაინის რეფერენსის
 // CustomerHome-ის მიხედვით)
 export function CustomerHomeScreen({ navigation }: Props) {
+  const { profile } = useCustomerProfile();
+  const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`;
   const [search, setSearch] = useState('');
   const [selCats, setSelCats] = useState<Set<string>>(new Set());
   const [selDistrict, setSelDistrict] = useState<string | null>(null);
@@ -96,15 +95,24 @@ export function CustomerHomeScreen({ navigation }: Props) {
   const handlePostJob = () => {
     navigation.navigate('PostJob');
   };
+  const handleAllServices = () => {
+    navigation.navigate('CustomerCategories');
+  };
+
+  const topCategories = TOP_CATEGORY_IDS.map((id) => CATEGORIES.find((c) => c.id === id)).filter(
+    (c): c is (typeof CATEGORIES)[number] => !!c,
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
-          <Avatar initials="ნს" color="#7C3AED" size={38} />
+          <Avatar initials={initials} color="#7C3AED" size={38} />
           <View style={styles.headerText}>
             <Text style={styles.greeting}>გამარჯობა,</Text>
-            <Text style={styles.name}>ნინო სულაბ. 👋</Text>
+            <Text style={styles.name} numberOfLines={1}>
+              {profile.firstName} {profile.lastName.charAt(0)}. 👋
+            </Text>
           </View>
           <Pressable style={styles.bellButton} onPress={handleNotifications}>
             <Bell size={19} color={colors.foreground} strokeWidth={1.8} />
@@ -141,37 +149,33 @@ export function CustomerHomeScreen({ navigation }: Props) {
               </Pressable>
             )}
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-            <Chip variant="filled" label="ყველა" selected={selCats.size === 0} onPress={() => setSelCats(new Set())} />
-            {SPEC_CATS.map((c) => (
-              <Chip
-                key={c.id}
-                variant="filled"
-                label={`${c.icon} ${c.label}`}
-                selected={selCats.has(c.id)}
-                onPress={() => toggleCat(c.id)}
-              />
-            ))}
-          </ScrollView>
-
-          {selCats.size > 0 && (
-            <View style={styles.selectedPills}>
-              {[...selCats].map((id) => {
-                const c = SPEC_CATS.find((x) => x.id === id);
-                if (!c) return null;
-                return (
-                  <View key={id} style={styles.pill}>
-                    <Text style={styles.pillText}>
-                      {c.icon} {c.label}
-                    </Text>
-                    <Pressable onPress={() => toggleCat(id)}>
-                      <X size={10} color={colors.secondaryForeground} strokeWidth={2.5} />
-                    </Pressable>
+          <View style={styles.serviceGrid}>
+            {topCategories.map((c) => {
+              const selected = selCats.has(c.id);
+              return (
+                <Pressable
+                  key={c.id}
+                  style={[styles.serviceCard, selected && styles.serviceCardSelected]}
+                  onPress={() => toggleCat(c.id)}
+                >
+                  <View style={[styles.serviceIconWrap, { backgroundColor: c.bg }]}>
+                    <Text style={styles.serviceIcon}>{c.icon}</Text>
                   </View>
-                );
-              })}
-            </View>
-          )}
+                  <Text style={styles.serviceLabel} numberOfLines={2}>
+                    {c.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            <Pressable style={styles.serviceCard} onPress={handleAllServices}>
+              <View style={[styles.serviceIconWrap, { backgroundColor: colors.secondary }]}>
+                <LayoutGrid size={20} color={colors.secondaryForeground} />
+              </View>
+              <Text style={styles.serviceLabel} numberOfLines={2}>
+                ყველა სერვისი
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -443,27 +447,44 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingRight: spacing.lg,
   },
-  selectedPills: {
+  serviceGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
+    gap: spacing.sm,
   },
-  pill: {
+  serviceCard: {
+    width: '47%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: colors.accent,
-    borderRadius: radius.full,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 4,
+    gap: spacing.sm,
   },
-  pillText: {
-    ...typography.small,
-    color: colors.secondaryForeground,
+  serviceCardSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.secondary,
+  },
+  serviceIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  serviceIcon: {
+    fontSize: 17,
+  },
+  serviceLabel: {
+    fontSize: 12,
     fontWeight: '600',
+    color: colors.foreground,
+    flex: 1,
+    lineHeight: 15,
   },
   resultsTitle: {
     ...typography.h3,

@@ -31,8 +31,8 @@
 
 **მხოლოდ Email/Password + Google Sign-In.** არა ტელეფონის ნომერი, არა SMS/OTP ვერიფიკაცია — ეს წესი აშკარად ამორიცხულია დიზაინის რეფერენსიდან (`create-account-form.md`).
 
-- რეგისტრაცია: სახელი, გვარი, ელფოსტა, **მისამართი** (customer-ისთვისაც — დიზაინის რეფერენსის დამატება `product-spec.md`-ის საწყის აღწერაზე, პრიორიტეტის წესით), პაროლი+დადასტურება
-- Google რეგისტრაცია: სახელი/ელფოსტა/ფოტო წამოღებულია Google-იდან, მომხმარებელი მხოლოდ აკლებს მისამართს (`GoogleCompleteScreen`)
+- რეგისტრაცია: ელფოსტა, **მისამართი** (customer-ისთვისაც — დიზაინის რეფერენსის დამატება `product-spec.md`-ის საწყის აღწერაზე, პრიორიტეტის წესით), პაროლი+დადასტურება. **სახელი/გვარი: Customer-ისთვის ორ ცალკე ველად** (`სახელი`, `გვარი`) — მომხმარებლის აშკარა მოთხოვნით override-ავს ზიპის ერთიან "სახელი და გვარი" ველს; Provider-ისთვის ზიპის მიხედვით ერთი ველი უცვლელად რჩება (`RegisterScreen.tsx`-ში `role`-ზე დამოკიდებული branch).
+- Google რეგისტრაცია: სახელი/ელფოსტა/ფოტო წამოღებულია Google-იდან, მომხმარებელი მხოლოდ აკლებს მისამართს (`GoogleCompleteScreen`). Customer-ისთვის mock Google-ის სახელი იყოფა firstName/lastName-ად პირველი space-ით.
 - როლი (Customer/Provider) აირჩევა registration-მდე (`RoleSelectScreen`) და გადაეცემა navigation param-ად Register/GoogleComplete ეკრანებზე — **Login ეკრანს როლი არ სჭირდება** (რეალურ ანგარიშში როლი უკვე განსაზღვრულია, Firestore-დან უნდა წამოვიდეს ავტორიზაციის შემდეგ)
 - **ჯერ არ არის დაკავშირებული რეალურ Firebase-თან** — ყველა submit handler-ს აქვს `// TODO: Firebase Auth ...` კომენტარი და მუშავდება მხოლოდ ლოკალური state/loading simulation-ით. Firebase პროექტი უკვე შექმნილია (`google-services.json` placeholder-ის ნაცვლად რეალურით ჩანაცვლებულია), მაგრამ auth/firestore/storage კოდი ჯერ არ არის დაწერილი.
 
@@ -57,8 +57,13 @@
 3. **ფოტოს ატვირთვის ლიმიტი job post-ში — 1-3 ფოტო**, არა 5 (დიზაინის რეფერენსზე override).
 4. **ერთ ანგარიშს ერთი როლი.** არა role-switch UI.
 5. **ერთი აქცენტის ფერი მთელ აპში** (`#2563EB`) — დიზაინის რეფერენსში RoleSelect-ის ბარათებს ჰქონდა ლურჯი/იისფერი split, მაგრამ ეს override-ავს `product-spec.md`-ის ზოგადი დიზაინის წესით (`src/theme/colors.ts`).
-6. **Job-ის სტატუსების ციკლი:** მომლოდინე → დადასტურებულია → დასრულების დადასტურების მოთხოვნა → დახურული + შეფასება.
+6. **Job-ის სტატუსების ციკლი:** მომლოდინე → დადასტურებულია → დასრულების დადასტურების მოთხოვნა → დახურული + შეფასება. **Implementiert** — `CustomerJobDetailScreen`-ს აქვს სრული დასრულების/პრობლემის/შეფასების flow (ამბერ card "სამუშაო დასრულდა?" → celebration BottomSheet → `RatingScreen`), ზუსტად ზიპის App.tsx-ის CustomerJobDetail-ის მიხედვით. `ProviderJobDetailScreen`-ს დაემატა `completed` mode (მიღებული შეფასების ჩვენებით).
 7. **ტელეფონის ნომერი/საკონტაქტო ინფო არასდროს ჩანს ავტომატურად** — მხოლოდ ორმხრივი გადაწყვეტილებით ჩატში.
+8. **Provider-ის სპეციალობის არჩევა — dropdown + "სხვა", ერთი არჩევანი.** მომხმარებლის დაფიქსირებული გადაწყვეტილებით override-ავს ზიპის მრავალარჩევანიან chip-ებს. გაზიარებული კომპონენტი `src/components/SpecialtyPickerField.tsx` (ველი + BottomSheet სია + "სხვა"-ს თავისუფალი ტექსტი) — გამოიყენება `ProviderSetupScreen`-სა და `ProviderEditProfileScreen`-ში.
+9. **Provider-ის სამუშაო რაიონები — მთელი საქართველოს მხარეები**, არა მხოლოდ თბილისის რაიონები. `src/data/georgiaRegions.ts` (11 მხარე, თბილისის რაიონები `districts.ts`-იდან საერთო წყაროა), გაზიარებული accordion კომპონენტი `src/components/RegionAreaAccordion.tsx` (მხარე იშლება, პირველი პუნქტი "ყველას მონიშვნა", მერე ცალკეული რაიონები) — გამოიყენება რეგისტრაციის `RegionAreaPickerScreen`-შიც (callback-ის საშუალებით, ცალკე root-stack ეკრანი) და პროფილის `ProviderServiceAreasScreen`-შიც (პირდაპირ ჩაშენებული).
+10. **სერვისის კატეგორიები — 15 კატეგორია** (`src/data/categories.ts`), მომხმარებლის მიწოდებული სრული სია. Customer Home-ის "სერვისები" სექცია აღარ არის სქროლადი chip-ების რიგი — ახლა 2×2 ბადეა: **3 ყველაზე მოთხოვნადი** (`TOP_CATEGORY_IDS` — სანტექნიკა/ელექტროობა/დასუფთავება) + **"ყველა სერვისი"** ღილაკი. ეს ღილაკი ხსნის `CustomerCategoriesScreen`-ს (ყველა 15 კატეგორიის ბადე), საიდანაც კონკრეტულ კატეგორიაზე დაჭერით იხსნება `CustomerCategoryScreen` (მხოლოდ იმ კატეგორიის ოსტატები). Top-3 ღილაკებზე დაჭერა კვლავ inline მრავალარჩევანიან ფილტრს ამატებს Home-ის სიაში (გადაწყვეტილება #1 დაცულია).
+11. **`CustomerCategory`-ის ორიგინალი ზიპის ვერსია იყო ბაგიანი** — `PROVIDERS.map()`-ს იყენებდა `.filter(category)`-ის გარეშე (ყველა ოსტატს უჩვენებდა, კატეგორიის მიუხედავად) და თავად ზიპშივე არსად არ იყო რეალურად გამოძახებული (orphan screen). ჩვენთან გასწორებულია (რეალურად filter-ავს) და დაკავშირებულია "ყველა სერვისი" ნაკადში.
+12. **Global state პირველად ჩნდება: `CustomerProfileContext`** (`src/state/CustomerProfileContext.tsx`, App.tsx-ში `RootNavigator`-ის გარშემო). ინახავს `firstName/lastName/email/defaultAddress`-ს — რეგისტრაცია (ორივე გზა) წერს, `CustomerHome`/`CustomerProfile`/`CustomerEditProfile` კითხულობენ/ცვლიან, `PostJobScreen`-ის მისამართის ველი მხოლოდ **წინასწარ ივსება** `defaultAddress`-ით mount-ზე და **არასდროს არ წერს უკან** — job-ისთვის შეცვლილი მისამართი (მაგ. მეგობრის სახლისთვის) პროფილის default-ს არ ეხება.
 
 ## ვიზუალური დიზაინის სისტემა
 
@@ -82,11 +87,13 @@ Tab-ის შიგნით მდებარე ეკრანების 
 ```
 src/
   components/   # საერთო UI კომპონენტები (Button, TextField, Chip, Avatar, StatusPill,
-                # BottomSheet — native Modal-ზე დაფუძნებული ქვევიდან ამომხტარი ფურცელი, ...)
-  data/         # mock მონაცემები (categories, districts, specialties, mockHomeData,
-                # mockChats) — ჩანაცვლდება Firestore queries-ით
+                # BottomSheet, InlineBanner, RegionAreaAccordion, SpecialtyPickerField, ...)
+  data/         # mock მონაცემები (categories — 15 კატეგორია, districts, georgiaRegions,
+                # specialties, mockHomeData, mockChats, mockNotifications, mockReviews)
+                # — ჩანაცვლდება Firestore queries-ით
   navigation/   # RootNavigator, CustomerTabs, ProviderTabs + ტიპები
   screens/      # თითო ეკრანი — თითო ფაილი
+  state/        # Global state (React Context) — ჯერჯერობით მხოლოდ CustomerProfileContext
   theme/        # ფერები, radius, spacing, typography ტოკენები
 docs/
   design-reference/   # საწყისი სპეციფიკაციები, გადატანილი Downloads-იდან მუდმივი წვდომისთვის
@@ -95,13 +102,19 @@ docs/
 
 ## აშენებული ეკრანები (მდგომარეობა ამ დოკუმენტის ბოლო განახლებისას)
 
-**A — Onboarding:** Welcome, RoleSelect, Register, Login, ForgotPassword, GoogleComplete, CustomerSetup, ProviderSetup — **დასრულებული**
-**B — Provider:** ProviderHome (B1), ProviderJobDetail (B2, browse/selected mode) — **დასრულებული**
-**C — Customer:** CustomerHome/Browse (C1), PostJob (C2, ფოტო-ლიმიტი 3-ზე override), CustomerJobDetail (C3+C4 — ერთი ეკრანი, ორივე state, დიზაინის რეფერენსის მსგავსად) — **დასრულებული**
+ზიპის (Figma Make React web პროტოტიპის) **ყველა რეალურად გამოყენებადი ეკრანი უკვე აშენებულია.** დეტალურად:
+
+**A — Onboarding:** Welcome, RoleSelect, Register (customer-ისთვის სახელი/გვარი გაყოფილი, იხ. გადაწყვეტილება #8-ის თავზე), Login, ForgotPassword, GoogleComplete, CustomerSetup, ProviderSetup (specialty dropdown + Georgia-ის რეგიონების area picker) — **დასრულებული**
+**B — Provider:** ProviderHome (B1), ProviderJobDetail (B2, browse/selected/**completed** mode) — **დასრულებული**
+**C — Customer:** CustomerHome/Browse (C1, 2×2 სერვისების ბადე), PostJob (C2, ფოტო-ლიმიტი 3-ზე override + ახალი მისამართის ველი), CustomerJobDetail (C3+C4, სრული completion/problem/rating flow) — **დასრულებული**
 **D — Chat:** ChatsList (D1), ChatConversation (D2), ფასის შეთავაზების ბარათი (D3) — **დასრულებული**, იხ. არქიტექტურული გადაწყვეტილება #2
-**E — პროფილები:** ProviderProfile (E1), CustomerProfile (E2) — **დასრულებული**. ორივეს აქვს "გასვლა" ღილაკი გადამოწმების BottomSheet-ით (`navigation.getParent()?.reset()` Welcome-ზე). მენიუს პუნქტების დანიშნულების ეკრანები (რედაქტირება, ჩემი მოთხოვნები, დაფარვის რაიონები და ა.შ.) ჯერ TODO placeholder-ებია.
-**სამუშაოს დასრულება/შეფასება** (product-spec.md პუნქტი #14, Rating screen) — **არ არის აშენებული**. Job Detail-ის ეკრანებში (B2/C3-C4) ეს ნაწილი შეგნებულად გამოტოვებულია.
-**Notifications** — **არ არის აშენებული** (Bell ღილაკები ყველგან TODO placeholder-ია)
+**E — პროფილები:** ProviderProfile (E1), CustomerProfile (E2) — **დასრულებული**, ორივე მენიუს პუნქტი მიბმულია რეალურ ეკრანზე (ქვემოთ). "გასვლა" BottomSheet-ით (`navigation.getParent()?.reset()` Welcome-ზე).
+**პროფილის ქვე-ეკრანები (ახალი, ზიპიდან გადმოტანილი):** NotificationsScreen + NotificationSettingsScreen, ProfileSettings (პაროლის შეცვლა), CustomerEditProfile, ProviderEditProfile, ProviderServiceAreas, ProviderCompletedJobs, ProviderReviews, ProviderMyJobs (ზიპშივე orphan იყო — ჩვენთან `ProviderHomeScreen`-ის სტატისტიკის "სამ." უჯრიდან ვხსნით), CustomerJobs, ViewProviderProfile (Customer-ის მხრიდან ოსტატის საჯარო პროფილი) — **ყველა დასრულებული**.
+**RatingScreen** (product-spec.md პუნქტი #14) — **დასრულებული**, ინტეგრირებულია `CustomerJobDetailScreen`-ის completion flow-ში (იხ. გადაწყვეტილება #6).
+**Notifications** — **დასრულებული**, `NotificationsScreen`/`NotificationSettingsScreen`, bell ღილაკები ყველგან რეალურად მიბმულია.
+**`CustomerCategoriesScreen`/`CustomerCategoryScreen`** — ახალი, ზიპში არ არსებობდა ამ ფორმით (იხ. გადაწყვეტილება #10-11).
+**`RegionAreaPickerScreen`** — ახალი, ზიპში საერთოდ არ არსებობდა (იხ. გადაწყვეტილება #9).
+**შეგნებულად არ აშენებულა:** ზიპის `ErrorState`/`OfflineState` გენერიკული კომპონენტები — არცერთ ეკრანზე რეალურად არ იყო გამოყენებული ზიპშივე (მკვდარი კოდი). "დახმარება" მენიუს პუნქტი (Customer/Provider Profile) — ზიპშივე `screen: null` იყო, დანიშნულების ეკრანი არასდროს არსებობდა.
 
 ## ცნობილი ტექნიკური თავისებურებები ამ მანქანაზე
 

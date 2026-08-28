@@ -30,6 +30,9 @@ export type RootStackParamList = {
   ProviderMyJobs: undefined;
   CustomerJobs: undefined;
   ViewProviderProfile: { id: string };
+  CustomerCategories: undefined;
+  CustomerCategory: { id: string };
+  RegionAreaPicker: { selected: string[]; onSave: (areas: string[]) => void };
   RatingScreen: {
     jobId: string;
     providerName: string;

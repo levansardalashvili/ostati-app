@@ -8,6 +8,7 @@ import { Button } from '../components/Button';
 import { ProgressBar } from '../components/ProgressBar';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
+import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GoogleComplete'>;
@@ -19,10 +20,13 @@ const MOCK_GOOGLE_USER = {
   email: 'nino.sulaberidze@gmail.com',
   initials: 'ნს',
 };
+const [MOCK_GOOGLE_FIRST_NAME, ...MOCK_GOOGLE_LAST_NAME_PARTS] = MOCK_GOOGLE_USER.name.split(' ');
+const MOCK_GOOGLE_LAST_NAME = MOCK_GOOGLE_LAST_NAME_PARTS.join(' ');
 
 // A3 — Google-ის ანგარიშით პროფილის დასრულება (product-spec.md, create-account-form.md)
 export function GoogleCompleteScreen({ navigation, route }: Props) {
   const { role } = route.params;
+  const { setProfile } = useCustomerProfile();
 
   const [address, setAddress] = useState('');
   const [touched, setTouched] = useState(false);
@@ -40,6 +44,12 @@ export function GoogleCompleteScreen({ navigation, route }: Props) {
       if (role === 'provider') {
         navigation.replace('ProviderSetup');
       } else {
+        setProfile({
+          firstName: MOCK_GOOGLE_FIRST_NAME,
+          lastName: MOCK_GOOGLE_LAST_NAME,
+          email: MOCK_GOOGLE_USER.email,
+          defaultAddress: address.trim(),
+        });
         navigation.replace('CustomerSetup', { userName: MOCK_GOOGLE_USER.name });
       }
     }, 1000);

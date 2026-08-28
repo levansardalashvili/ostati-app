@@ -26,6 +26,9 @@ import { ProviderMyJobsScreen } from '../screens/ProviderMyJobsScreen';
 import { CustomerJobsScreen } from '../screens/CustomerJobsScreen';
 import { ViewProviderProfileScreen } from '../screens/ViewProviderProfileScreen';
 import { RatingScreen } from '../screens/RatingScreen';
+import { CustomerCategoriesScreen } from '../screens/CustomerCategoriesScreen';
+import { CustomerCategoryScreen } from '../screens/CustomerCategoryScreen';
+import { RegionAreaPickerScreen } from '../screens/RegionAreaPickerScreen';
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -62,6 +65,9 @@ export function RootNavigator() {
       <Stack.Screen name="CustomerJobs" component={CustomerJobsScreen} />
       <Stack.Screen name="ViewProviderProfile" component={ViewProviderProfileScreen} />
       <Stack.Screen name="RatingScreen" component={RatingScreen} />
+      <Stack.Screen name="CustomerCategories" component={CustomerCategoriesScreen} />
+      <Stack.Screen name="CustomerCategory" component={CustomerCategoryScreen} />
+      <Stack.Screen name="RegionAreaPicker" component={RegionAreaPickerScreen} />
     </Stack.Navigator>
   );
 }
