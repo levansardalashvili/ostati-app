@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
-import type { SpecialtyOption } from '../components/SpecialtyPickerField';
-import type { MediaItem } from '../components/MediaUploadGrid';
+import { userService } from '../services/userService';
+import type { ProviderProfile } from '../types/provider';
 
 // ProviderProfileContext — Provider-ის საკუთარი პროფილის მონაცემები
 // (Register/GoogleComplete წერს სახელს/გვარს, ProviderSetup წერს საწყის
@@ -10,36 +10,10 @@ import type { MediaItem } from '../components/MediaUploadGrid';
 // გაზიარებულია ეკრანებს შორის, არა თითო ეკრანის ცალკე ლოკალური state.
 // ProviderProfileScreen-ის "პროფილის სისრულე" ბარათი (მომხმარებლის
 // მოთხოვნით) ამის საფუძველზე ითვლის %-ს — იხ. computeCompleteness ქვემოთ.
-// TODO: ჩანაცვლდება Firestore-ის providerProfiles/{uid} დოკუმენტით.
-export type ProviderProfileState = {
-  firstName: string;
-  lastName: string;
-  specialty: SpecialtyOption[];
-  areas: string[];
-  experience: string | null;
-  about: string;
-  hasPhoto: boolean;
-  certificates: MediaItem[];
-  portfolio: MediaItem[];
-  sqmPrices: Record<string, string>;
-};
-
-const DEFAULT_PROVIDER_PROFILE: ProviderProfileState = {
-  firstName: 'გიორგი',
-  lastName: 'ბერიძე',
-  specialty: [{ id: 'plumber', label: 'სანტექნიკოსი' }],
-  areas: ['ვაკე', 'საბურთალო', 'ვერა'],
-  experience: '10plus',
-  about: 'ვარ სანტექნიკოსი 15 წლიანი გამოცდილებით. ვასრულებ ყველა სახის სანტექნიკის სამუშაოს სწრაფად და ხარისხიანად.',
-  hasPhoto: false,
-  certificates: [{ id: 1, bg: '#DBEAFE' }],
-  portfolio: [
-    { id: 1, bg: '#D1FAE5' },
-    { id: 2, bg: '#FEF3C7' },
-    { id: 3, bg: '#FCE7F3' },
-  ],
-  sqmPrices: {},
-};
+//
+// რეაქტიული ასლია userService-ის (getProviderProfile/updateProviderProfile)
+// გარშემო — იხ. CustomerProfileContext.tsx-ის იგივე პატერნი/შენიშვნა.
+export type ProviderProfileState = ProviderProfile;
 
 const ABOUT_MIN_LENGTH = 20;
 
@@ -78,10 +52,10 @@ type ProviderProfileContextValue = {
 const ProviderProfileContext = createContext<ProviderProfileContextValue | null>(null);
 
 export function ProviderProfileProvider({ children }: { children: React.ReactNode }) {
-  const [profile, setProfileState] = useState<ProviderProfileState>(DEFAULT_PROVIDER_PROFILE);
+  const [profile, setProfileState] = useState<ProviderProfileState>(() => userService.getProviderProfile());
 
   const setProfile = (patch: Partial<ProviderProfileState>) => {
-    setProfileState((prev) => ({ ...prev, ...patch }));
+    setProfileState(userService.updateProviderProfile(patch));
   };
 
   return <ProviderProfileContext.Provider value={{ profile, setProfile }}>{children}</ProviderProfileContext.Provider>;

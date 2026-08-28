@@ -17,6 +17,7 @@ import { GoogleButton } from '../components/GoogleButton';
 import { ProgressBar } from '../components/ProgressBar';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
+import { authService } from '../services/authService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
@@ -28,10 +29,14 @@ const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 // A3 — რეგისტრაცია (product-spec.md, create-account-form.md).
 // მისამართის ველი customer-ისთვისაც ემატება — დიზაინის რეფერენსის
 // მიხედვით, პრიორიტეტის წესის თანახმად (ზიპი კონფლიქტში იმარჯვებს).
+// Provider-ისთვის მისამართი საერთოდ არ ჩანს/არ სავალდებულოა (მომხმარებლის
+// მოთხოვნით) — Provider-ის სამუშაო არეალს მოგვიანებით, ProviderSetup-ზე
+// ირჩევს (RegionAreaPicker), საცხოვრებელი მისამართი მას საერთოდ არ სჭირდება.
 // "სახელი და გვარი" ორივე როლისთვის გაყოფილია ცალკე ველებად
 // (მომხმარებლის მოთხოვნით override-ავს ზიპის ერთიან ველს).
 export function RegisterScreen({ navigation, route }: Props) {
   const { role } = route.params;
+  const isProvider = role === 'provider';
   const { setProfile } = useCustomerProfile();
   const { setProfile: setProviderProfile } = useProviderProfile();
 
@@ -57,7 +62,7 @@ export function RegisterScreen({ navigation, route }: Props) {
         : touched.email && !isEmail(email)
           ? 'შეიყვანე სწორი ელ. ფოსტა'
           : '',
-    address: touched.address && !address.trim() ? 'ეს ველი სავალდებულოა' : '',
+    address: !isProvider && touched.address && !address.trim() ? 'ეს ველი სავალდებულოა' : '',
     pass:
       touched.pass && !pass
         ? 'ეს ველი სავალდებულოა'
@@ -73,13 +78,14 @@ export function RegisterScreen({ navigation, route }: Props) {
   };
 
   const nameValid = !!firstName.trim() && !!lastName.trim();
-  const allValid = nameValid && isEmail(email) && address.trim() && pass.length >= 8 && pass === confirm && agreed;
+  const allValid =
+    nameValid && isEmail(email) && (isProvider || address.trim()) && pass.length >= 8 && pass === confirm && agreed;
 
   const handleSubmit = () => {
-    setTouched({ firstName: true, lastName: true, email: true, address: true, pass: true, confirm: true });
+    setTouched({ firstName: true, lastName: true, email: true, address: !isProvider, pass: true, confirm: true });
     if (!allValid) return;
     setLoading(true);
-    // TODO: Firebase Auth (createUserWithEmailAndPassword) დაემატება ავთენტიფიკაციის ეტაპზე
+    authService.registerWithEmail({ email: email.trim(), password: pass, role });
     setTimeout(() => {
       setLoading(false);
       if (role === 'provider') {
@@ -99,6 +105,7 @@ export function RegisterScreen({ navigation, route }: Props) {
 
   const handleGoogle = () => {
     setGLoading(true);
+    authService.signInWithGoogle();
     setTimeout(() => {
       setGLoading(false);
       navigation.navigate('GoogleComplete', { role });
@@ -160,14 +167,16 @@ export function RegisterScreen({ navigation, route }: Props) {
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            <AddressAutocompleteField
-              label="მისამართი"
-              value={address}
-              onChangeText={setAddress}
-              onBlur={() => touch('address')}
-              placeholder="მაგ. ჭავჭავაძის 48"
-              error={errors.address}
-            />
+            {!isProvider && (
+              <AddressAutocompleteField
+                label="მისამართი"
+                value={address}
+                onChangeText={setAddress}
+                onBlur={() => touch('address')}
+                placeholder="მაგ. ჭავჭავაძის 48"
+                error={errors.address}
+              />
+            )}
             <TextField
               label="პაროლი"
               value={pass}

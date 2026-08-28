@@ -1,8 +1,12 @@
 // Root stack-ის route-ების სია. ეტაპობრივად დაემატება ყველა ეკრანი
 // product-spec.md-ის "ეკრანების სრული სია" მიხედვით.
-import type { RatingData } from '../data/mockHomeData';
+import type { RatingData } from '../types/review';
+import type { Role } from '../types/user';
 
-export type Role = 'customer' | 'provider';
+// Role ახლა src/types/user.ts-შია განსაზღვრული (domain models refactor) —
+// აქ რეექსპორტდება, რომ არსებული `import type { Role } from '../navigation/types'`
+// import-ები ყველგან ხელუხლებელი დარჩეს.
+export type { Role };
 
 export type RootStackParamList = {
   Welcome: undefined;

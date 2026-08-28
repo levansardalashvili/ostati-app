@@ -6,8 +6,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
 import { ProviderFeedJobCard } from '../components/ProviderFeedJobCard';
 import { colors, radius, spacing, typography } from '../theme';
-import type { FeedJob } from '../data/mockHomeData';
-import { getOpenProviderFeed } from '../data/providerFeedFilters';
+import { jobService } from '../services/jobService';
+import type { FeedJob } from '../types/job';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderJobFeed'>;
@@ -17,7 +17,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProviderJobFeed'>;
 // providerFeedFilters/ProviderFeedJobCard-იდან.
 export function ProviderJobFeedScreen({ navigation }: Props) {
   const [interests, setInterests] = useState<Set<string>>(new Set());
-  const filtered = useMemo(() => getOpenProviderFeed(), []);
+  const filtered = useMemo(() => jobService.getOpenProviderFeed(), []);
 
   const handleJobDetail = (id: string) => {
     navigation.navigate('ProviderJobDetail', { id });

@@ -7,7 +7,7 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
-import { PROVIDER_MY_JOBS_ACTIVE, PROVIDER_MY_JOBS_DONE } from '../data/mockReviews';
+import { jobService } from '../services/jobService';
 import type { ProviderTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -24,7 +24,7 @@ type Tab = 'active' | 'done';
 // ნაცვლად.
 export function ProviderMyJobsScreen({}: Props) {
   const [tab, setTab] = useState<Tab>('active');
-  const items = tab === 'active' ? PROVIDER_MY_JOBS_ACTIVE : PROVIDER_MY_JOBS_DONE;
+  const items = tab === 'active' ? jobService.listMyActiveJobs() : jobService.listMyDoneJobs();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

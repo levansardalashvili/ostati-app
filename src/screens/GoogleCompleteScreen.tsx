@@ -24,9 +24,13 @@ const MOCK_GOOGLE_USER = {
 const [MOCK_GOOGLE_FIRST_NAME, ...MOCK_GOOGLE_LAST_NAME_PARTS] = MOCK_GOOGLE_USER.name.split(' ');
 const MOCK_GOOGLE_LAST_NAME = MOCK_GOOGLE_LAST_NAME_PARTS.join(' ');
 
-// A3 — Google-ის ანგარიშით პროფილის დასრულება (product-spec.md, create-account-form.md)
+// A3 — Google-ის ანგარიშით პროფილის დასრულება (product-spec.md, create-account-form.md).
+// Provider-ისთვის მისამართის ველი არ ჩანს/არ სავალდებულოა — RegisterScreen-ის
+// იგივე წესით (Provider-ს საცხოვრებელი მისამართი საერთოდ არ სჭირდება,
+// სამუშაო არეალს მოგვიანებით ProviderSetup-ზე ირჩევს).
 export function GoogleCompleteScreen({ navigation, route }: Props) {
   const { role } = route.params;
+  const isProvider = role === 'provider';
   const { setProfile } = useCustomerProfile();
   const { setProfile: setProviderProfile } = useProviderProfile();
 
@@ -34,12 +38,12 @@ export function GoogleCompleteScreen({ navigation, route }: Props) {
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const addressError = touched && !address.trim() ? 'ეს ველი სავალდებულოა' : '';
-  const canContinue = address.trim() && !loading;
+  const addressError = !isProvider && touched && !address.trim() ? 'ეს ველი სავალდებულოა' : '';
+  const canContinue = (isProvider || address.trim()) && !loading;
 
   const handleContinue = () => {
     setTouched(true);
-    if (!address.trim()) return;
+    if (!isProvider && !address.trim()) return;
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
@@ -84,16 +88,18 @@ export function GoogleCompleteScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        <View style={styles.field}>
-          <AddressAutocompleteField
-            label="მისამართი"
-            value={address}
-            onChangeText={setAddress}
-            onBlur={() => setTouched(true)}
-            placeholder="მაგ. ჭავჭავაძის 48"
-            error={addressError}
-          />
-        </View>
+        {!isProvider && (
+          <View style={styles.field}>
+            <AddressAutocompleteField
+              label="მისამართი"
+              value={address}
+              onChangeText={setAddress}
+              onBlur={() => setTouched(true)}
+              placeholder="მაგ. ჭავჭავაძის 48"
+              error={addressError}
+            />
+          </View>
+        )}
 
         <Button
           label="გაგრძელება"

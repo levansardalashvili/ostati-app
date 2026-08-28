@@ -4,7 +4,7 @@ import { Camera, Check, Clock, MapPin, MessageCircle, ThumbsUp } from 'lucide-re
 import { CategoryIcon } from './CategoryIcon';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
-import type { FeedJob } from '../data/mockHomeData';
+import type { FeedJob } from '../types/job';
 
 type Props = {
   job: FeedJob;

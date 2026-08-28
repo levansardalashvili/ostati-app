@@ -9,7 +9,8 @@ import { CategoryIcon } from '../components/CategoryIcon';
 import { Skeleton } from '../components/Skeleton';
 import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
-import { CUSTOMER_JOBS } from '../data/mockHomeData';
+import { jobService } from '../services/jobService';
+import { useJobStatus } from '../state/JobStatusContext';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -41,14 +42,22 @@ const EMPTY_TEXT: Record<Tab, string> = {
 export function CustomerJobsScreen({ navigation }: Props) {
   const [tab, setTab] = useState<Tab>('active');
   const [isLoading, setIsLoading] = useState(true);
+  const { getStatus } = useJobStatus();
 
   useEffect(() => {
     const t = setTimeout(() => setIsLoading(false), 800);
     return () => clearTimeout(t);
   }, []);
 
-  const statusFor: Record<Tab, string> = { active: 'active', pending: 'pending', done: 'completed' };
-  const items = CUSTOMER_JOBS.filter((j) => j.status === statusFor[tab]);
+  // "awaiting_customer_confirmation"/"disputed" — job ჯერ კიდევ აქტიურ
+  // მუშაობშია (არ არის დასრულებული), ამიტომ "დადასტურებული" ტაბში რჩება
+  // (ორმხრივი დასრულების flow, JobStatusContext.tsx).
+  const items = jobService.listCustomerJobs().filter((j) => {
+    const status = getStatus(j.id) ?? j.status;
+    if (tab === 'active') return status === 'active' || status === 'awaiting_customer_confirmation' || status === 'disputed';
+    if (tab === 'pending') return status === 'pending';
+    return status === 'completed';
+  });
 
   const openChat = (providerName: string) => {
     navigation.navigate('ChatConversation', {
@@ -102,7 +111,7 @@ export function CustomerJobsScreen({ navigation }: Props) {
                     <Text style={styles.jobDate}>{j.date}</Text>
                   </View>
                 </View>
-                <StatusPill status={j.status} />
+                <StatusPill status={getStatus(j.id) ?? j.status} />
               </View>
               <Text style={styles.jobDesc} numberOfLines={2}>
                 {j.desc}

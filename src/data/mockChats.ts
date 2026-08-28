@@ -1,41 +1,8 @@
 // TODO: ჩანაცვლდება Firestore-ის conversations/messages collections-ით.
 // ჯერჯერობით — დიზაინის რეფერენსის mock მონაცემების ზუსტი ასლი (D1/D2).
-import type { JobStatus } from '../components/StatusPill';
-
-export type MsgState = 'sending' | 'sent' | 'read' | 'failed';
-
-export type OfferStatus = 'pending' | 'accepted' | 'declined';
-
-export type ChatMsg = {
-  id: string;
-  type: 'text' | 'image' | 'date' | 'offer';
-  from: 'me' | 'other';
-  text?: string;
-  imgColor?: string;
-  t?: string;
-  state?: MsgState;
-  label?: string;
-  amount?: number;
-  comment?: string;
-  offerStatus?: OfferStatus;
-};
-
-export type ChatEntry = {
-  id: string;
-  name: string;
-  initials: string;
-  color: string;
-  last: string;
-  time: string;
-  unread: number;
-  online: boolean;
-  jobId?: string;
-  jobTitle?: string;
-  jobCategory?: string;
-  jobDistrict?: string;
-  jobDate?: string;
-  jobStatus?: JobStatus;
-};
+// ტიპები src/types/chat.ts-შია (domain models refactor) — ეს ფაილი
+// მხოლოდ მონაცემებია, chatService.ts-ის მეშვეობით გამოყენებული.
+import type { ChatEntry, ChatMsg } from '../types/chat';
 
 export const CHATS_LIST: ChatEntry[] = [
   {

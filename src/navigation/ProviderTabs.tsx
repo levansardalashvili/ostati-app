@@ -7,12 +7,12 @@ import { ProviderMyJobsScreen } from '../screens/ProviderMyJobsScreen';
 import { ChatsListScreen } from '../screens/ChatsListScreen';
 import { ProviderProfileScreen } from '../screens/ProviderProfileScreen';
 import { colors, radius, typography } from '../theme';
-import { CHATS_LIST } from '../data/mockChats';
+import { chatService } from '../services/chatService';
 import type { ProviderTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<ProviderTabParamList>();
 
-const unreadChats = CHATS_LIST.filter((c) => c.unread > 0).length;
+const unreadChats = chatService.listChats().filter((c) => c.unread > 0).length;
 
 // Bottom Navigation — Provider (product-spec.md-ის საწყისი "Home / ჩატები /
 // პროფილი" 3 ჩანართი გაფართოვდა "სამუშაოები" ჩანართით — ეს ყოფილი

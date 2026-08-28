@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { CustomerProfileProvider } from './src/state/CustomerProfileContext';
 import { FavoriteProvidersProvider } from './src/state/FavoriteProvidersContext';
+import { JobStatusProvider } from './src/state/JobStatusContext';
 import { ProviderProfileProvider } from './src/state/ProviderProfileContext';
 
 export default function App() {
@@ -16,10 +17,12 @@ export default function App() {
         <CustomerProfileProvider>
           <FavoriteProvidersProvider>
             <ProviderProfileProvider>
-              <NavigationContainer>
-                <RootNavigator />
-                <StatusBar style="dark" />
-              </NavigationContainer>
+              <JobStatusProvider>
+                <NavigationContainer>
+                  <RootNavigator />
+                  <StatusBar style="dark" />
+                </NavigationContainer>
+              </JobStatusProvider>
             </ProviderProfileProvider>
           </FavoriteProvidersProvider>
         </CustomerProfileProvider>

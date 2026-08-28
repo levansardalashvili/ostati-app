@@ -9,9 +9,9 @@ import type { MediaItem } from '../components/MediaUploadGrid';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
-import { PROVIDERS } from '../data/mockHomeData';
-import { PROVIDER_REVIEWS } from '../data/mockReviews';
-import { CURRENT_PROVIDER_ID } from '../data/providerFeedFilters';
+import { CURRENT_PROVIDER_ID } from '../services/jobService';
+import { reviewService } from '../services/reviewService';
+import { userService } from '../services/userService';
 import { useFavoriteProviders } from '../state/FavoriteProvidersContext';
 import { isNewProvider } from '../utils/providerRank';
 import type { RootStackParamList } from '../navigation/types';
@@ -25,9 +25,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ViewProviderProfile'>;
 // `p.id === CURRENT_PROVIDER_ID`-ით ვარკვევთ (ProviderProfileScreen-ის
 // preview ყოველთვის 'p1'-ს, ანუ "მიმდინარე" Provider-ს, ხსნის).
 export function ViewProviderProfileScreen({ navigation, route }: Props) {
-  const p = PROVIDERS.find((x) => x.id === route.params.id) ?? PROVIDERS[0];
+  const p = userService.getProviderById(route.params.id) ?? userService.listProviders()[0];
   const specialty = SPECIALTY_LABEL[p.category] ?? p.category;
-  const reviews = PROVIDER_REVIEWS[p.id] ?? [];
+  const reviews = reviewService.getReviewsForProvider(p.id);
   const [previewCert, setPreviewCert] = useState<MediaItem | null>(null);
   const [previewPortfolio, setPreviewPortfolio] = useState<MediaItem | null>(null);
   const { isFavorite, toggleFavorite } = useFavoriteProviders();

@@ -8,7 +8,7 @@ import { CategoryIcon } from '../components/CategoryIcon';
 import { Skeleton } from '../components/Skeleton';
 import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
-import { PROVIDER_COMPLETED_JOBS } from '../data/mockReviews';
+import { reviewService } from '../services/reviewService';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderCompletedJobs'>;
@@ -17,6 +17,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProviderCompletedJobs'>
 // მიხედვით.
 export function ProviderCompletedJobsScreen({ navigation }: Props) {
   const [isLoading, setIsLoading] = useState(true);
+  const completedJobs = reviewService.getCompletedJobs();
   useEffect(() => {
     const t = setTimeout(() => setIsLoading(false), 850);
     return () => clearTimeout(t);
@@ -31,7 +32,7 @@ export function ProviderCompletedJobsScreen({ navigation }: Props) {
             <JobRowSkeleton key={i} />
           ))}
         </View>
-      ) : PROVIDER_COMPLETED_JOBS.length === 0 ? (
+      ) : completedJobs.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
             <Award size={22} color={colors.mutedForeground} />
@@ -41,7 +42,7 @@ export function ProviderCompletedJobsScreen({ navigation }: Props) {
         </View>
       ) : (
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          {PROVIDER_COMPLETED_JOBS.map((j) => (
+          {completedJobs.map((j) => (
             <View key={j.id} style={styles.card}>
               <CategoryIcon categoryId={j.category} size={40} />
               <View style={{ flex: 1, minWidth: 0 }}>

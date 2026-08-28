@@ -1,30 +1,61 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Award, CheckCircle, Clock, MapPin, MessageCircle, MoreVertical, Star, ThumbsUp } from 'lucide-react-native';
+import { AlertTriangle, Award, CheckCircle, Clock, MapPin, MessageCircle, MoreVertical, Star, ThumbsUp } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { colors, radius, spacing, typography } from '../theme';
-import { PROVIDER_FEED } from '../data/mockHomeData';
+import { jobService } from '../services/jobService';
+import { useJobStatus } from '../state/JobStatusContext';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderJobDetail'>;
 
 // B2 — Job-ის დეტალი + ინტერესის დადასტურება (Provider მხრიდან)
 // (product-spec.md; დიზაინის რეფერენსის ProviderJobDetail-ის browse/selected
-// mode-ების მიხედვით)
+// mode-ების მიხედვით). "selected" mode-ის შიგნით ორმხრივი დასრულების state
+// machine მუშაობს (JobStatusContext.tsx) — Provider-ს პირდაპირ დასრულება არ
+// შეუძლია, მხოლოდ "სამუშაო დავასრულე", რაც Customer-ის დადასტურებას ელოდება.
 export function ProviderJobDetailScreen({ navigation, route }: Props) {
   const { id, mode = 'browse' } = route.params;
-  const job = PROVIDER_FEED.find((j) => j.id === id) ?? PROVIDER_FEED[0];
+  const providerFeed = jobService.listProviderFeed();
+  const job = providerFeed.find((j) => j.id === id) ?? providerFeed[0];
   const [expressed, setExpressed] = useState(false);
   const [offerSheetOpen, setOfferSheetOpen] = useState(false);
   const [offerPrice, setOfferPrice] = useState('');
+  const { getStatus, setStatus } = useJobStatus();
+
+  // "selected"/"completed" mode-ის რეალური ვარიანტი გაზიარებული სტატუსიდან
+  // გამოითვლება, თუ job-ს Customer-ის მხარესთან ბმული აქვს (customerJobId) —
+  // route-ის სტატიკური `mode` param მხოლოდ fallback-ია (ან საწყისი
+  // navigation-ის მინიშნებაა). Provider-ს "დასრულებული" mode-ის პირდაპირ
+  // დაყენება არასდროს არ შეუძლია — მხოლოდ სტატუსის ცვლილებით.
+  const linkedStatus = job.customerJobId ? getStatus(job.customerJobId) : undefined;
+  const variant: 'browse' | 'active' | 'awaiting_confirmation' | 'disputed' | 'completed' =
+    linkedStatus === 'awaiting_customer_confirmation'
+      ? 'awaiting_confirmation'
+      : linkedStatus === 'disputed'
+        ? 'disputed'
+        : linkedStatus === 'completed'
+          ? 'completed'
+          : linkedStatus === 'active'
+            ? 'active'
+            : mode === 'completed'
+              ? 'completed'
+              : mode === 'selected'
+                ? 'active'
+                : 'browse';
+
+  const markWorkDone = () => {
+    if (!job.customerJobId) return;
+    setStatus(job.customerJobId, 'awaiting_customer_confirmation');
+  };
 
   const receivedRating =
-    mode === 'completed'
+    variant === 'completed'
       ? { stars: 5, review: 'ძალიან კარგი სამუშაო, მადლობა!', chips: ['დროულად მოვიდა', 'ხარისხიანი სამუშაო'] }
       : null;
 
@@ -59,19 +90,41 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       />
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-        {mode === 'selected' && (
+        {variant === 'active' && (
           <View style={styles.selectedBanner}>
             <View style={styles.bannerHeaderRow}>
               <CheckCircle size={16} color={colors.success} />
               <Text style={styles.selectedBannerTitle}>შენ აგირჩიეს ამ სამუშაოსთვის</Text>
             </View>
             <Text style={styles.selectedBannerText}>
-              ველოდებით მომხმარებლის დადასტურებას სამუშაოს დასრულების შესახებ.
+              დაასრულე სამუშაო და დააჭირე „სამუშაო დავასრულე" — მომხმარებელი დაადასტურებს დასრულებას.
             </Text>
           </View>
         )}
 
-        {mode === 'completed' && (
+        {variant === 'awaiting_confirmation' && (
+          <View style={styles.selectedBanner}>
+            <View style={styles.bannerHeaderRow}>
+              <Clock size={16} color={colors.success} />
+              <Text style={styles.selectedBannerTitle}>სამუშაო დასრულებულად მონიშნე</Text>
+            </View>
+            <Text style={styles.selectedBannerText}>
+              ელოდება მომხმარებლის დადასტურებას სამუშაოს დასრულების შესახებ.
+            </Text>
+          </View>
+        )}
+
+        {variant === 'disputed' && (
+          <View style={styles.disputedBanner}>
+            <View style={styles.bannerHeaderRow}>
+              <AlertTriangle size={16} color={colors.destructive} />
+              <Text style={styles.disputedBannerTitle}>მომხმარებელმა პრობლემა აღნიშნა</Text>
+            </View>
+            <Text style={styles.disputedBannerText}>დაუკავშირდი მომხმარებელს ჩატში პრობლემის გასარკვევად.</Text>
+          </View>
+        )}
+
+        {variant === 'completed' && (
           <View style={styles.completedBanner}>
             <View style={styles.bannerHeaderRow}>
               <Award size={16} color={colors.primary} />
@@ -155,7 +208,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         </View>
       </ScrollView>
 
-      {mode === 'browse' && (
+      {variant === 'browse' && (
         <View style={styles.footer}>
           <Pressable style={styles.chatButton} onPress={handleChat}>
             <MessageCircle size={17} color={colors.foreground} />
@@ -176,10 +229,29 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
           </Pressable>
         </View>
       )}
-      {mode === 'selected' && (
+      {variant === 'active' && (
+        <View style={styles.footer}>
+          <Pressable style={styles.chatButton} onPress={handleChat}>
+            <MessageCircle size={17} color={colors.foreground} />
+            <Text style={styles.chatButtonText}>ჩატი</Text>
+          </Pressable>
+          {/* Provider-ს პირდაპირ დასრულების უფლება არა აქვს — ეს ღილაკი
+              მხოლოდ "awaiting_customer_confirmation"-ზე გადადის, Customer-ის
+              დადასტურებამდე job "completed" ვერასდროს გახდება. ღილაკი მხოლოდ
+              მაშინ ჩანს, როცა ამ job-ს Customer-ის მხარესთან რეალური ბმული
+              აქვს (customerJobId) — წინააღმდეგ შემთხვევაში დასაჭერი არაფერია. */}
+          {job.customerJobId && (
+            <Pressable style={styles.completeWorkButton} onPress={markWorkDone}>
+              <CheckCircle size={17} color={colors.primaryForeground} />
+              <Text style={styles.completeWorkButtonText}>სამუშაო დავასრულე</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+      {variant === 'awaiting_confirmation' && (
         <View style={styles.footer}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.waitingText}>ველოდებით მომხმარებლის დადასტურებას</Text>
+            <Text style={styles.waitingText}>ელოდება მომხმარებლის დადასტურებას</Text>
             <Pressable style={[styles.chatButton, { alignSelf: 'stretch' }]} onPress={handleChat}>
               <MessageCircle size={17} color={colors.foreground} />
               <Text style={styles.chatButtonText}>ჩატი</Text>
@@ -187,7 +259,18 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
           </View>
         </View>
       )}
-      {mode === 'completed' && (
+      {variant === 'disputed' && (
+        <View style={styles.footer}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.disputedFooterText}>მომხმარებელმა პრობლემა აღნიშნა — გაარკვიე დეტალები ჩატში.</Text>
+            <Pressable style={[styles.chatButton, { alignSelf: 'stretch' }]} onPress={handleChat}>
+              <MessageCircle size={17} color={colors.foreground} />
+              <Text style={styles.chatButtonText}>ჩატი</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+      {variant === 'completed' && (
         <View style={styles.footer}>
           <Pressable style={styles.reviewsButton} onPress={() => navigation.navigate('ProviderReviews')}>
             <Award size={17} color={colors.primary} />
@@ -263,6 +346,24 @@ const styles = StyleSheet.create({
   selectedBannerText: {
     ...typography.small,
     color: colors.success,
+  },
+  disputedBanner: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    backgroundColor: colors.dangerBackground,
+    padding: spacing.md,
+  },
+  disputedBannerTitle: {
+    ...typography.captionMedium,
+    color: colors.destructive,
+    fontWeight: '700',
+  },
+  disputedBannerText: {
+    ...typography.small,
+    color: colors.destructive,
   },
   headerCard: {
     backgroundColor: colors.card,
@@ -427,9 +528,30 @@ const styles = StyleSheet.create({
     color: colors.primaryForeground,
     fontWeight: '700',
   },
+  completeWorkButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.success,
+    borderRadius: radius.md,
+    minHeight: 52,
+  },
+  completeWorkButtonText: {
+    ...typography.bodyMedium,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
   waitingText: {
     ...typography.small,
     color: colors.mutedForeground,
+    textAlign: 'center',
+    marginBottom: spacing.sm + 2,
+  },
+  disputedFooterText: {
+    ...typography.small,
+    color: colors.destructive,
     textAlign: 'center',
     marginBottom: spacing.sm + 2,
   },

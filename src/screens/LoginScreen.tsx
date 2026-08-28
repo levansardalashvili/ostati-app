@@ -15,6 +15,7 @@ import { Button } from '../components/Button';
 import { GoogleButton } from '../components/GoogleButton';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
+import { authService } from '../services/authService';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
@@ -45,7 +46,7 @@ export function LoginScreen({ navigation }: Props) {
     setCredError('');
     if (!canSubmit) return;
     setLoading(true);
-    // TODO: Firebase Auth (signInWithEmailAndPassword) დაემატება ავთენტიფიკაციის ეტაპზე
+    authService.signInWithEmail({ email: email.trim(), password: pass });
     setTimeout(() => {
       setLoading(false);
       // წარმატების შემდეგ: როლის მიხედვით Home ეკრანზე გადასვლა
@@ -54,6 +55,7 @@ export function LoginScreen({ navigation }: Props) {
 
   const handleGoogle = () => {
     setGLoading(true);
+    authService.signInWithGoogle();
     setTimeout(() => {
       setGLoading(false);
       // Google Sign-In წარმატების შემდეგ: არსებული ანგარიშის როლის მიხედვით Home ეკრანზე

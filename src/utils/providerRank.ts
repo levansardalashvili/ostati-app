@@ -1,4 +1,4 @@
-import type { Provider } from '../data/mockHomeData';
+import type { Provider } from '../types/provider';
 
 // ახალი ოსტატის ზღვარი — 0 შეფასება. ასეთ შემთხვევაში "0.0 ★"-ის ნაცვლად
 // "ახალი ოსტატი" ბეჯი უნდა ჩანდეს ყველგან, სადაც რეიტინგი ჩნდება

@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Briefcase,
   Check,
-  CheckCircle2,
   Clock,
   MapPin,
   MessageCircle,
@@ -25,7 +24,13 @@ import { StatusPill, type JobStatus } from '../components/StatusPill';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
-import { CUSTOMER_JOBS, INTERESTED_PROVIDERS, PHOTO_COLORS, Provider, RatingData, SUBMITTED_RATINGS } from '../data/mockHomeData';
+import { PHOTO_COLORS } from '../data/mockHomeData';
+import { jobService } from '../services/jobService';
+import { quoteService } from '../services/quoteService';
+import { reviewService } from '../services/reviewService';
+import { useJobStatus } from '../state/JobStatusContext';
+import type { Provider } from '../types/provider';
+import type { RatingData } from '../types/review';
 import { isNewProvider, weightedRating } from '../utils/providerRank';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -40,10 +45,11 @@ const PROBLEM_OPTIONS = ['ოსტატი ჯერ არ მოსულა
 // პუნქტი #14) — ზუსტად ზიპის App.tsx-ის CustomerJobDetail-ის მიხედვით.
 export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const job = useMemo(
-    () => CUSTOMER_JOBS.find((j) => j.id === route.params.jobId) ?? CUSTOMER_JOBS[1],
+    () => jobService.getCustomerJobById(route.params.jobId) ?? jobService.listCustomerJobs()[1],
     [route.params.jobId],
   );
-  const interestedList = INTERESTED_PROVIDERS[job.id] ?? [];
+  const interestedList = quoteService.getQuotesForJob(job.id);
+  const { getStatus, setStatus } = useJobStatus();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelSheetOpen, setCancelSheetOpen] = useState(false);
@@ -81,22 +87,23 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     ? sortedInterestedList.filter((entry) => entry.provider.id === selectedProvider.id)
     : sortedInterestedList;
 
-  // დასრულების/პრობლემის/შეფასების ნაკადი
-  const [jobCompleted, setJobCompleted] = useState(job.status === 'completed');
-  const [completionSheetOpen, setCompletionSheetOpen] = useState(false);
+  // დასრულების/პრობლემის/შეფასების ნაკადი — ორმხრივი state machine
+  // (JobStatusContext.tsx, StatusPill.tsx) — Customer-ს პირდაპირ "დასრულების"
+  // შესაძლებლობა აღარ აქვს, მხოლოდ Provider-ის "სამუშაო დავასრულე"-ს შემდეგ
+  // ხედავს დადასტურების ბარათს (მომხმარებლის მოთხოვნით).
   const [problemSheetOpen, setProblemSheetOpen] = useState(false);
   const [problemOption, setProblemOption] = useState<string | null>(null);
   const [problemOther, setProblemOther] = useState('');
-  const [problemSubmitted, setProblemSubmitted] = useState(false);
-  const [ratingData, setRatingData] = useState<RatingData | null>(() => SUBMITTED_RATINGS[job.id] ?? null);
+  const [ratingData, setRatingData] = useState<RatingData | null>(() => reviewService.getSubmittedRating(job.id) ?? null);
 
-  const effectiveStatus: JobStatus = cancelled ? 'cancelled' : jobCompleted ? 'completed' : selectedProvider ? 'active' : job.status;
-  const showCompletionCard = effectiveStatus === 'active' && !!selectedProvider && !jobCompleted && !problemSubmitted;
+  const sharedStatus = getStatus(job.id) ?? job.status;
+  const effectiveStatus: JobStatus = cancelled ? 'cancelled' : sharedStatus;
+  const showCompletionConfirmCard = effectiveStatus === 'awaiting_customer_confirmation';
 
   const progressSteps = [
     { label: 'მოთხოვნა გამოქვეყნდა', done: true },
     { label: 'ოსტატი შეირჩა', done: !!selectedProvider },
-    { label: 'სამუშაო დასრულდა', done: jobCompleted },
+    { label: 'სამუშაო დასრულდა', done: effectiveStatus === 'completed' },
   ];
 
   const handleEdit = () => {
@@ -118,15 +125,19 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const confirmSelection = () => {
     if (!confirmProvider) return;
     setSelectedProvider(confirmProvider);
+    setStatus(job.id, 'active'); // provider_selected
     setConfirmProvider(null);
   };
   const confirmCancel = () => {
     setCancelled(true);
     setCancelSheetOpen(false);
   };
-  const markCompleted = () => {
-    setJobCompleted(true);
-    setCompletionSheetOpen(true);
+  // Customer-ის "დადასტურება" — Provider-ის დასრულების მოთხოვნას ეთანხმება
+  // და პირდაპირ სავალდებულო შეფასებაზე გადადის. Job "completed" ხდება
+  // მხოლოდ მას შემდეგ, რაც ვარსკვლავიანი შეფასება რეალურად გაიგზავნება
+  // (openRating-ის onRate callback-ში) — არა ამ ღილაკზე დაჭერისთანავე.
+  const confirmCompletion = () => {
+    openRating();
   };
   const openRating = () => {
     navigation.navigate('RatingScreen', {
@@ -134,13 +145,16 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       providerName: selectedProvider?.name ?? 'გიორგი ბერიძე',
       providerInitials: selectedProvider?.initials ?? 'გბ',
       providerColor: selectedProvider?.color ?? colors.primary,
-      onRate: (data) => setRatingData(data),
+      onRate: (data) => {
+        setRatingData(data);
+        setStatus(job.id, 'completed');
+      },
     });
   };
   const submitProblem = () => {
     if (!problemOption || (problemOption === 'სხვა' && !problemOther.trim())) return;
     setProblemSheetOpen(false);
-    setProblemSubmitted(true);
+    setStatus(job.id, 'disputed');
   };
 
   return (
@@ -230,13 +244,13 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {showCompletionCard && (
+        {showCompletionConfirmCard && (
           <View style={styles.completionCard}>
             <View style={styles.completionHeaderRow}>
               <Clock size={15} color={colors.warning} />
-              <Text style={styles.completionTitle}>სამუშაო დასრულდა?</Text>
+              <Text style={styles.completionTitle}>ოსტატმა სამუშაო დასრულებულად მონიშნა</Text>
             </View>
-            <Text style={styles.completionSubtitle}>დაადასტურე, შესრულდა თუ არა სამუშაო.</Text>
+            <Text style={styles.completionSubtitle}>დაადასტურე დასრულება, ან შეატყობინე პრობლემის შესახებ.</Text>
             {selectedProvider && (
               <View style={styles.completionProviderRow}>
                 <Avatar initials={selectedProvider.initials} color={selectedProvider.color} size={38} />
@@ -253,14 +267,14 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
               <Pressable style={styles.problemButton} onPress={() => setProblemSheetOpen(true)}>
                 <Text style={styles.problemButtonText}>პრობლემა მაქვს</Text>
               </Pressable>
-              <Pressable style={styles.completeButton} onPress={markCompleted}>
-                <Text style={styles.completeButtonText}>დიახ, დასრულდა</Text>
+              <Pressable style={styles.completeButton} onPress={confirmCompletion}>
+                <Text style={styles.completeButtonText}>დადასტურება</Text>
               </Pressable>
             </View>
           </View>
         )}
 
-        {problemSubmitted && !jobCompleted && (
+        {effectiveStatus === 'disputed' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>მოთხოვნა ჯერ არ არის დასრულებული</Text>
             <Text style={styles.problemSubmittedText}>შეგიძლია გააგრძელო საუბარი ოსტატთან ჩატში.</Text>
@@ -273,7 +287,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {jobCompleted && (
+        {effectiveStatus === 'completed' && (
           <View style={styles.section}>
             {ratingData ? (
               <>
@@ -487,24 +501,6 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
         <Pressable style={styles.sheetCancelLink} onPress={() => setCancelSheetOpen(false)}>
           <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
         </Pressable>
-      </BottomSheet>
-
-      {/* შეფასება სავალდებულოა — ეს sheet არ იხურება backdrop-ზე დაჭერით
-          ან Android hardware back-ით (onClose no-op); "მოგვიანებით" განზრახ
-          არ არსებობს, ერთადერთი გზა წინ არის "ოსტატის შეფასება". */}
-      <BottomSheet visible={completionSheetOpen} onClose={() => {}}>
-        <View style={styles.completionSheetIcon}>
-          <CheckCircle2 size={28} color={colors.success} />
-        </View>
-        <Text style={styles.sheetTitle}>სამუშაო დასრულებულად მოინიშნა</Text>
-        <Text style={styles.sheetSubtitle}>სამუშაოს დასრულების შემდეგ საჭიროა ოსტატის შეფასება.</Text>
-        <Button
-          label="ოსტატის შეფასება"
-          onPress={() => {
-            setCompletionSheetOpen(false);
-            openRating();
-          }}
-        />
       </BottomSheet>
 
       <BottomSheet
@@ -1118,16 +1114,6 @@ const styles = StyleSheet.create({
     ...typography.captionMedium,
     color: colors.primaryForeground,
     fontWeight: '700',
-  },
-  completionSheetIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.full,
-    backgroundColor: colors.successBackground,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: spacing.sm + 2,
   },
   problemIntro: {
     ...typography.small,

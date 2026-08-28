@@ -1,8 +1,11 @@
 // TODO: ჩანაცვლდება Firestore-ის reviews collection-ით.
 // ზუსტად აღებულია დიზაინის რეფერენსის (ზიპის App.tsx)
 // PROVIDER_REVIEWS/PROVIDER_COMPLETED_JOBS-იდან.
-
-export type Review = { name: string; stars: number; date: string; text: string };
+// ტიპები src/types/review.ts და src/types/job.ts-შია (domain models
+// refactor) — ეს ფაილი მხოლოდ მონაცემებია, reviewService.ts/jobService.ts-ის
+// მეშვეობით გამოყენებული.
+import type { CompletedJob, MyJobRow } from '../types/job';
+import type { Review } from '../types/review';
 
 export const PROVIDER_REVIEWS: Record<string, Review[]> = {
   p1: [
@@ -25,15 +28,6 @@ export const PROVIDER_REVIEWS: Record<string, Review[]> = {
   ],
 };
 
-export type CompletedJob = {
-  id: string;
-  category: string;
-  title: string;
-  district: string;
-  date: string;
-  rating: number | null;
-};
-
 export const PROVIDER_COMPLETED_JOBS: CompletedJob[] = [
   { id: 'c1', category: 'plumbing', title: 'ონკანის გამოცვლა სამზარეულოში', district: 'ვაკე', date: '2 დ. წინ', rating: 5 },
   { id: 'c2', category: 'plumbing', title: 'სანტექნიკის სისტემის მონტაჟი', district: 'საბურთალო', date: '1 კვ. წინ', rating: 5 },
@@ -41,8 +35,6 @@ export const PROVIDER_COMPLETED_JOBS: CompletedJob[] = [
   { id: 'c4', category: 'plumbing', title: 'ვანის ოთახის სრული გადაკეთება', district: 'მთაწმინდა', date: '1 თვ. წინ', rating: 5 },
   { id: 'c5', category: 'plumbing', title: 'წყლის ლაინის შეკეთება', district: 'ისანი', date: '1.5 თვ. წინ', rating: null },
 ];
-
-export type MyJobRow = { title: string; customer: string; addr: string; when: string; pay: string };
 
 export const PROVIDER_MY_JOBS_ACTIVE: MyJobRow[] = [
   { title: 'ონკანის შეკეთება', customer: 'ნინო სულ.', addr: 'ვაკე, ჭავჭავ. 45', when: 'დღეს 16:00', pay: '120₾' },

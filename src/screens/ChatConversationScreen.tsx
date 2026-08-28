@@ -30,7 +30,9 @@ import { Button } from '../components/Button';
 import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
-import { CHATS_LIST, CHAT_MESSAGES, ChatMsg, MsgState } from '../data/mockChats';
+import { chatService } from '../services/chatService';
+import { useJobStatus } from '../state/JobStatusContext';
+import type { ChatMsg, MsgState } from '../types/chat';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChatConversation'>;
@@ -45,10 +47,15 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ChatConversation'>;
 // ეს ცვლილება ამ ეტაპზე მხოლოდ ჩატის ლოკალურ state-შია.
 export function ChatConversationScreen({ navigation, route }: Props) {
   const { chatId, name, initials, color, role } = route.params;
-  const chatEntry = CHATS_LIST.find((c) => c.id === chatId);
+  const chatEntry = chatService.getChatById(chatId);
   const online = chatEntry?.online ?? false;
+  const { getStatus } = useJobStatus();
+  // ჩატის job-ბანერის სტატუსი ცოცხალია (JobStatusContext.tsx) — არა
+  // CHATS_LIST-ის სტატიკური mock ველი, რომ Provider-ის "სამუშაო
+  // დავასრულე" აქაც დაუყოვნებლივ აისახოს.
+  const liveJobStatus = chatEntry?.jobId ? getStatus(chatEntry.jobId) ?? chatEntry.jobStatus : chatEntry?.jobStatus;
 
-  const [messages, setMessages] = useState<ChatMsg[]>(() => CHAT_MESSAGES[chatId] ?? []);
+  const [messages, setMessages] = useState<ChatMsg[]>(() => chatService.getMessages(chatId));
   const [msgText, setMsgText] = useState('');
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [imgPreview, setImgPreview] = useState<string | null>(null);
@@ -181,7 +188,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
             )}
           </View>
           <View style={styles.jobActions}>
-            {chatEntry.jobStatus && <StatusPill status={chatEntry.jobStatus} />}
+            {liveJobStatus && <StatusPill status={liveJobStatus} />}
             <Pressable onPress={handleOpenJobDetail}>
               <Text style={styles.jobDetailLink}>დეტ. ნახვა</Text>
             </Pressable>

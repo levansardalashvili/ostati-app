@@ -1,18 +1,27 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius } from '../theme';
+import type { JobStatus } from '../types/job';
 
-export type JobStatus = 'active' | 'pending' | 'completed' | 'cancelled';
+// JobStatus გადატანილია src/types/job.ts-ში (state machine-ის სრული
+// დოკუმენტაციითურთ) — აქ რეექსპორტდება, რომ არსებული
+// `import { StatusPill, type JobStatus } from '../components/StatusPill'`
+// import-ები ყველგან ხელუხლებელი დარჩეს.
+export type { JobStatus };
 
-// ძირითადი user-facing lifecycle (მომხმარებლის მოთხოვნით): "მომლოდინე"
-// (pending — Provider ჯერ არ არის არჩეული) → "დადასტურებულია" (active —
-// Customer-მა Provider აირჩია) → "დასრულებულია" (completed — Customer-მა
-// დაადასტურა დასრულება და შეაფასა). შიდა ტიპის key-ები (`active` და ა.შ.)
-// უცვლელია — მხოლოდ ნაჩვენები ტექსტი შეიცვალა. "გაუქმდა" ამ 3-საფეხურიან
-// lifecycle-ის ნაწილი არ არის (გამონაკლისი/terminal state), უცვლელია.
+// ძირითადი user-facing lifecycle ტექსტი (მომხმარებლის მოთხოვნით): "მომლოდინე"
+// → "დადასტურებულია" → "დასრულებულია". შიდა ტიპის key-ები (`active` და ა.შ.)
+// უცვლელია — მხოლოდ ნაჩვენები ტექსტი შეიცვალა.
 const STATUS_MAP: Record<JobStatus, { label: string; bg: string; text: string; dot: string }> = {
   active: { label: 'დადასტურებულია', bg: colors.successBackground, text: colors.success, dot: colors.success },
   pending: { label: 'მომლოდინე', bg: colors.warningBackground, text: colors.warning, dot: colors.warning },
+  awaiting_customer_confirmation: {
+    label: 'ელოდება დადასტურებას',
+    bg: colors.warningBackground,
+    text: colors.warning,
+    dot: colors.warning,
+  },
+  disputed: { label: 'პრობლემაა', bg: colors.dangerBackground, text: colors.destructive, dot: colors.destructive },
   completed: { label: 'დასრულებულია', bg: colors.secondary, text: colors.secondaryForeground, dot: colors.primary },
   cancelled: { label: 'გაუქმდა', bg: colors.dangerBackground, text: colors.destructive, dot: colors.destructive },
 };

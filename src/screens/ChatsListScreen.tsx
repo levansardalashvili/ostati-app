@@ -9,7 +9,7 @@ import { Avatar } from '../components/Avatar';
 import { Skeleton } from '../components/Skeleton';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
-import { CHATS_LIST } from '../data/mockChats';
+import { chatService } from '../services/chatService';
 import type { CustomerTabParamList, Role, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -28,12 +28,13 @@ export function ChatsListScreen({ navigation, role }: Props) {
     return () => clearTimeout(t);
   }, []);
 
+  const chats = useMemo(() => chatService.listChats(), []);
   const filtered = useMemo(
-    () => CHATS_LIST.filter((c) => !query || c.name.toLowerCase().includes(query.toLowerCase())),
-    [query],
+    () => chats.filter((c) => !query || c.name.toLowerCase().includes(query.toLowerCase())),
+    [chats, query],
   );
 
-  const openChat = (chat: (typeof CHATS_LIST)[number]) => {
+  const openChat = (chat: (typeof chats)[number]) => {
     navigation.navigate('ChatConversation', {
       chatId: chat.id,
       name: chat.name,

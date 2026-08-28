@@ -6,7 +6,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
 import { Skeleton } from '../components/Skeleton';
 import { colors, radius, spacing, typography } from '../theme';
-import { PROVIDER_REVIEWS } from '../data/mockReviews';
+import { reviewService } from '../services/reviewService';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderReviews'>;
@@ -15,7 +15,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProviderReviews'>;
 // მიხედვით (ყოველთვის საკუთარი პროფილის — p1 — შეფასებები, ისევე როგორც
 // ზიპშია, mode/id param-ის გარეშე).
 export function ProviderReviewsScreen({ navigation }: Props) {
-  const reviews = PROVIDER_REVIEWS.p1 ?? [];
+  const reviews = reviewService.getReviewsForProvider('p1');
   const avg = reviews.length ? reviews.reduce((s, r) => s + r.stars, 0) / reviews.length : 0;
   const avgLabel = avg.toFixed(1);
   const [isLoading, setIsLoading] = useState(true);

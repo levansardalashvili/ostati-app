@@ -13,9 +13,10 @@ import { StatusPill } from '../components/StatusPill';
 import { Switch } from '../components/Switch';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
-import { FeedJob, PROVIDER_FEED } from '../data/mockHomeData';
 import { getUnreadCount } from '../data/mockNotifications';
-import { CURRENT_PROVIDER_ID, getOpenProviderFeed } from '../data/providerFeedFilters';
+import { CURRENT_PROVIDER_ID, jobService } from '../services/jobService';
+import { useJobStatus } from '../state/JobStatusContext';
+import type { FeedJob } from '../types/job';
 import type { ProviderTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -50,11 +51,17 @@ export function ProviderHomeScreen({ navigation }: Props) {
   }, []);
 
   // "მიმდინარე სამუშაო" — job, რომელზეც Customer-მა სწორედ ეს Provider აირჩია.
-  // ასეთი job Feed-ში აღარ ჩანს (იხ. getOpenProviderFeed).
-  const currentJob = PROVIDER_FEED.find((j) => j.assignedProviderId === CURRENT_PROVIDER_ID) ?? null;
+  // ასეთი job Feed-ში აღარ ჩანს (იხ. getOpenProviderFeed). სრულად
+  // "completed"-ზე გადასვლის შემდეგ (ორმხრივი დასრულების flow,
+  // JobStatusContext.tsx) ეს ბარათი Home-ზეც აღარ ჩანს — აღარ არის
+  // "მიმდინარე".
+  const { getStatus } = useJobStatus();
+  const currentJobCandidate = jobService.listProviderFeed().find((j) => j.assignedProviderId === CURRENT_PROVIDER_ID) ?? null;
+  const currentJobStatus = currentJobCandidate?.customerJobId ? getStatus(currentJobCandidate.customerJobId) : undefined;
+  const currentJob = currentJobStatus === 'completed' ? null : currentJobCandidate;
   const currentJobCategory = currentJob ? CATEGORIES.find((c) => c.id === currentJob.category) : null;
 
-  const filtered = useMemo(() => getOpenProviderFeed(), []);
+  const filtered = useMemo(() => jobService.getOpenProviderFeed(), []);
   const homeFeed = filtered.slice(0, HOME_FEED_LIMIT);
 
   const handleNotifications = () => {
@@ -171,7 +178,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
                 </View>
               </View>
               <View style={styles.currentJobRight}>
-                <StatusPill status="active" />
+                <StatusPill status={currentJobStatus ?? 'active'} />
                 <ChevronRight size={16} color={colors.mutedForeground} />
               </View>
             </Pressable>

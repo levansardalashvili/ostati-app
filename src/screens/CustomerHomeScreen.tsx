@@ -21,9 +21,11 @@ import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
 import { TBILISI_AREAS as DISTRICTS } from '../data/districts';
-import { CUSTOMER_JOBS, PROVIDERS, Provider } from '../data/mockHomeData';
 import { getUnreadCount } from '../data/mockNotifications';
+import { jobService } from '../services/jobService';
+import { userService } from '../services/userService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
+import type { Provider } from '../types/provider';
 import { isNewProvider, providerRankScore } from '../utils/providerRank';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
@@ -76,7 +78,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
 
   const filtered = useMemo(() => {
     const effectiveDistrict = selDistrict === 'mine' ? myDistrict : selDistrict;
-    return PROVIDERS.filter((p) => {
+    return userService.listProviders().filter((p) => {
       if (selCats.size > 0 && !selCats.has(p.category)) return false;
       // მთხოვნის მიხედვით — ოსტატის საცხოვრებელი მისამართის (`location`) ნაცვლად
       // მისი სამუშაო არეალით (`areas`) ვფილტრავთ.
@@ -122,7 +124,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
   // "მიმდინარე სამუშაო" — ჩანს მხოლოდ მაშინ, როცა Customer-მა კონკრეტულ
   // Provider-ს აირჩია (status === 'active'). დაჭერისას იხსნება არსებული
   // CustomerJobDetail ეკრანი — არა ცალკე duplicate დეტალის ეკრანი.
-  const currentJob = CUSTOMER_JOBS.find((j) => j.status === 'active') ?? null;
+  const currentJob = jobService.listCustomerJobs().find((j) => j.status === 'active') ?? null;
   const currentJobCategory = currentJob ? CATEGORIES.find((c) => c.id === currentJob.category) : null;
   const handleOpenCurrentJob = () => {
     if (!currentJob) return;

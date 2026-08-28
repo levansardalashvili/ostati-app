@@ -6,6 +6,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
+import { authService } from '../services/authService';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ForgotPassword'>;
@@ -31,7 +32,7 @@ export function ForgotPasswordScreen({ navigation }: Props) {
     setTouched(true);
     if (!email || !isEmail(email)) return;
     setLoading(true);
-    // TODO: Firebase Auth (sendPasswordResetEmail) დაემატება ავთენტიფიკაციის ეტაპზე
+    authService.sendPasswordReset(email.trim());
     setTimeout(() => {
       setLoading(false);
       setSent(true);

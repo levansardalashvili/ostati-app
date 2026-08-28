@@ -1,35 +1,15 @@
 // TODO: ჩანაცვლდება Firestore-დან წამოღებული რეალური მონაცემებით.
 // ჯერჯერობით — დიზაინის რეფერენსის mock მონაცემების ზუსტი ასლი
 // (product-spec.md-ის B1/C1/C3 ეკრანების დემონსტრირებისთვის).
-
-export type Provider = {
-  id: string;
-  name: string;
-  category: string;
-  years: number;
-  rating: number;
-  reviews: number;
-  location: string;
-  areas: string[];
-  price: string;
-  jobs: number;
-  verified: boolean;
-  online: boolean;
-  initials: string;
-  color: string;
-  bio: string;
-  skills: string[];
-  certificates: { id: number; bg: string }[];
-  portfolio: { id: number; bg: string }[];
-  // ამ ოსტატის კვ.მ-ის ფასი (თუ მისი სპეციალობა კვადრატულობით ითვლება —
-  // src/data/specialties.ts-ის pricePerSqm). Customer-ის job detail-ზე
-  // "დაინტერესებული ოსტატის" ბარათზე ჩნდება, თუ ცალკე შეთავაზებული ფასი არ არის.
-  sqmPrice?: string;
-  // საჯარო პროფილზე საჩვენებელი სპეციალობების სია (Provider-ის მრავალარჩევანიანი
-  // სპეციალობის კონცეფცია — SpecialtyPickerField-ისავე, #8) — `category`-სგან
-  // დამოუკიდებელია, რომელიც მხოლოდ ფილტრაციისთვის რჩება ერთადერთ მნიშვნელობად.
-  specialties: string[];
-};
+//
+// ტიპები აქედან გადატანილია src/types/-ში (domain models refactor) —
+// ეს ფაილი ახლა მხოლოდ მონაცემებია, სერვისების ფენის მეშვეობით
+// გამოყენებული (src/services/userService.ts, jobService.ts, quoteService.ts,
+// reviewService.ts) — ეკრანები აღარ უნდა შემოიტანონ ეს ფაილი პირდაპირ.
+import type { CustomerJob, FeedJob } from '../types/job';
+import type { Provider } from '../types/provider';
+import type { JobQuote } from '../types/quote';
+import type { RatingData } from '../types/review';
 
 export const PROVIDERS: Provider[] = [
   {
@@ -144,26 +124,6 @@ export const PROVIDERS: Provider[] = [
   },
 ];
 
-export type FeedJob = {
-  id: string;
-  category: string;
-  title: string;
-  customer: string;
-  location: string;
-  date: string;
-  ago: string;
-  interested: number;
-  urgent: boolean;
-  hasPhoto: boolean;
-  desc: string;
-  // Customer-ის მიერ არჩეული Provider-ის id, თუ job უკვე გადაწყვეტილია.
-  // CURRENT_PROVIDER_ID-ს დამთხვევისას job Feed-იდან ქრება და "მიმდინარე
-  // სამუშაო" ხდება Provider Home-ზე; ნებისმიერი სხვა id-ით — უბრალოდ ქრება
-  // Feed-იდან (job სხვა Provider-ისთვის დაიხურა). undefined/null — job
-  // ჯერ კიდევ ღიაა ინტერესის გამოსახატად.
-  assignedProviderId?: string | null;
-};
-
 export const PROVIDER_FEED: FeedJob[] = [
   {
     id: 'f1',
@@ -193,6 +153,10 @@ export const PROVIDER_FEED: FeedJob[] = [
     // demo: მიმდინარე Provider-ისთვის (p1) უკვე არჩეულია — "მიმდინარე
     // სამუშაო"-დ ჩანს Provider Home-ზე, Feed-ში აღარ ჩანს.
     assignedProviderId: 'p1',
+    // demo: იგივე job, რაც Customer-ის მხრიდან CUSTOMER_JOBS-ის 'j1'-ია
+    // (provider p1-ისვე აქტიური სამუშაო) — ორმხრივი დასრულების flow-ის
+    // დემონსტრირებისთვის საჭირო ბმული (JobStatusContext.tsx).
+    customerJobId: 'j1',
   },
   {
     id: 'f3',
@@ -223,17 +187,6 @@ export const PROVIDER_FEED: FeedJob[] = [
     desc: '20 კვ.მ ოთახი, 2 ფერი. ეკო-საღებავი სასურველია.',
   },
 ];
-
-export type CustomerJob = {
-  id: string;
-  title: string;
-  category: string;
-  status: 'active' | 'pending' | 'completed' | 'cancelled';
-  provider: string | null;
-  date: string;
-  address: string;
-  desc: string;
-};
 
 export const CUSTOMER_JOBS: CustomerJob[] = [
   {
@@ -273,22 +226,13 @@ export const CUSTOMER_JOBS: CustomerJob[] = [
 // "დაინტერესებისას" ხელით შეთავაზებული ფასი ამ კონკრეტულ სამუშაოზე
 // (არასავალდებულო) — თუ არ არის, Customer-ის ბარათზე sqmPrice-ზე ვვარდებით,
 // და თუ ისიც არ არის — გენერიკულ "ფასი ნახვის შემდეგ" ტექსტზე.
-export const INTERESTED_PROVIDERS: Record<string, { provider: Provider; offeredPrice?: string }[]> = {
+export const INTERESTED_PROVIDERS: Record<string, JobQuote[]> = {
   j1: [{ provider: PROVIDERS[0], offeredPrice: '120' }],
   j2: [{ provider: PROVIDERS[0] }, { provider: PROVIDERS[2], offeredPrice: '650' }, { provider: PROVIDERS[3] }],
   j3: [],
 };
 
 export const PHOTO_COLORS = ['#DBEAFE', '#D1FAE5', '#FEF3C7', '#FCE7F3'];
-
-export type RatingData = {
-  stars: number;
-  review: string;
-  chips: string[];
-  // დასრულებული სამუშაოს ფოტო Customer-ისგან (არასავალდებულო) — RatingScreen-ზე
-  // ატვირთული, MediaItem-ის იგივე {id, bg} mock ფორმატი.
-  photos?: { id: number; bg: string }[];
-};
 
 // job-ისთვის უკვე გაგზავნილი შეფასება — j3 წინასწარ შეფასებულია (ზიპის
 // SUBMITTED_RATINGS-ის მიხედვით), დანარჩენებისთვის ცარიელია.

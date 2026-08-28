@@ -8,7 +8,7 @@ import { BackHeader } from '../components/BackHeader';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
-import { PROVIDERS } from '../data/mockHomeData';
+import { userService } from '../services/userService';
 import { isNewProvider } from '../utils/providerRank';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -19,7 +19,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CustomerCategory'>;
 // ზიპში ეს ეკრანი ყველა ოსტატს უფილტრაციოდ აჩვენებდა).
 export function CustomerCategoryScreen({ navigation, route }: Props) {
   const category = CATEGORIES.find((c) => c.id === route.params.id);
-  const providers = useMemo(() => PROVIDERS.filter((p) => p.category === route.params.id), [route.params.id]);
+  const providers = useMemo(
+    () => userService.listProviders().filter((p) => p.category === route.params.id),
+    [route.params.id],
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

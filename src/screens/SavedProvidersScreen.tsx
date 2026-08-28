@@ -8,8 +8,9 @@ import { BackHeader } from '../components/BackHeader';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
-import { PROVIDERS } from '../data/mockHomeData';
+import { userService } from '../services/userService';
 import { useFavoriteProviders } from '../state/FavoriteProvidersContext';
+import type { Provider } from '../types/provider';
 import { isNewProvider } from '../utils/providerRank';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -23,10 +24,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SavedProviders'>;
 // მენიუდან იხსნება.
 export function SavedProvidersScreen({ navigation }: Props) {
   const { favoriteIds, toggleFavorite } = useFavoriteProviders();
-  const saved = PROVIDERS.filter((p) => favoriteIds.has(p.id));
+  const saved = userService.listProviders().filter((p) => favoriteIds.has(p.id));
 
   const openProfile = (id: string) => navigation.navigate('ViewProviderProfile', { id });
-  const openChat = (p: (typeof PROVIDERS)[number]) => {
+  const openChat = (p: Provider) => {
     navigation.navigate('ChatConversation', {
       chatId: p.id,
       name: p.name,

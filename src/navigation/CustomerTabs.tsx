@@ -7,12 +7,12 @@ import { CustomerJobsScreen } from '../screens/CustomerJobsScreen';
 import { ChatsListScreen } from '../screens/ChatsListScreen';
 import { CustomerProfileScreen } from '../screens/CustomerProfileScreen';
 import { colors, radius, typography } from '../theme';
-import { CHATS_LIST } from '../data/mockChats';
+import { chatService } from '../services/chatService';
 import type { CustomerTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
 
-const unreadChats = CHATS_LIST.filter((c) => c.unread > 0).length;
+const unreadChats = chatService.listChats().filter((c) => c.unread > 0).length;
 
 // Bottom Navigation — Customer (product-spec.md-ის საწყისი "Home / ჩატები /
 // პროფილი" 3 ჩანართი გაფართოვდა "განცხადებები" ჩანართით — ეს ყოფილი
