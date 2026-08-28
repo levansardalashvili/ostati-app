@@ -33,7 +33,7 @@ type Props = CompositeScreenProps<
 
 const MENU = [
   { icon: Pencil, label: 'პროფილის რედაქტირება', bg: '#EFF6FF', color: '#2563EB', badge: 0 },
-  { icon: MapPin, label: 'დაფარვის რაიონები', bg: '#ECFDF5', color: '#059669', badge: 0 },
+  { icon: MapPin, label: 'სამუშაო არეალი', bg: '#ECFDF5', color: '#059669', badge: 0 },
   { icon: Briefcase, label: 'შესრულებული სამუშაოები', bg: '#F5F3FF', color: '#7C3AED', badge: 312 },
   { icon: Star, label: 'შეფასებები', bg: '#FFFBEB', color: '#D97706', badge: 127 },
   { icon: Bell, label: 'შეტყობინებები', bg: colors.muted, color: colors.mutedForeground, badge: getUnreadCount('provider') },
@@ -57,7 +57,7 @@ export function ProviderProfileScreen({ navigation }: Props) {
       navigation.navigate('ViewProviderProfile', { id: 'p1' });
     } else if (label === 'პროფილის რედაქტირება' || label === 'photo') {
       navigation.navigate('ProviderEditProfile');
-    } else if (label === 'დაფარვის რაიონები') {
+    } else if (label === 'სამუშაო არეალი') {
       navigation.navigate('ProviderServiceAreas');
     } else if (label === 'შესრულებული სამუშაოები') {
       navigation.navigate('ProviderCompletedJobs');
@@ -114,7 +114,6 @@ export function ProviderProfileScreen({ navigation }: Props) {
         <View style={styles.availabilityRow}>
           <View style={styles.availabilityDot} />
           <Text style={styles.availabilityText}>ხელმისაწვდომი</Text>
-          <Text style={styles.availabilityNote}>· მთ. კონტ. Provider Home-ზე</Text>
         </View>
       </View>
 
@@ -278,10 +277,6 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.success,
     fontWeight: '700',
-  },
-  availabilityNote: {
-    ...typography.small,
-    color: colors.mutedForeground,
   },
   body: {
     flex: 1,

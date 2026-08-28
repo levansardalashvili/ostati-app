@@ -1,8 +1,9 @@
 import React from 'react';
 import { View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, MessageCircle, User } from 'lucide-react-native';
+import { FilePlus2, Home, MessageCircle, User } from 'lucide-react-native';
 import { CustomerHomeScreen } from '../screens/CustomerHomeScreen';
+import { CustomerJobsScreen } from '../screens/CustomerJobsScreen';
 import { ChatsListScreen } from '../screens/ChatsListScreen';
 import { CustomerProfileScreen } from '../screens/CustomerProfileScreen';
 import { colors, radius, typography } from '../theme';
@@ -13,8 +14,12 @@ const Tab = createBottomTabNavigator<CustomerTabParamList>();
 
 const unreadChats = CHATS_LIST.filter((c) => c.unread > 0).length;
 
-// Bottom Navigation — Customer (product-spec.md: "Home / ჩატები / პროფილი",
-// დიზაინის რეფერენსის BottomNav-ის მიხედვით)
+// Bottom Navigation — Customer (product-spec.md-ის საწყისი "Home / ჩატები /
+// პროფილი" 3 ჩანართი გაფართოვდა "განცხადებები" ჩანართით — ეს ყოფილი
+// root-stack "CustomerJobs" ("ჩემი მოთხოვნები") ეკრანია, ახლა ტაბის სახით,
+// პლუს ახალი განცხადების დამატების ღილაკი მის header-ში — მომხმარებლის
+// მოთხოვნით, ცალკე "მოთხოვნის გამოქვეყნება"-ზე გადამისამართებადი ცარიელი
+// ტაბის ნაცვლად).
 export function CustomerTabs() {
   return (
     <Tab.Navigator
@@ -38,6 +43,14 @@ export function CustomerTabs() {
         options={{
           tabBarLabel: 'მთავარი',
           tabBarIcon: ({ color, focused }) => <Home size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />,
+        }}
+      />
+      <Tab.Screen
+        name="MyJobsTab"
+        component={CustomerJobsScreen}
+        options={{
+          tabBarLabel: 'განცხადებები',
+          tabBarIcon: ({ color, focused }) => <FilePlus2 size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />,
         }}
       />
       <Tab.Screen

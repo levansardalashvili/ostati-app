@@ -1,29 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  Bell,
-  Briefcase,
-  Camera,
-  ChevronRight,
-  Check,
-  Clock,
-  MapPin,
-  MessageCircle,
-  ThumbsUp,
-} from 'lucide-react-native';
+import { Bell, Briefcase, ChevronRight, Clock, MapPin, User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { CategoryIcon } from '../components/CategoryIcon';
-import { Skeleton } from '../components/Skeleton';
+import { ProviderFeedJobCard, ProviderFeedJobCardSkeleton } from '../components/ProviderFeedJobCard';
+import { StatusPill } from '../components/StatusPill';
 import { Switch } from '../components/Switch';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
 import { FeedJob, PROVIDER_FEED } from '../data/mockHomeData';
 import { getUnreadCount } from '../data/mockNotifications';
+import { CURRENT_PROVIDER_ID, getOpenProviderFeed } from '../data/providerFeedFilters';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -39,21 +31,17 @@ const MOCK_STATS = [
   { value: '4.9★', label: 'შეფ.' },
 ];
 
-const CAT_OPTS = ['ყველა', 'სანტ.', 'ელექ.', 'ხატ.', 'ავეჯ.', 'კონდ.'];
-const CAT_IDS: (string | null)[] = [null, 'plumbing', 'electrical', 'painting', 'furniture', 'ac'];
-const AREA_OPTS = ['ყველა', 'ვაკე', 'საბ.', 'ვერა', 'გლდ.'];
-const AREA_VALS: (string | null)[] = [null, 'ვაკე', 'საბურთალო', 'ვერა', 'გლდანი'];
-const TIME_OPTS = ['ყველა', 'დღეს', 'ხვალ', 'მოქნ.'];
-const TIME_VALS: (string | null)[] = [null, 'დღეს', 'ხვალ', 'მოქნ'];
+// Home-ზე მხოლოდ ბოლო 5 შესაბამისი მოთხოვნაა ჩანს — დანარჩენის სანახავად
+// "ყველას ნახვა" ხსნის სრულ Feed-ს (ProviderJobFeedScreen).
+const HOME_FEED_LIMIT = 5;
 
 // B1 — Provider Home (product-spec.md; დიზაინის რეფერენსის ProviderHome-ის
 // მიხედვით)
 export function ProviderHomeScreen({ navigation }: Props) {
+  // `available` მხოლოდ push-შეტყობინებებზე მოქმედებს — Job Feed (`filtered`)
+  // მისგან დამოუკიდებელია და OFF-ის დროსაც ჩანს (მომხმარებლის მოთხოვნით).
   const [available, setAvailable] = useState(true);
   const [interests, setInterests] = useState<Set<string>>(new Set());
-  const [catIdx, setCatIdx] = useState(0);
-  const [areaIdx, setAreaIdx] = useState(0);
-  const [timeIdx, setTimeIdx] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -61,24 +49,26 @@ export function ProviderHomeScreen({ navigation }: Props) {
     return () => clearTimeout(t);
   }, []);
 
-  const activeCat = CAT_IDS[catIdx];
-  const activeArea = AREA_VALS[areaIdx];
-  const activeTime = TIME_VALS[timeIdx];
+  // "მიმდინარე სამუშაო" — job, რომელზეც Customer-მა სწორედ ეს Provider აირჩია.
+  // ასეთი job Feed-ში აღარ ჩანს (იხ. getOpenProviderFeed).
+  const currentJob = PROVIDER_FEED.find((j) => j.assignedProviderId === CURRENT_PROVIDER_ID) ?? null;
+  const currentJobCategory = currentJob ? CATEGORIES.find((c) => c.id === currentJob.category) : null;
 
-  const filtered = useMemo(() => {
-    return PROVIDER_FEED.filter((j) => {
-      if (activeCat && j.category !== activeCat) return false;
-      if (activeArea && j.location !== activeArea) return false;
-      if (activeTime && !j.date.startsWith(activeTime)) return false;
-      return true;
-    });
-  }, [activeCat, activeArea, activeTime]);
+  const filtered = useMemo(() => getOpenProviderFeed(), []);
+  const homeFeed = filtered.slice(0, HOME_FEED_LIMIT);
 
   const handleNotifications = () => {
     navigation.navigate('Notifications', { role: 'provider' });
   };
   const handleJobDetail = (id: string) => {
     navigation.navigate('ProviderJobDetail', { id });
+  };
+  const handleOpenCurrentJob = () => {
+    if (!currentJob) return;
+    navigation.navigate('ProviderJobDetail', { id: currentJob.id, mode: 'selected' });
+  };
+  const handleViewAllFeed = () => {
+    navigation.navigate('ProviderJobFeed');
   };
   const handleOpenChat = (job: FeedJob) => {
     navigation.navigate('ChatConversation', {
@@ -96,20 +86,14 @@ export function ProviderHomeScreen({ navigation }: Props) {
       return next;
     });
   };
-  const clearFilters = () => {
-    setCatIdx(0);
-    setAreaIdx(0);
-    setTimeIdx(0);
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
-            <Text style={styles.greeting}>დილა მშვიდობისა,</Text>
             <Text style={styles.name} numberOfLines={1}>
-              გიორგი ბერიძე
+              გამარჯობა, გიორგი
             </Text>
           </View>
           <View style={styles.headerActions}>
@@ -134,7 +118,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
                   {available ? 'ხელმისაწვდომი' : 'დაკავებული'}
                 </Text>
                 <Text style={[styles.availabilitySubtitle, { color: available ? colors.success : colors.mutedForeground }]}>
-                  {available ? 'ახალი სამ. შეტყობინებები ჩართულია' : 'პუშ შეტყობინებები გამორთულია'}
+                  {available ? 'შეტყობინებები ჩართულია' : 'შეტყობინებები გამორთულია'}
                 </Text>
               </View>
             </View>
@@ -166,185 +150,79 @@ export function ProviderHomeScreen({ navigation }: Props) {
           </LinearGradient>
         </View>
 
+        {currentJob && currentJobCategory && (
+          <View style={styles.currentJobSection}>
+            <Text style={styles.currentJobSectionTitle}>მიმდინარე სამუშაო</Text>
+            <Pressable style={styles.currentJobCard} onPress={handleOpenCurrentJob}>
+              <CategoryIcon categoryId={currentJobCategory.id} size={44} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={styles.currentJobCustomerRow}>
+                  <User size={12} color={colors.mutedForeground} />
+                  <Text style={styles.currentJobCustomer} numberOfLines={1}>
+                    {currentJob.customer}
+                  </Text>
+                </View>
+                <Text style={styles.currentJobCategoryText}>{currentJobCategory.label}</Text>
+                <View style={styles.currentJobMetaRow}>
+                  <Clock size={11} color={colors.mutedForeground} />
+                  <Text style={styles.currentJobMetaText}>{currentJob.date}</Text>
+                  <MapPin size={11} color={colors.mutedForeground} />
+                  <Text style={styles.currentJobMetaText}>{currentJob.location}</Text>
+                </View>
+              </View>
+              <View style={styles.currentJobRight}>
+                <StatusPill status="active" />
+                <ChevronRight size={16} color={colors.mutedForeground} />
+              </View>
+            </Pressable>
+          </View>
+        )}
+
         <View style={styles.feedSection}>
           <View style={styles.feedHeaderRow}>
             <View>
               <Text style={styles.feedTitle}>ახალი მოთხოვნები</Text>
-              <Text style={styles.feedSubtitle}>შენს რაიონში</Text>
+              <Text style={styles.feedSubtitle}>შენს სამუშაო არეალში</Text>
             </View>
             <View style={styles.feedCountBadge}>
               <View style={styles.pulseDot} />
               <Text style={styles.feedCountText}>{filtered.length}</Text>
             </View>
           </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-            <FilterChip label={CAT_OPTS[catIdx]} active={catIdx !== 0} onPress={() => setCatIdx((i) => (i + 1) % CAT_OPTS.length)} />
-            <FilterChip label={AREA_OPTS[areaIdx]} active={areaIdx !== 0} onPress={() => setAreaIdx((i) => (i + 1) % AREA_OPTS.length)} />
-            <FilterChip label={TIME_OPTS[timeIdx]} active={timeIdx !== 0} onPress={() => setTimeIdx((i) => (i + 1) % TIME_OPTS.length)} />
-          </ScrollView>
         </View>
 
         <View style={styles.cardsSection}>
           {isLoading ? (
-            [0, 1, 2].map((i) => <JobCardSkeleton key={i} />)
+            [0, 1, 2].map((i) => <ProviderFeedJobCardSkeleton key={i} />)
           ) : filtered.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIcon}>
                 <Briefcase size={20} color={colors.mutedForeground} />
               </View>
               <Text style={styles.emptyTitle}>ახალი მოთხოვნები ჯერ არ არის</Text>
-              <Text style={styles.emptySubtitle}>
-                {catIdx === 0 && areaIdx === 0
-                  ? 'შენს კატეგორიასა და რაიონში ახალი მოთხოვნა გამოჩნდება.'
-                  : 'ამ ფილტრებით განცხადებები არ მოიძებნა.'}
-              </Text>
-              {(catIdx > 0 || areaIdx > 0 || timeIdx > 0) && (
-                <Pressable onPress={clearFilters}>
-                  <Text style={styles.clearFiltersLink}>ფილტრის გასუფთავება</Text>
-                </Pressable>
-              )}
+              <Text style={styles.emptySubtitle}>შენს კატეგორიასა და არეალში ახალი მოთხოვნა გამოჩნდება.</Text>
             </View>
           ) : (
-            filtered.map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                sent={interests.has(job.id)}
-                onDetail={() => handleJobDetail(job.id)}
-                onInterested={() => markInterested(job.id)}
-                onChat={() => handleOpenChat(job)}
-              />
-            ))
+            <>
+              {homeFeed.map((job) => (
+                <ProviderFeedJobCard
+                  key={job.id}
+                  job={job}
+                  sent={interests.has(job.id)}
+                  onDetail={() => handleJobDetail(job.id)}
+                  onInterested={() => markInterested(job.id)}
+                  onChat={() => handleOpenChat(job)}
+                />
+              ))}
+              <Pressable style={styles.viewAllButton} onPress={handleViewAllFeed}>
+                <Text style={styles.viewAllButtonText}>ყველას ნახვა</Text>
+                <ChevronRight size={15} color={colors.primary} />
+              </Pressable>
+            </>
           )}
         </View>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.filterChip, active && styles.filterChipActive]}>
-      <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{label}</Text>
-      <ChevronRight
-        size={10}
-        color={active ? '#BFDBFE' : colors.mutedForeground}
-        style={{ transform: [{ rotate: '90deg' }] }}
-      />
-    </Pressable>
-  );
-}
-
-function JobCard({
-  job,
-  sent,
-  onDetail,
-  onInterested,
-  onChat,
-}: {
-  job: FeedJob;
-  sent: boolean;
-  onDetail: () => void;
-  onInterested: () => void;
-  onChat: () => void;
-}) {
-  const category = CATEGORIES.find((c) => c.id === job.category) ?? CATEGORIES[0];
-
-  return (
-    <View style={styles.jobCard}>
-      <View style={styles.jobCardBody}>
-        <View style={styles.jobHeaderRow}>
-          <CategoryIcon categoryId={category.id} size={38} />
-          <View style={{ flex: 1 }}>
-            <View style={styles.jobTitleRow}>
-              <Text style={styles.jobTitle}>{job.title}</Text>
-              {job.urgent && (
-                <View style={styles.urgentBadge}>
-                  <Text style={styles.urgentBadgeText}>🔥 სასწ.</Text>
-                </View>
-              )}
-            </View>
-            <View style={styles.jobMetaRow}>
-              <Text style={styles.jobMetaText}>{category.label}</Text>
-              <Text style={styles.dotSeparator}>•</Text>
-              <View style={styles.jobMetaLocation}>
-                <MapPin size={10} color={colors.mutedForeground} />
-                <Text style={styles.jobMetaText}>{job.location}</Text>
-              </View>
-              <Text style={styles.dotSeparator}>•</Text>
-              <Text style={styles.jobMetaText}>{job.ago} წინ</Text>
-            </View>
-          </View>
-        </View>
-
-        <Text style={styles.jobDesc}>{job.desc}</Text>
-
-        <View style={styles.jobTimeRow}>
-          <Clock size={12} color={colors.primary} />
-          <Text style={styles.jobTimeText}>{job.date}</Text>
-        </View>
-
-        <View style={styles.jobTagsRow}>
-          {job.budget && (
-            <View style={styles.jobTag}>
-              <Text style={styles.jobTagText}>
-                სავ. ბიუჯ.: <Text style={styles.jobTagValue}>{job.budget}</Text>
-              </Text>
-            </View>
-          )}
-          {job.hasPhoto && (
-            <View style={styles.jobTag}>
-              <Camera size={10} color={colors.mutedForeground} />
-              <Text style={styles.jobTagText}>ფოტოა</Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.jobActionRow}>
-        <Text style={styles.interestedCount}>{job.interested + (sent ? 1 : 0)} დაინტ.</Text>
-        <View style={styles.jobActionButtons}>
-          <Pressable style={styles.detailButton} onPress={onDetail}>
-            <Text style={styles.detailButtonText}>დეტ. ნახვა</Text>
-          </Pressable>
-          {sent ? (
-            <Pressable style={styles.chatButton} onPress={onChat}>
-              <MessageCircle size={13} color={colors.primaryForeground} />
-              <Text style={styles.chatButtonText}>ჩატის გახსნა</Text>
-            </Pressable>
-          ) : (
-            <Pressable style={styles.chatButton} onPress={onInterested}>
-              <ThumbsUp size={13} color={colors.primaryForeground} />
-              <Text style={styles.chatButtonText}>დაინტ. ვარ</Text>
-            </Pressable>
-          )}
-        </View>
-      </View>
-
-      {sent && (
-        <View style={styles.sentStrip}>
-          <Check size={13} color={colors.success} strokeWidth={2.5} />
-          <Text style={styles.sentStripText}>ინტერესი გაგზავნილია</Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
-function JobCardSkeleton() {
-  return (
-    <View style={[styles.jobCard, { padding: spacing.md, gap: spacing.sm }]}>
-      <View style={{ flexDirection: 'row', gap: spacing.md }}>
-        <Skeleton width={38} height={38} borderRadius={radius.md} />
-        <View style={{ flex: 1, gap: spacing.xs }}>
-          <Skeleton width="80%" height={16} />
-          <Skeleton width="50%" height={12} />
-        </View>
-      </View>
-      <Skeleton width="100%" height={12} />
-      <Skeleton width="60%" height={12} />
-    </View>
   );
 }
 
@@ -370,10 +248,6 @@ const styles = StyleSheet.create({
   headerText: {
     flex: 1,
     minWidth: 0,
-  },
-  greeting: {
-    ...typography.small,
-    color: colors.mutedForeground,
   },
   name: {
     ...typography.h2,
@@ -535,33 +409,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '700',
   },
-  filterRow: {
-    gap: spacing.sm,
-    paddingRight: spacing.lg,
-  },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs + 2,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  filterChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  filterChipText: {
-    ...typography.small,
-    color: colors.mutedForeground,
-    fontWeight: '600',
-  },
-  filterChipTextActive: {
-    color: colors.primaryForeground,
-  },
   cardsSection: {
     paddingHorizontal: spacing.lg,
     marginTop: spacing.md,
@@ -595,169 +442,67 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.sm + 2,
   },
-  clearFiltersLink: {
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: spacing.sm + 2,
+  },
+  viewAllButtonText: {
     ...typography.captionMedium,
     color: colors.primary,
+    fontWeight: '700',
   },
-  jobCard: {
+  currentJobSection: {
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+  },
+  currentJobSectionTitle: {
+    ...typography.bodyMedium,
+    color: colors.foreground,
+    marginBottom: spacing.sm + 2,
+  },
+  currentJobCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.lg,
-    overflow: 'hidden',
-  },
-  jobCardBody: {
     padding: spacing.md,
-    paddingBottom: spacing.sm + 2,
   },
-  jobHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    marginBottom: spacing.sm + 2,
-  },
-  jobTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  jobTitle: {
-    ...typography.captionMedium,
-    color: colors.foreground,
-    fontWeight: '700',
-    flex: 1,
-  },
-  urgentBadge: {
-    backgroundColor: colors.dangerBackground,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  urgentBadgeText: {
-    ...typography.small,
-    color: colors.destructive,
-    fontWeight: '700',
-  },
-  jobMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
-  jobMetaLocation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  jobMetaText: {
-    ...typography.small,
-    color: colors.mutedForeground,
-  },
-  dotSeparator: {
-    color: colors.border,
-    fontSize: 9,
-  },
-  jobDesc: {
-    ...typography.caption,
-    color: colors.mutedForeground,
-    marginBottom: spacing.sm + 2,
-  },
-  jobTimeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: spacing.sm + 2,
-  },
-  jobTimeText: {
-    ...typography.small,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  jobTagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs + 2,
-  },
-  jobTag: {
+  currentJobCustomerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.muted,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
   },
-  jobTagText: {
-    ...typography.small,
-    color: colors.mutedForeground,
-  },
-  jobTagValue: {
-    fontWeight: '700',
+  currentJobCustomer: {
+    ...typography.bodyMedium,
     color: colors.foreground,
+    fontWeight: '700',
+    flexShrink: 1,
   },
-  jobActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  interestedCount: {
+  currentJobCategoryText: {
     ...typography.small,
     color: colors.mutedForeground,
+    marginTop: 1,
   },
-  jobActionButtons: {
+  currentJobMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 2,
   },
-  detailButton: {
-    backgroundColor: colors.muted,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs + 2,
-  },
-  detailButtonText: {
+  currentJobMetaText: {
     ...typography.small,
     color: colors.mutedForeground,
-    fontWeight: '600',
+    marginRight: spacing.xs + 2,
   },
-  chatButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs + 2,
-  },
-  chatButtonText: {
-    ...typography.small,
-    color: colors.primaryForeground,
-    fontWeight: '600',
-  },
-  sentStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.successBackground,
-    borderTopWidth: 1,
-    borderTopColor: '#A7F3D0',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  sentStripText: {
-    ...typography.small,
-    color: colors.success,
-    fontWeight: '600',
+  currentJobRight: {
+    alignItems: 'flex-end',
+    gap: spacing.xs + 2,
   },
 });

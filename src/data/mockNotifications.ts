@@ -100,7 +100,7 @@ export const NOTIFICATIONS: NotificationEntry[] = [
     iconEmoji: '🔧',
     iconColor: '#fff',
     iconBg: '#7C3AED',
-    title: 'ახალი მოთხოვნა შენს რაიონში',
+    title: 'ახალი მოთხოვნა შენს არეალში',
     text: 'სანტექნიკოსი • ვაკე • დღეს',
     time: '3 წ. წინ',
     read: false,

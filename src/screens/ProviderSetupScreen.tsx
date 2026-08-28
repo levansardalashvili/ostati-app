@@ -8,12 +8,17 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, ChevronRight, MapPin, User } from 'lucide-react-native';
+import { Award, Camera, ChevronRight, Image as ImageIcon, MapPin, User } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
+import { ExperiencePickerField } from '../components/ExperiencePickerField';
+import { MediaPreviewModal } from '../components/MediaPreviewModal';
+import { MediaUploadGrid, nextMediaItem, type MediaItem } from '../components/MediaUploadGrid';
 import { ProgressBar } from '../components/ProgressBar';
-import { SpecialtyPickerField, type SelectedSpecialty } from '../components/SpecialtyPickerField';
+import { SpecialtyPickerField, type SpecialtyOption } from '../components/SpecialtyPickerField';
+import { SqmPriceField } from '../components/SqmPriceField';
 import { colors, radius, spacing, typography } from '../theme';
+import { isSqmPriced } from '../data/specialties';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderSetup'>;
@@ -23,14 +28,26 @@ const ABOUT_MAX = 300;
 // A4 — პროფილის შევსება (Provider) (product-spec.md; დიზაინის რეფერენსის
 // ProviderSetupScreen-ის მიხედვით)
 export function ProviderSetupScreen({ navigation }: Props) {
-  const [specialty, setSpecialty] = useState<SelectedSpecialty>(null);
-  const [years, setYears] = useState(3);
+  const [specialty, setSpecialty] = useState<SpecialtyOption[]>([]);
+  const [experience, setExperience] = useState<string | null>(null);
   const [areas, setAreas] = useState<string[]>([]);
   const [about, setAbout] = useState('');
   const [loading, setLoading] = useState(false);
   const [hasPhoto, setHasPhoto] = useState(false);
+  const [certificates, setCertificates] = useState<MediaItem[]>([]);
+  const [portfolio, setPortfolio] = useState<MediaItem[]>([]);
+  const [previewCert, setPreviewCert] = useState<MediaItem | null>(null);
+  const [previewPortfolio, setPreviewPortfolio] = useState<MediaItem | null>(null);
+  const [sqmPrices, setSqmPrices] = useState<Record<string, string>>({});
 
-  const canSave = !!specialty && areas.length > 0;
+  // კვ.მ-ზე ფასიანი სპეციალობები, provider-ის შერჩეულთაგან — ერთი ველი
+  // თითო სპეციალობაზე, საერთო მნიშვნელობის ნაცვლად (მომხმარებლის მოთხოვნით).
+  const sqmSpecialties = specialty.filter((s) => isSqmPriced(s.id));
+
+  // პროფილის შევსება სავალდებულოა — "გამოტოვება" შესაძლებლობა განზრახ
+  // არ არსებობს (მომხმარებლის მოთხოვნით). სერთიფიკატები/ნამუშევრები
+  // არასავალდებულოა და canSave-ს არ მოქმედებს.
+  const canSave = specialty.length > 0 && areas.length > 0;
 
   const openAreaPicker = () => {
     navigation.navigate('RegionAreaPicker', {
@@ -42,16 +59,12 @@ export function ProviderSetupScreen({ navigation }: Props) {
   const handleContinue = () => {
     if (!canSave) return;
     setLoading(true);
-    // TODO: პროვაიდერის პროფილის შენახვა Firestore-ში
+    // TODO: პროვაიდერის პროფილის შენახვა Firestore-ში (specialty, areas,
+    // experience, about, certificates, portfolio, sqmPrices)
     setTimeout(() => {
       setLoading(false);
       navigation.reset({ index: 0, routes: [{ name: 'ProviderHome' }] });
     }, 1200);
-  };
-
-  const handleSkip = () => {
-    // პროფილის შევსება მოგვიანებით შესაძლებელია პროფილის ეკრანიდან
-    navigation.reset({ index: 0, routes: [{ name: 'ProviderHome' }] });
   };
 
   return (
@@ -60,9 +73,7 @@ export function ProviderSetupScreen({ navigation }: Props) {
         <View style={styles.headerRow}>
           <View style={styles.headerSpacer} />
           <ProgressBar step={2} total={2} />
-          <Pressable onPress={handleSkip}>
-            <Text style={styles.skipText}>გამოტ.</Text>
-          </Pressable>
+          <View style={styles.headerSpacer} />
         </View>
         <Text style={styles.title}>შექმენი ოსტატის პროფილი</Text>
         <Text style={styles.subtitle}>მომხმარებლები უკეთ გიპოვებენ.</Text>
@@ -100,35 +111,35 @@ export function ProviderSetupScreen({ navigation }: Props) {
           <SpecialtyPickerField value={specialty} onChange={setSpecialty} />
         </View>
 
+        {sqmSpecialties.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>ფასი კვ.მ-ზე</Text>
+            <Text style={styles.sectionHint}>მიუთითე ფასი თითოეული სპეციალობისთვის ცალკე</Text>
+            <View style={{ gap: spacing.sm + 2 }}>
+              {sqmSpecialties.map((s) => (
+                <SqmPriceField
+                  key={s.id}
+                  label={s.label}
+                  value={sqmPrices[s.id] ?? ''}
+                  onChangeText={(v) => setSqmPrices((prev) => ({ ...prev, [s.id]: v }))}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>გამოცდილება</Text>
-          <View style={styles.stepper}>
-            <Pressable
-              style={styles.stepperButton}
-              onPress={() => setYears((y) => Math.max(0, y - 1))}
-            >
-              <Text style={styles.stepperButtonText}>–</Text>
-            </Pressable>
-            <View style={styles.stepperValue}>
-              <Text style={styles.stepperValueText}>{years}</Text>
-              <Text style={styles.stepperValueLabel}>წელი</Text>
-            </View>
-            <Pressable
-              style={styles.stepperButton}
-              onPress={() => setYears((y) => Math.min(50, y + 1))}
-            >
-              <Text style={styles.stepperButtonText}>+</Text>
-            </Pressable>
-          </View>
+          <ExperiencePickerField value={experience} onChange={setExperience} />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>სამუშაო რაიონები</Text>
+          <Text style={styles.sectionLabel}>სამუშაო არეალი</Text>
           <Text style={styles.sectionHint}>სად გინდა მუშაობა?</Text>
           <Pressable style={styles.areaPickerButton} onPress={openAreaPicker}>
             <MapPin size={16} color={colors.mutedForeground} />
             <Text style={styles.areaPickerButtonText} numberOfLines={1}>
-              {areas.length > 0 ? areas.join(', ') : 'აირჩიე რაიონები'}
+              {areas.length > 0 ? areas.join(', ') : 'აირჩიე არეალი'}
             </Text>
             <ChevronRight size={16} color={colors.mutedForeground} />
           </Pressable>
@@ -149,6 +160,30 @@ export function ProviderSetupScreen({ navigation }: Props) {
             {about.length}/{ABOUT_MAX}
           </Text>
         </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>სერთიფიკატები</Text>
+          <Text style={styles.sectionHint}>არასავალდებულო — ამაღლებს ნდობას მომხმარებელთან</Text>
+          <MediaUploadGrid
+            items={certificates}
+            icon={Award}
+            onAdd={() => setCertificates((c) => [...c, nextMediaItem(c)])}
+            onRemove={(id) => setCertificates((c) => c.filter((it) => it.id !== id))}
+            onPreview={setPreviewCert}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>ნამუშევრების ფოტოები</Text>
+          <Text style={styles.sectionHint}>არასავალდებულო — შესრულებული სამუშაოების მაგალითები</Text>
+          <MediaUploadGrid
+            items={portfolio}
+            icon={ImageIcon}
+            onAdd={() => setPortfolio((p) => [...p, nextMediaItem(p)])}
+            onRemove={(id) => setPortfolio((p) => p.filter((it) => it.id !== id))}
+            onPreview={setPreviewPortfolio}
+          />
+        </View>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -160,6 +195,19 @@ export function ProviderSetupScreen({ navigation }: Props) {
           loading={loading}
         />
       </View>
+
+      <MediaPreviewModal
+        item={previewCert}
+        icon={Award}
+        onClose={() => setPreviewCert(null)}
+        onDelete={(id) => setCertificates((c) => c.filter((it) => it.id !== id))}
+      />
+      <MediaPreviewModal
+        item={previewPortfolio}
+        icon={ImageIcon}
+        onClose={() => setPreviewPortfolio(null)}
+        onDelete={(id) => setPortfolio((p) => p.filter((it) => it.id !== id))}
+      />
     </SafeAreaView>
   );
 }
@@ -185,10 +233,6 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 36,
-  },
-  skipText: {
-    ...typography.captionMedium,
-    color: colors.mutedForeground,
   },
   title: {
     ...typography.h2,
@@ -270,41 +314,6 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
     marginBottom: spacing.sm,
-  },
-  stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-  },
-  stepperButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.sm,
-    backgroundColor: colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepperButtonText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.foreground,
-  },
-  stepperValue: {
-    alignItems: 'center',
-  },
-  stepperValueText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.foreground,
-  },
-  stepperValueLabel: {
-    ...typography.small,
-    color: colors.mutedForeground,
   },
   areaPickerButton: {
     flexDirection: 'row',

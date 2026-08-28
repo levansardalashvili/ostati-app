@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CheckCircle, Star } from 'lucide-react-native';
+import { CheckCircle, Image as ImageIcon, Star } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
 import { Button } from '../components/Button';
+import { MediaPreviewModal } from '../components/MediaPreviewModal';
+import { MediaUploadGrid, nextMediaItem, type MediaItem } from '../components/MediaUploadGrid';
 import { colors, radius, spacing, typography } from '../theme';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -16,14 +18,32 @@ const STAR_LABELS = ['', 'ძალიან ცუდი', 'ცუდი', 'ს
 
 // RatingScreen — "ოსტატის შეფასება" (ზუსტად ზიპის App.tsx-ის RatingScreen-ის
 // მიხედვით). დათანხმებული შეფასება navigation param-ით მოწოდებული `onRate`
-// callback-ით ბრუნდება CustomerJobDetailScreen-ში (Firebase-მდე — TODO).
+// callback-ით მიეწოდება CustomerJobDetailScreen-ს (Firebase-მდე — TODO).
+// შეფასება სავალდებულოა (მომხმარებლის მოთხოვნით): უკან დაბრუნება (header
+// ისარი, gesture, Android hardware back) დაბლოკილია მანამ, სანამ
+// შეფასება არ გაიგზავნება — "მოგვიანებით" ღილაკი განზრახ არ არსებობს.
+// გაგზავნის შემდეგ Customer პირდაპირ Customer Home-ზე ბრუნდება
+// (`navigation.reset`), არა CustomerJobDetailScreen-ზე უკან.
 export function RatingScreen({ navigation, route }: Props) {
   const { providerName, providerInitials, providerColor, onRate } = route.params;
 
   const [stars, setStars] = useState(0);
   const [review, setReview] = useState('');
   const [chips, setChips] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<MediaItem[]>([]);
+  const [previewPhoto, setPreviewPhoto] = useState<MediaItem | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ gestureEnabled: false });
+  }, [navigation]);
+
+  useEffect(() => {
+    return navigation.addListener('beforeRemove', (e) => {
+      if (submitted) return;
+      e.preventDefault();
+    });
+  }, [navigation, submitted]);
 
   const toggleChip = (c: string) => {
     setChips((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
@@ -31,8 +51,12 @@ export function RatingScreen({ navigation, route }: Props) {
 
   const handleSubmit = () => {
     if (stars === 0) return;
-    onRate?.({ stars, review, chips });
+    onRate?.({ stars, review, chips, photos: photos.length > 0 ? photos : undefined });
     setSubmitted(true);
+  };
+
+  const goHome = () => {
+    navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
   };
 
   if (submitted) {
@@ -49,7 +73,7 @@ export function RatingScreen({ navigation, route }: Props) {
               <Star key={s} size={22} color="#FBBF24" fill={stars >= s ? '#FBBF24' : 'transparent'} />
             ))}
           </View>
-          <Button label="დახურვა" onPress={() => navigation.goBack()} />
+          <Button label="მთავარზე დაბრუნება" onPress={goHome} />
         </View>
       </SafeAreaView>
     );
@@ -57,7 +81,7 @@ export function RatingScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <BackHeader title="ოსტატის შეფასება" onBack={() => navigation.goBack()} />
+      <BackHeader title="ოსტატის შეფასება" onBack={() => navigation.goBack()} showBack={false} />
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         <View style={styles.providerCard}>
           <Avatar initials={providerInitials} color={providerColor} size={48} />
@@ -107,11 +131,31 @@ export function RatingScreen({ navigation, route }: Props) {
             style={styles.textarea}
           />
         </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>
+            დასრულებული სამუშაოს ფოტო <Text style={styles.optionalText}>(სურვილისამებრ)</Text>
+          </Text>
+          <MediaUploadGrid
+            items={photos}
+            icon={ImageIcon}
+            onAdd={() => setPhotos((p) => [...p, nextMediaItem(p)])}
+            onRemove={(id) => setPhotos((p) => p.filter((it) => it.id !== id))}
+            onPreview={setPreviewPhoto}
+          />
+        </View>
       </ScrollView>
 
       <View style={styles.footer}>
         <Button label="შეფასების გაგზავნა" onPress={handleSubmit} disabled={stars === 0} />
       </View>
+
+      <MediaPreviewModal
+        item={previewPhoto}
+        icon={ImageIcon}
+        onClose={() => setPreviewPhoto(null)}
+        onDelete={(id) => setPhotos((p) => p.filter((it) => it.id !== id))}
+      />
     </SafeAreaView>
   );
 }

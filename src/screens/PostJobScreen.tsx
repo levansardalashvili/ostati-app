@@ -14,25 +14,24 @@ import {
   Check,
   CheckCircle,
   ChevronRight,
+  Clock,
   Image as ImageIcon,
-  MapPin,
   Shield,
   X,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
+import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
+import { DatePickerField } from '../components/DatePickerField';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTIES } from '../data/specialties';
-import { TBILISI_AREAS } from '../data/districts';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PostJob'>;
 
-const DATES = ['დღეს', 'ხვალ', 'ამ კვირაში', 'მოქნილი'];
-const TIMES = ['9:00–12:00', '12:00–15:00', '15:00–18:00', '18:00–21:00', 'დრო არ აქვს'];
-const URGENCIES = ['დღეს', '1–2 დღეში', 'ამ კვირაში', 'არ მეჩქარება'];
+const TIMES = ['9:00–12:00', '12:00–15:00', '15:00–18:00', '18:00–21:00', 'ნებისმიერ დროს'];
 const PHOTO_BG = ['#DBEAFE', '#D1FAE5', '#FEF3C7'];
 // პროდუქტული წესი (product-spec.md) — job post-ში მაქს. 3 ფოტო,
 // არა 5, როგორც დიზაინის რეფერენსშია
@@ -45,34 +44,29 @@ const DESCRIPTION_MIN = 20;
 export function PostJobScreen({ navigation }: Props) {
   const { profile } = useCustomerProfile();
   const [category, setCategory] = useState('');
-  const [title, setTitle] = useState('');
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<number[]>([]);
   // მისამართი წინასწარ ივსება პროფილის default address-ით, მაგრამ აქ
   // ცვლილება არასდროს არ სცვლის თავად default address-ს (მხოლოდ ამ
   // კონკრეტული job post-ის მისამართია) — მომხმარებლის მოთხოვნით.
   const [address, setAddress] = useState(profile.defaultAddress);
-  const [district, setDistrict] = useState('');
-  const [districtOpen, setDistrictOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState('');
-  const [urgency, setUrgency] = useState('');
-  const [budget, setBudget] = useState('');
+  const [timeSheetOpen, setTimeSheetOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [published, setPublished] = useState(false);
   const [submitTouched, setSubmitTouched] = useState(false);
 
   const categoryError = submitTouched && !category ? 'აირჩიე კატეგორია' : '';
-  const titleError = submitTouched && !title.trim() ? 'ეს ველი სავალდებულოა' : '';
   const descriptionError =
     submitTouched && description.trim().length > 0 && description.trim().length < DESCRIPTION_MIN
       ? 'აღწერა ძალიან მოკლეა'
       : submitTouched && !description.trim()
         ? 'ეს ველი სავალდებულოა'
         : '';
-  const districtError = submitTouched && !district ? 'აირჩიე რაიონი' : '';
-
-  const canSubmit = !!category && title.trim().length > 0 && description.trim().length >= DESCRIPTION_MIN && !!district;
+  const canSubmit = !!category && description.trim().length >= DESCRIPTION_MIN;
+  const selectedSpecialty = SPECIALTIES.find((sp) => sp.id === category) ?? null;
 
   const handlePublish = () => {
     setSubmitTouched(true);
@@ -87,6 +81,12 @@ export function PostJobScreen({ navigation }: Props) {
 
   const addPhoto = () => setPhotos((ps) => [...ps, Date.now() + ps.length]);
   const removePhoto = (id: number) => setPhotos((ps) => ps.filter((p) => p !== id));
+
+  // თარიღის არჩევის შემდეგ მომხმარებელი პირდაპირ დროის არჩევაზე გადადის
+  const handleDateSelect = (date: Date) => {
+    setSelectedDate(date);
+    setTimeSheetOpen(true);
+  };
 
   if (published) {
     return (
@@ -123,35 +123,17 @@ export function PostJobScreen({ navigation }: Props) {
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled">
         <View style={styles.field}>
           <FieldLabel text="კატეგორია" required />
-          <View style={{ gap: spacing.sm }}>
-            {SPECIALTIES.map((sp) => {
-              const on = category === sp.id;
-              return (
-                <Pressable
-                  key={sp.id}
-                  onPress={() => setCategory(sp.id)}
-                  style={[styles.categoryOption, on && styles.categoryOptionSelected]}
-                >
-                  <Text style={styles.categoryIcon}>{sp.icon}</Text>
-                  <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{sp.label}</Text>
-                  {on && <Check size={16} color={colors.primary} strokeWidth={3} />}
-                </Pressable>
-              );
-            })}
-          </View>
+          <Pressable
+            style={[styles.categoryButton, categoryError && styles.inputError]}
+            onPress={() => setCategorySheetOpen(true)}
+          >
+            <Text style={styles.categoryButtonIcon}>{selectedSpecialty?.icon ?? '🛠️'}</Text>
+            <Text style={[styles.categoryButtonText, !selectedSpecialty && styles.categoryButtonPlaceholder]} numberOfLines={1}>
+              {selectedSpecialty?.label ?? 'აირჩიე კატეგორია'}
+            </Text>
+            <ChevronRight size={16} color={colors.mutedForeground} />
+          </Pressable>
           <FieldError message={categoryError} />
-        </View>
-
-        <View style={styles.field}>
-          <FieldLabel text="რა სამუშაო გჭირდება?" required />
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder="მაგ. ონკანიდან წყალი ჟონავს"
-            placeholderTextColor={colors.mutedForeground}
-            style={[styles.input, titleError && styles.inputError]}
-          />
-          <FieldError message={titleError} />
         </View>
 
         <View style={styles.field}>
@@ -213,94 +195,23 @@ export function PostJobScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.field}>
-          <FieldLabel text="რაიონი" required />
-          <Pressable
-            style={[styles.districtButton, districtOpen && styles.districtButtonOpen, districtError && styles.inputError]}
-            onPress={() => setDistrictOpen((o) => !o)}
-          >
-            <View style={styles.districtButtonLeft}>
-              <MapPin size={16} color={colors.mutedForeground} />
-              <Text style={district ? styles.districtValue : styles.districtPlaceholder}>
-                {district || 'რაიონის არჩევა...'}
-              </Text>
-            </View>
-            <ChevronRight
-              size={16}
-              color={colors.mutedForeground}
-              style={{ transform: [{ rotate: districtOpen ? '90deg' : '0deg' }] }}
-            />
-          </Pressable>
-          {districtOpen && (
-            <View style={styles.districtDropdown}>
-              {TBILISI_AREAS.map((d, i) => {
-                const selected = district === d;
-                return (
-                  <Pressable
-                    key={d}
-                    onPress={() => {
-                      setDistrict(d);
-                      setDistrictOpen(false);
-                    }}
-                    style={[
-                      styles.districtOption,
-                      i > 0 && styles.districtOptionBorder,
-                      selected && styles.districtOptionSelected,
-                    ]}
-                  >
-                    <Text style={[styles.districtOptionText, selected && styles.districtOptionTextSelected]}>{d}</Text>
-                    {selected && <Check size={15} color={colors.primary} strokeWidth={2.5} />}
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-          <FieldError message={districtError} />
-        </View>
-
-        <View style={styles.field}>
           <FieldLabel text="სასურველი თარიღი" />
-          <View style={styles.chipWrap}>
-            {DATES.map((d) => (
-              <ToggleChip key={d} label={d} selected={selectedDate === d} onPress={() => setSelectedDate(selectedDate === d ? '' : d)} />
-            ))}
-          </View>
+          <DatePickerField value={selectedDate} onChange={handleDateSelect} />
         </View>
 
         <View style={styles.field}>
           <FieldLabel text="სასურველი დრო" />
-          <View style={styles.chipWrap}>
-            {TIMES.map((t) => (
-              <ToggleChip key={t} label={t} selected={selectedTime === t} onPress={() => setSelectedTime(selectedTime === t ? '' : t)} />
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.field}>
-          <FieldLabel text="როდის გჭირდება?" />
-          <View style={styles.urgencyGrid}>
-            {URGENCIES.map((u) => (
-              <View key={u} style={styles.urgencyItem}>
-                <ToggleChip label={u} selected={urgency === u} onPress={() => setUrgency(urgency === u ? '' : u)} fullWidth />
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.field}>
-          <View style={styles.budgetLabelRow}>
-            <Text style={styles.plainLabel}>სავარაუდო ბიუჯეტი</Text>
-            <View style={styles.optionalBadge}>
-              <Text style={styles.optionalBadgeText}>არასავალდ.</Text>
-            </View>
-          </View>
-          <TextInput
-            value={budget}
-            onChangeText={setBudget}
-            placeholder="მაგ. 80–120 ₾"
-            placeholderTextColor={colors.mutedForeground}
-            style={styles.input}
-          />
-          <Text style={styles.hint}>ბიუჯეტი მხოლოდ საორიენტაციოა. საბოლოო ფასზე ოსტატთან ჩატში შეთანხმდები.</Text>
+          <Pressable
+            style={[styles.categoryButton, !selectedDate && styles.categoryButtonDisabled]}
+            disabled={!selectedDate}
+            onPress={() => setTimeSheetOpen(true)}
+          >
+            <Clock size={16} color={colors.mutedForeground} />
+            <Text style={[styles.categoryButtonText, !selectedTime && styles.categoryButtonPlaceholder]} numberOfLines={1}>
+              {selectedTime || (selectedDate ? 'აირჩიე დრო' : 'ჯერ აირჩიე თარიღი')}
+            </Text>
+            <ChevronRight size={16} color={colors.mutedForeground} />
+          </Pressable>
         </View>
 
         <View style={styles.privacyCard}>
@@ -311,7 +222,9 @@ export function PostJobScreen({ navigation }: Props) {
             <Text style={styles.privacyText}>
               შენი ტელეფონი, ელ. ფოსტა და ზუსტი მისამართი ოსტატებისთვის ავტომატურად არ გამოჩნდება.
             </Text>
-            <Text style={styles.privacyText}>კომუნიკაცია თავდაპირველად აპის ჩატში ხდება.</Text>
+            <Text style={styles.privacyText}>
+              ფასს ადგენს ოსტატი შენი აღწერისა და ფოტოების ნახვის შემდეგ — ის შემოგთავაზებს ფასს ჩატში, სადაც შეძლებ დათანხმებას ან უარყოფას.
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -325,6 +238,47 @@ export function PostJobScreen({ navigation }: Props) {
           loading={loading}
         />
       </View>
+
+      <BottomSheet visible={categorySheetOpen} onClose={() => setCategorySheetOpen(false)}>
+        <Text style={styles.sheetTitle}>კატეგორია</Text>
+        {SPECIALTIES.map((sp) => {
+          const on = category === sp.id;
+          return (
+            <Pressable
+              key={sp.id}
+              onPress={() => {
+                setCategory(sp.id);
+                setCategorySheetOpen(false);
+              }}
+              style={styles.categorySheetRow}
+            >
+              <Text style={styles.categoryIcon}>{sp.icon}</Text>
+              <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{sp.label}</Text>
+              {on && <Check size={16} color={colors.primary} strokeWidth={3} />}
+            </Pressable>
+          );
+        })}
+      </BottomSheet>
+
+      <BottomSheet visible={timeSheetOpen} onClose={() => setTimeSheetOpen(false)}>
+        <Text style={styles.sheetTitle}>სასურველი დრო</Text>
+        {TIMES.map((t) => {
+          const on = selectedTime === t;
+          return (
+            <Pressable
+              key={t}
+              onPress={() => {
+                setSelectedTime(t);
+                setTimeSheetOpen(false);
+              }}
+              style={styles.categorySheetRow}
+            >
+              <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{t}</Text>
+              {on && <Check size={16} color={colors.primary} strokeWidth={3} />}
+            </Pressable>
+          );
+        })}
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -345,27 +299,6 @@ function FieldError({ message }: { message: string }) {
       <AlertCircle size={11} color={colors.destructive} />
       <Text style={styles.errorText}>{message}</Text>
     </View>
-  );
-}
-
-function ToggleChip({
-  label,
-  selected,
-  onPress,
-  fullWidth,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-  fullWidth?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.toggleChip, selected && styles.toggleChipSelected, fullWidth && styles.toggleChipFullWidth]}
-    >
-      <Text style={[styles.toggleChipText, selected && styles.toggleChipTextSelected]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -432,33 +365,60 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
   },
-  categoryOption: {
+  categoryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 6,
-    borderRadius: radius.lg,
-    borderWidth: 2,
-    borderColor: colors.border,
+    gap: spacing.sm,
     backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
-  categoryOptionSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.secondary,
+  categoryButtonDisabled: {
+    opacity: 0.5,
+  },
+  categoryButtonIcon: {
+    fontSize: 18,
+  },
+  categoryButtonText: {
+    ...typography.caption,
+    color: colors.foreground,
+    fontWeight: '600',
+    flex: 1,
+  },
+  categoryButtonPlaceholder: {
+    color: colors.mutedForeground,
+    fontWeight: '400',
+  },
+  categorySheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 4,
+    paddingVertical: spacing.sm + 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.muted,
+  },
+  sheetTitle: {
+    ...typography.h3,
+    color: colors.foreground,
+    marginBottom: spacing.sm + 2,
   },
   categoryIcon: {
-    fontSize: 20,
-    width: 28,
+    fontSize: 18,
+    width: 24,
     textAlign: 'center',
   },
   categoryLabel: {
-    ...typography.captionMedium,
+    ...typography.caption,
     color: colors.foreground,
+    fontWeight: '500',
     flex: 1,
   },
   categoryLabelSelected: {
-    color: colors.secondaryForeground,
+    color: colors.primary,
+    fontWeight: '700',
   },
   errorRow: {
     flexDirection: 'row',
@@ -512,117 +472,6 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     fontWeight: '600',
     fontSize: 10,
-  },
-  districtButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  districtButtonOpen: {
-    borderColor: colors.primary,
-  },
-  districtButtonLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm + 2,
-  },
-  districtValue: {
-    ...typography.caption,
-    color: colors.foreground,
-    fontWeight: '600',
-  },
-  districtPlaceholder: {
-    ...typography.caption,
-    color: colors.mutedForeground,
-  },
-  districtDropdown: {
-    marginTop: spacing.sm - 2,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-  },
-  districtOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 4,
-  },
-  districtOptionBorder: {
-    borderTopWidth: 1,
-    borderTopColor: colors.muted,
-  },
-  districtOptionSelected: {
-    backgroundColor: colors.secondary,
-  },
-  districtOptionText: {
-    ...typography.caption,
-    color: colors.foreground,
-    fontWeight: '600',
-  },
-  districtOptionTextSelected: {
-    color: colors.secondaryForeground,
-  },
-  chipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  urgencyGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  urgencyItem: {
-    width: '48%',
-  },
-  toggleChip: {
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-  },
-  toggleChipFullWidth: {
-    alignSelf: 'stretch',
-  },
-  toggleChipSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.secondary,
-  },
-  toggleChipText: {
-    ...typography.captionMedium,
-    color: colors.mutedForeground,
-  },
-  toggleChipTextSelected: {
-    color: colors.secondaryForeground,
-  },
-  budgetLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  optionalBadge: {
-    backgroundColor: colors.muted,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  optionalBadgeText: {
-    ...typography.small,
-    color: colors.mutedForeground,
-    fontWeight: '600',
   },
   privacyCard: {
     flexDirection: 'row',

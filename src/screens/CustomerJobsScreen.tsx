@@ -1,33 +1,43 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FileText, MessageCircle } from 'lucide-react-native';
+import { FileText, MessageCircle, Plus } from 'lucide-react-native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { BackHeader } from '../components/BackHeader';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { Skeleton } from '../components/Skeleton';
 import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
 import { CUSTOMER_JOBS } from '../data/mockHomeData';
-import type { RootStackParamList } from '../navigation/types';
+import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'CustomerJobs'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<CustomerTabParamList, 'MyJobsTab'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 type Tab = 'active' | 'pending' | 'done';
 
+// ტაბის ლეიბლები StatusPill-ის ლეიბლებთან შესატყვისობაშია (#32).
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'active', label: 'აქტიური' },
-  { id: 'pending', label: 'მოლოდინი' },
-  { id: 'done', label: 'დასრულდა' },
+  { id: 'active', label: 'დადასტურებული' },
+  { id: 'pending', label: 'მომლოდინე' },
+  { id: 'done', label: 'დასრულებული' },
 ];
 
 const EMPTY_TEXT: Record<Tab, string> = {
-  active: 'აქტიური სამუშაოები არ გაქვს',
-  pending: 'მოლოდინის სამუშაოები არ გაქვს',
+  active: 'დადასტურებული სამუშაოები არ გაქვს',
+  pending: 'მომლოდინე სამუშაოები არ გაქვს',
   done: 'დასრულებული სამუშაოები არ გაქვს',
 };
 
-// CustomerJobs — "ჩემი მოთხოვნები" (ზუსტად ზიპის App.tsx-ის
-// CustomerJobs-ის მიხედვით).
+// CustomerJobs — "ჩემი განცხადებები" (ყოფილი ზიპის CustomerJobs-ის
+// მიხედვით აშენებული ეკრანი). Bottom Tab-ის ("MyJobsTab") საკუთარი
+// ეკრანია — აღარ არის root-stack-ზე push-ილი (მომხმარებლის მოთხოვნით:
+// "მოთხოვნა"-ს მაგივრად ეს ტაბი პირდაპირ "ჩემი განცხადებები"-ს აჩვენებს,
+// პლუს ახალი განცხადების დამატების ღილაკი header-ში). Profile-ის "ჩემი
+// მოთხოვნები" მენიუც ამავე ტაბზე გადადის (CustomerProfileScreen.tsx),
+// push-ის ნაცვლად.
 export function CustomerJobsScreen({ navigation }: Props) {
   const [tab, setTab] = useState<Tab>('active');
   const [isLoading, setIsLoading] = useState(true);
@@ -52,7 +62,12 @@ export function CustomerJobsScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <BackHeader title="ჩემი სამუშაოები" onBack={() => navigation.goBack()} />
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>ჩემი განცხადებები</Text>
+        <Pressable style={styles.addButton} onPress={() => navigation.navigate('PostJob')}>
+          <Plus size={20} color={colors.primaryForeground} strokeWidth={2.5} />
+        </Pressable>
+      </View>
       <View style={styles.tabsRow}>
         {TABS.map((t) => (
           <Pressable key={t.id} style={[styles.tab, tab === t.id && styles.tabActive]} onPress={() => setTab(t.id)}>
@@ -94,13 +109,7 @@ export function CustomerJobsScreen({ navigation }: Props) {
               </Text>
               <View style={styles.cardFooter}>
                 <View style={styles.footerLeft}>
-                  <Text style={styles.budget}>{j.budget}</Text>
-                  {j.provider && (
-                    <>
-                      <Text style={styles.dot}>·</Text>
-                      <Text style={styles.providerName}>{j.provider}</Text>
-                    </>
-                  )}
+                  {j.provider && <Text style={styles.providerName}>{j.provider}</Text>}
                 </View>
                 {j.provider && (
                   <Pressable
@@ -142,6 +151,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: {
+    ...typography.h2,
+    color: colors.foreground,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabsRow: {
     flexDirection: 'row',
@@ -225,14 +257,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs + 2,
-  },
-  budget: {
-    ...typography.captionMedium,
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  dot: {
-    color: colors.border,
   },
   providerName: {
     ...typography.small,

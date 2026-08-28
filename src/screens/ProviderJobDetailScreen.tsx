@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Award, CheckCircle, Clock, MapPin, MessageCircle, MoreVertical, Star, ThumbsUp } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
+import { BottomSheet } from '../components/BottomSheet';
+import { Button } from '../components/Button';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { colors, radius, spacing, typography } from '../theme';
 import { PROVIDER_FEED } from '../data/mockHomeData';
@@ -18,6 +20,8 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   const { id, mode = 'browse' } = route.params;
   const job = PROVIDER_FEED.find((j) => j.id === id) ?? PROVIDER_FEED[0];
   const [expressed, setExpressed] = useState(false);
+  const [offerSheetOpen, setOfferSheetOpen] = useState(false);
+  const [offerPrice, setOfferPrice] = useState('');
 
   const receivedRating =
     mode === 'completed'
@@ -35,6 +39,11 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   };
   const handleMore = () => {
     // TODO: მენიუს მოქმედებები (მაგ. "გაუზიარე", "შეატყობინე") მოგვიანებით
+  };
+  const confirmInterest = () => {
+    setExpressed(true);
+    setOfferSheetOpen(false);
+    // TODO: jobResponses-ში ჩაწერა Firestore-ში (providerId, jobId, offerPrice)
   };
 
   return (
@@ -117,12 +126,8 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
           </View>
 
           <View style={styles.statsRow}>
-            <View>
-              <Text style={styles.statLabel}>ბიუჯეტი</Text>
-              <Text style={styles.statValueBudget}>{job.budget ?? '—'}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.statLabel}>დაინტერ.</Text>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={styles.statLabel}>დაინტერესებული</Text>
               <Text style={styles.statValue}>{job.interested + (expressed ? 1 : 0)}</Text>
             </View>
           </View>
@@ -158,14 +163,16 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
           </Pressable>
           <Pressable
             style={[styles.interestButton, expressed && styles.interestButtonExpressed]}
-            onPress={() => setExpressed(true)}
+            onPress={() => !expressed && setOfferSheetOpen(true)}
           >
             {expressed ? (
               <CheckCircle size={17} color={colors.primaryForeground} />
             ) : (
               <ThumbsUp size={17} color={colors.primaryForeground} />
             )}
-            <Text style={styles.interestButtonText}>{expressed ? 'დაინტ. ხარ' : 'დაინტერესება'}</Text>
+            <Text style={styles.interestButtonText}>
+              {expressed ? (offerPrice ? `შეთავაზდა: ${offerPrice} ₾` : 'დაინტ. ხარ') : 'დაინტერესება'}
+            </Text>
           </Pressable>
         </View>
       )}
@@ -188,6 +195,28 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
           </Pressable>
         </View>
       )}
+
+      <BottomSheet visible={offerSheetOpen} onClose={() => setOfferSheetOpen(false)}>
+        <Text style={styles.sheetTitle}>დაინტერესების გაგზავნა</Text>
+        <Text style={styles.sheetSubtitle}>შეგიძლია მიუთითო შეთავაზებული ფასი (არასავალდებულო).</Text>
+        <Text style={styles.offerLabel}>შეთავაზებული ფასი</Text>
+        <View style={styles.offerInputWrap}>
+          <TextInput
+            value={offerPrice}
+            onChangeText={(v) => setOfferPrice(v.replace(/[^0-9]/g, ''))}
+            placeholder="ჩაწერეთ თანხა"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="numeric"
+            style={styles.offerInput}
+            autoFocus
+          />
+          <Text style={styles.offerSuffix}>₾</Text>
+        </View>
+        <Button label="დაინტერესების გაგზავნა" onPress={confirmInterest} />
+        <Pressable style={styles.sheetCancelLink} onPress={() => setOfferSheetOpen(false)}>
+          <Text style={styles.sheetCancelLinkText}>გაუქმება</Text>
+        </Pressable>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -289,7 +318,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     backgroundColor: colors.secondary,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
@@ -299,10 +328,6 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.primary,
     opacity: 0.7,
-  },
-  statValueBudget: {
-    ...typography.h3,
-    color: colors.secondaryForeground,
   },
   statValue: {
     ...typography.h3,
@@ -471,5 +496,51 @@ const styles = StyleSheet.create({
     ...typography.bodyMedium,
     color: colors.secondaryForeground,
     fontWeight: '700',
+  },
+  sheetTitle: {
+    ...typography.h3,
+    color: colors.foreground,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  sheetSubtitle: {
+    ...typography.caption,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  offerLabel: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+  offerInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.muted,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  offerInput: {
+    ...typography.body,
+    color: colors.foreground,
+    flex: 1,
+    paddingVertical: spacing.md,
+  },
+  offerSuffix: {
+    ...typography.bodyMedium,
+    color: colors.mutedForeground,
+    fontWeight: '700',
+    marginLeft: spacing.sm,
+  },
+  sheetCancelLink: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
+  sheetCancelLinkText: {
+    ...typography.captionMedium,
+    color: colors.mutedForeground,
   },
 });

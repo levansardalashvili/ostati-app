@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, MapPin, MessageCircle, Share2, Star } from 'lucide-react-native';
+import { ArrowLeft, Award, Image as ImageIcon, MapPin, MessageCircle, Share2, Star } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
+import { MediaPreviewModal } from '../components/MediaPreviewModal';
+import type { MediaItem } from '../components/MediaUploadGrid';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
@@ -20,6 +22,8 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
   const p = PROVIDERS.find((x) => x.id === route.params.id) ?? PROVIDERS[0];
   const specialty = SPECIALTY_LABEL[p.category] ?? p.category;
   const reviews = PROVIDER_REVIEWS[p.id] ?? [];
+  const [previewCert, setPreviewCert] = useState<MediaItem | null>(null);
+  const [previewPortfolio, setPreviewPortfolio] = useState<MediaItem | null>(null);
 
   const handleChat = () => {
     navigation.navigate('ChatConversation', {
@@ -93,6 +97,29 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>სპეციალობები</Text>
+          <View style={styles.tagsRow}>
+            {p.specialties.map((s) => (
+              <View key={s} style={styles.skillTag}>
+                <Text style={styles.skillTagText}>{s}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>ფასი</Text>
+          {p.price || p.sqmPrice ? (
+            <View style={{ gap: spacing.xs + 2 }}>
+              {p.price && <Text style={styles.priceText}>{p.price}</Text>}
+              {p.sqmPrice && <Text style={styles.priceText}>ფასი კვ.მ-ზე: {p.sqmPrice} ₾ / მ²</Text>}
+            </View>
+          ) : (
+            <Text style={styles.priceTextMuted}>ფასი სამუშაოს ნახვის შემდეგ განისაზღვრება</Text>
+          )}
+        </View>
+
+        <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>სერვისები</Text>
           <View style={styles.tagsRow}>
             {p.skills.map((s) => (
@@ -103,8 +130,34 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
           </View>
         </View>
 
+        {p.certificates.length > 0 && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>სერთიფიკატები</Text>
+            <View style={styles.mediaRow}>
+              {p.certificates.map((c) => (
+                <Pressable key={c.id} style={[styles.mediaThumb, { backgroundColor: c.bg }]} onPress={() => setPreviewCert(c)}>
+                  <Award size={20} color="rgba(100,116,139,0.5)" />
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {p.portfolio.length > 0 && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>ნამუშევრები</Text>
+            <View style={styles.mediaRow}>
+              {p.portfolio.map((ph) => (
+                <Pressable key={ph.id} style={[styles.mediaThumb, { backgroundColor: ph.bg }]} onPress={() => setPreviewPortfolio(ph)}>
+                  <ImageIcon size={20} color="rgba(100,116,139,0.5)" />
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>დაფარვის რაიონები</Text>
+          <Text style={styles.sectionTitle}>სამუშაო არეალი</Text>
           <View style={styles.tagsRow}>
             {p.areas.map((a) => (
               <View key={a} style={styles.areaTag}>
@@ -171,6 +224,9 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
         </Pressable>
         <Text style={styles.footerNote}>საკონტაქტო ინფორმაცია დაცულია და ავტომატურად არ არის გაზიარებული.</Text>
       </View>
+
+      <MediaPreviewModal item={previewCert} icon={Award} onClose={() => setPreviewCert(null)} />
+      <MediaPreviewModal item={previewPortfolio} icon={ImageIcon} onClose={() => setPreviewPortfolio(null)} />
     </SafeAreaView>
   );
 }
@@ -350,6 +406,16 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     lineHeight: 19,
   },
+  priceText: {
+    ...typography.captionMedium,
+    color: colors.foreground,
+    fontWeight: '700',
+  },
+  priceTextMuted: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    fontStyle: 'italic',
+  },
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -381,6 +447,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: colors.mutedForeground,
+  },
+  mediaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  mediaThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   reviewsEmpty: {
     alignItems: 'center',

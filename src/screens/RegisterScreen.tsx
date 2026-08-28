@@ -26,13 +26,12 @@ const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 // A3 — რეგისტრაცია (product-spec.md, create-account-form.md).
 // მისამართის ველი customer-ისთვისაც ემატება — დიზაინის რეფერენსის
 // მიხედვით, პრიორიტეტის წესის თანახმად (ზიპი კონფლიქტში იმარჯვებს).
-// Customer-ისთვის "სახელი და გვარი" გაყოფილია ცალკე ველებად (მომხმარებლის
-// მოთხოვნით) — Provider-ისთვის ერთი ველი უცვლელად რჩება.
+// "სახელი და გვარი" ორივე როლისთვის გაყოფილია ცალკე ველებად
+// (მომხმარებლის მოთხოვნით override-ავს ზიპის ერთიან ველს).
 export function RegisterScreen({ navigation, route }: Props) {
   const { role } = route.params;
   const { setProfile } = useCustomerProfile();
 
-  const [name, setName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -47,7 +46,6 @@ export function RegisterScreen({ navigation, route }: Props) {
   const touch = (field: string) => setTouched((t) => ({ ...t, [field]: true }));
 
   const errors = {
-    name: touched.name && !name.trim() ? 'ეს ველი სავალდებულოა' : '',
     firstName: touched.firstName && !firstName.trim() ? 'ეს ველი სავალდებულოა' : '',
     lastName: touched.lastName && !lastName.trim() ? 'ეს ველი სავალდებულოა' : '',
     email:
@@ -71,11 +69,11 @@ export function RegisterScreen({ navigation, route }: Props) {
           : '',
   };
 
-  const nameValid = role === 'provider' ? !!name.trim() : !!firstName.trim() && !!lastName.trim();
+  const nameValid = !!firstName.trim() && !!lastName.trim();
   const allValid = nameValid && isEmail(email) && address.trim() && pass.length >= 8 && pass === confirm && agreed;
 
   const handleSubmit = () => {
-    setTouched({ name: true, firstName: true, lastName: true, email: true, address: true, pass: true, confirm: true });
+    setTouched({ firstName: true, lastName: true, email: true, address: true, pass: true, confirm: true });
     if (!allValid) return;
     setLoading(true);
     // TODO: Firebase Auth (createUserWithEmailAndPassword) დაემატება ავთენტიფიკაციის ეტაპზე
@@ -125,39 +123,28 @@ export function RegisterScreen({ navigation, route }: Props) {
           <Text style={styles.subtitle}>შეიყვანე შენი მონაცემები რეგისტრაციის გასაგრძელებლად.</Text>
 
           <View style={styles.fields}>
-            {role === 'provider' ? (
-              <TextField
-                label="სახელი და გვარი"
-                value={name}
-                onChangeText={setName}
-                onBlur={() => touch('name')}
-                placeholder="მაგ. გიორგი ბერიძე"
-                error={errors.name}
-              />
-            ) : (
-              <View style={styles.nameRow}>
-                <View style={{ flex: 1 }}>
-                  <TextField
-                    label="სახელი"
-                    value={firstName}
-                    onChangeText={setFirstName}
-                    onBlur={() => touch('firstName')}
-                    placeholder="მაგ. ნინო"
-                    error={errors.firstName}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <TextField
-                    label="გვარი"
-                    value={lastName}
-                    onChangeText={setLastName}
-                    onBlur={() => touch('lastName')}
-                    placeholder="მაგ. სულაბერიძე"
-                    error={errors.lastName}
-                  />
-                </View>
+            <View style={styles.nameRow}>
+              <View style={{ flex: 1 }}>
+                <TextField
+                  label="სახელი"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  onBlur={() => touch('firstName')}
+                  placeholder={role === 'provider' ? 'მაგ. გიორგი' : 'მაგ. ნინო'}
+                  error={errors.firstName}
+                />
               </View>
-            )}
+              <View style={{ flex: 1 }}>
+                <TextField
+                  label="გვარი"
+                  value={lastName}
+                  onChangeText={setLastName}
+                  onBlur={() => touch('lastName')}
+                  placeholder={role === 'provider' ? 'მაგ. ბერიძე' : 'მაგ. სულაბერიძე'}
+                  error={errors.lastName}
+                />
+              </View>
+            </View>
             <TextField
               label="ელ. ფოსტა"
               value={email}

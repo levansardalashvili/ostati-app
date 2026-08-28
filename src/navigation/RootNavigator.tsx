@@ -11,6 +11,7 @@ import { ProviderSetupScreen } from '../screens/ProviderSetupScreen';
 import { CustomerTabs } from './CustomerTabs';
 import { ProviderTabs } from './ProviderTabs';
 import { ProviderJobDetailScreen } from '../screens/ProviderJobDetailScreen';
+import { ProviderJobFeedScreen } from '../screens/ProviderJobFeedScreen';
 import { PostJobScreen } from '../screens/PostJobScreen';
 import { CustomerJobDetailScreen } from '../screens/CustomerJobDetailScreen';
 import { ChatConversationScreen } from '../screens/ChatConversationScreen';
@@ -23,7 +24,6 @@ import { ProviderServiceAreasScreen } from '../screens/ProviderServiceAreasScree
 import { ProviderCompletedJobsScreen } from '../screens/ProviderCompletedJobsScreen';
 import { ProviderReviewsScreen } from '../screens/ProviderReviewsScreen';
 import { ProviderMyJobsScreen } from '../screens/ProviderMyJobsScreen';
-import { CustomerJobsScreen } from '../screens/CustomerJobsScreen';
 import { ViewProviderProfileScreen } from '../screens/ViewProviderProfileScreen';
 import { RatingScreen } from '../screens/RatingScreen';
 import { CustomerCategoriesScreen } from '../screens/CustomerCategoriesScreen';
@@ -50,6 +50,7 @@ export function RootNavigator() {
       <Stack.Screen name="CustomerHome" component={CustomerTabs} />
       <Stack.Screen name="ProviderHome" component={ProviderTabs} />
       <Stack.Screen name="ProviderJobDetail" component={ProviderJobDetailScreen} />
+      <Stack.Screen name="ProviderJobFeed" component={ProviderJobFeedScreen} />
       <Stack.Screen name="PostJob" component={PostJobScreen} />
       <Stack.Screen name="CustomerJobDetail" component={CustomerJobDetailScreen} />
       <Stack.Screen name="ChatConversation" component={ChatConversationScreen} />
@@ -62,7 +63,6 @@ export function RootNavigator() {
       <Stack.Screen name="ProviderCompletedJobs" component={ProviderCompletedJobsScreen} />
       <Stack.Screen name="ProviderReviews" component={ProviderReviewsScreen} />
       <Stack.Screen name="ProviderMyJobs" component={ProviderMyJobsScreen} />
-      <Stack.Screen name="CustomerJobs" component={CustomerJobsScreen} />
       <Stack.Screen name="ViewProviderProfile" component={ViewProviderProfileScreen} />
       <Stack.Screen name="RatingScreen" component={RatingScreen} />
       <Stack.Screen name="CustomerCategories" component={CustomerCategoriesScreen} />

@@ -25,8 +25,8 @@ export function ProviderMyJobsScreen({ navigation }: Props) {
       <View style={styles.tabsRow}>
         {(
           [
-            { id: 'active' as Tab, label: 'აქტიური' },
-            { id: 'done' as Tab, label: 'დასრულდა' },
+            { id: 'active' as Tab, label: 'დადასტურებული' },
+            { id: 'done' as Tab, label: 'დასრულებული' },
           ]
         ).map((t) => (
           <Pressable key={t.id} style={[styles.tab, tab === t.id && styles.tabActive]} onPress={() => setTab(t.id)}>

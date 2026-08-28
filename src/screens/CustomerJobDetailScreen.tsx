@@ -49,8 +49,33 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const [cancelled, setCancelled] = useState(false);
   const [confirmProvider, setConfirmProvider] = useState<Provider | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(
-    () => interestedList.find((p) => p.name === job.provider) ?? null,
+    () => interestedList.find((entry) => entry.provider.name === job.provider)?.provider ?? null,
   );
+  const [sortBy, setSortBy] = useState<'price' | 'rating' | 'experience' | null>(null);
+
+  const priceValue = (entry: (typeof interestedList)[number]) => {
+    const raw = entry.offeredPrice ?? entry.provider.sqmPrice;
+    return raw ? Number(raw) : Number.POSITIVE_INFINITY;
+  };
+  const priceLabel = (entry: (typeof interestedList)[number]) => {
+    if (entry.offeredPrice) return `შეთავაზებული ფასი: ${entry.offeredPrice} ₾`;
+    if (entry.provider.sqmPrice) return `${entry.provider.sqmPrice} ₾ / მ²`;
+    return 'ფასი სამუშაოს ნახვის შემდეგ განისაზღვრება';
+  };
+  const sortedInterestedList = useMemo(() => {
+    if (!sortBy) return interestedList;
+    const copy = [...interestedList];
+    if (sortBy === 'price') copy.sort((a, b) => priceValue(a) - priceValue(b));
+    if (sortBy === 'rating') copy.sort((a, b) => b.provider.rating - a.provider.rating);
+    if (sortBy === 'experience') copy.sort((a, b) => b.provider.years - a.provider.years);
+    return copy;
+  }, [interestedList, sortBy]);
+
+  // Provider-ის არჩევის შემდეგ job სხვა ოსტატებისთვის იხურება — მხოლოდ
+  // არჩეული ოსტატი ჩანს, როგორც აქტიური კანდიდატი (მომხმარებლის მოთხოვნით).
+  const visibleInterestedList = selectedProvider
+    ? sortedInterestedList.filter((entry) => entry.provider.id === selectedProvider.id)
+    : sortedInterestedList;
 
   // დასრულების/პრობლემის/შეფასების ნაკადი
   const [jobCompleted, setJobCompleted] = useState(job.status === 'completed');
@@ -148,17 +173,12 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
             </View>
           </View>
 
-          {job.budget && (
+          {job.id === 'j1' && (
             <View style={styles.budgetRow}>
-              <View style={styles.budgetBadge}>
-                <Text style={styles.budgetBadgeText}>ბიუჯეტი: {job.budget}</Text>
+              <View style={styles.urgentBadge}>
+                <Zap size={11} color={colors.destructive} />
+                <Text style={styles.urgentBadgeText}>გადაუდებელი</Text>
               </View>
-              {job.id === 'j1' && (
-                <View style={styles.urgentBadge}>
-                  <Zap size={11} color={colors.destructive} />
-                  <Text style={styles.urgentBadgeText}>გადაუდებელი</Text>
-                </View>
-              )}
             </View>
           )}
 
@@ -270,6 +290,15 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
                   </View>
                 )}
                 {!!ratingData.review && <Text style={styles.ratingReviewText}>"{ratingData.review}"</Text>}
+                {ratingData.photos && ratingData.photos.length > 0 && (
+                  <View style={styles.ratingPhotoRow}>
+                    {ratingData.photos.map((photo) => (
+                      <View key={photo.id} style={[styles.ratingPhotoThumb, { backgroundColor: photo.bg }]}>
+                        <ImageIcon size={18} color="rgba(100,116,139,0.6)" />
+                      </View>
+                    ))}
+                  </View>
+                )}
               </>
             ) : (
               <>
@@ -286,9 +315,9 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
         <View style={styles.interestedSection}>
           <View style={styles.interestedHeaderRow}>
             <Text style={styles.interestedTitle}>დაინტერესებული ოსტატები</Text>
-            {interestedList.length > 0 && (
+            {visibleInterestedList.length > 0 && (
               <View style={styles.interestedCountBadge}>
-                <Text style={styles.interestedCountText}>{interestedList.length}</Text>
+                <Text style={styles.interestedCountText}>{visibleInterestedList.length}</Text>
               </View>
             )}
           </View>
@@ -303,55 +332,91 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
               </Text>
             </View>
           ) : (
-            <View style={{ gap: spacing.md }}>
-              {interestedList.map((prov) => {
-                const isSelected = selectedProvider?.id === prov.id;
-                return (
-                  <View key={prov.id} style={[styles.providerCard, isSelected && styles.providerCardSelected]}>
-                    {isSelected && (
-                      <View style={styles.selectedBadge}>
-                        <Check size={13} color={colors.primary} strokeWidth={2.5} />
-                        <Text style={styles.selectedBadgeText}>შერჩეული ოსტატი</Text>
-                      </View>
-                    )}
-                    <View style={styles.providerRow}>
-                      <Avatar initials={prov.initials} color={prov.color} size={46} online={prov.online} />
-                      <View style={{ flex: 1 }}>
-                        <View style={styles.providerNameRow}>
-                          <Text style={styles.providerName}>{prov.name}</Text>
-                          {prov.verified && <VerifiedBadge size={14} />}
-                        </View>
-                        <Text style={styles.providerMeta}>
-                          {SPECIALTY_LABEL[prov.category] ?? prov.category} · {prov.years} წელი
-                        </Text>
-                        <View style={styles.providerStatsRow}>
-                          <View style={styles.providerStat}>
-                            <Star size={11} color="#FBBF24" fill="#FBBF24" />
-                            <Text style={styles.providerStatText}>{prov.rating}</Text>
-                          </View>
-                          <Text style={styles.providerStatMuted}>{prov.reviews} შეფ.</Text>
-                          <Text style={styles.providerStatMuted}>{prov.jobs} სამ.</Text>
-                        </View>
-                      </View>
-                    </View>
-                    <View style={styles.providerActions}>
-                      <Pressable style={styles.secondaryAction} onPress={() => handleOpenProfile(prov)}>
-                        <Text style={styles.secondaryActionText}>პროფილი</Text>
+            <>
+              {selectedProvider && interestedList.length > 1 && (
+                <Text style={styles.closedNote}>
+                  მოთხოვნა დაიხურა სხვა ოსტატებისთვის — მხოლოდ არჩეული ოსტატია აქტიური.
+                </Text>
+              )}
+              {!selectedProvider && interestedList.length > 1 && (
+                <View style={styles.sortRow}>
+                  <Text style={styles.sortLabel}>დაალაგე:</Text>
+                  {(
+                    [
+                      { key: 'price', label: 'ფასით' },
+                      { key: 'rating', label: 'რეიტინგით' },
+                      { key: 'experience', label: 'გამოცდილებით' },
+                    ] as const
+                  ).map((opt) => {
+                    const on = sortBy === opt.key;
+                    return (
+                      <Pressable
+                        key={opt.key}
+                        style={[styles.sortChip, on && styles.sortChipOn]}
+                        onPress={() => setSortBy((prev) => (prev === opt.key ? null : opt.key))}
+                      >
+                        <Text style={[styles.sortChipText, on && styles.sortChipTextOn]}>{opt.label}</Text>
                       </Pressable>
-                      <Pressable style={styles.secondaryAction} onPress={() => handleOpenChat(prov)}>
-                        <MessageCircle size={12} color={colors.foreground} />
-                        <Text style={styles.secondaryActionText}>მიწერა</Text>
-                      </Pressable>
-                      {!selectedProvider && (
-                        <Pressable style={styles.selectAction} onPress={() => setConfirmProvider(prov)}>
-                          <Text style={styles.selectActionText}>არჩევა</Text>
-                        </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+              <View style={{ gap: spacing.md }}>
+                {visibleInterestedList.map((entry) => {
+                  const prov = entry.provider;
+                  const isSelected = selectedProvider?.id === prov.id;
+                  return (
+                    <View key={prov.id} style={[styles.providerCard, isSelected && styles.providerCardSelected]}>
+                      {isSelected && (
+                        <View style={styles.selectedBadge}>
+                          <Check size={13} color={colors.primary} strokeWidth={2.5} />
+                          <Text style={styles.selectedBadgeText}>შერჩეული ოსტატი</Text>
+                        </View>
                       )}
+                      <View style={styles.providerRow}>
+                        <Avatar initials={prov.initials} color={prov.color} size={46} online={prov.online} />
+                        <View style={{ flex: 1 }}>
+                          <View style={styles.providerNameRow}>
+                            <Text style={styles.providerName}>{prov.name}</Text>
+                            {prov.verified && <VerifiedBadge size={14} />}
+                          </View>
+                          <Text style={styles.providerMeta}>
+                            {SPECIALTY_LABEL[prov.category] ?? prov.category} · {prov.years} წელი
+                          </Text>
+                          <View style={styles.providerStatsRow}>
+                            <View style={styles.providerStat}>
+                              <Star size={11} color="#FBBF24" fill="#FBBF24" />
+                              <Text style={styles.providerStatText}>{prov.rating}</Text>
+                            </View>
+                            <Text style={styles.providerStatMuted}>{prov.reviews} შეფ.</Text>
+                            <Text style={styles.providerStatMuted}>{prov.jobs} სამ.</Text>
+                          </View>
+                        </View>
+                      </View>
+                      <View style={styles.priceRow}>
+                        <Text style={[styles.priceRowText, !entry.offeredPrice && !prov.sqmPrice && styles.priceRowTextMuted]}>
+                          {priceLabel(entry)}
+                        </Text>
+                      </View>
+                      <View style={styles.providerActions}>
+                        <Pressable style={styles.secondaryAction} onPress={() => handleOpenProfile(prov)}>
+                          <Text style={styles.secondaryActionText}>პროფილი</Text>
+                        </Pressable>
+                        <Pressable style={styles.secondaryAction} onPress={() => handleOpenChat(prov)}>
+                          <MessageCircle size={12} color={colors.foreground} />
+                          <Text style={styles.secondaryActionText}>მიწერა</Text>
+                        </Pressable>
+                        {!selectedProvider && (
+                          <Pressable style={styles.selectAction} onPress={() => setConfirmProvider(prov)}>
+                            <Text style={styles.selectActionText}>არჩევა</Text>
+                          </Pressable>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                );
-              })}
-            </View>
+                  );
+                })}
+              </View>
+            </>
           )}
         </View>
       </ScrollView>
@@ -416,12 +481,15 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
         </Pressable>
       </BottomSheet>
 
-      <BottomSheet visible={completionSheetOpen} onClose={() => setCompletionSheetOpen(false)}>
+      {/* შეფასება სავალდებულოა — ეს sheet არ იხურება backdrop-ზე დაჭერით
+          ან Android hardware back-ით (onClose no-op); "მოგვიანებით" განზრახ
+          არ არსებობს, ერთადერთი გზა წინ არის "ოსტატის შეფასება". */}
+      <BottomSheet visible={completionSheetOpen} onClose={() => {}}>
         <View style={styles.completionSheetIcon}>
           <CheckCircle2 size={28} color={colors.success} />
         </View>
         <Text style={styles.sheetTitle}>სამუშაო დასრულებულად მოინიშნა</Text>
-        <Text style={styles.sheetSubtitle}>შეგიძლია ახლა შეაფასო ოსტატი.</Text>
+        <Text style={styles.sheetSubtitle}>სამუშაოს დასრულების შემდეგ საჭიროა ოსტატის შეფასება.</Text>
         <Button
           label="ოსტატის შეფასება"
           onPress={() => {
@@ -429,9 +497,6 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
             openRating();
           }}
         />
-        <Pressable style={styles.sheetCancelLink} onPress={() => setCompletionSheetOpen(false)}>
-          <Text style={styles.sheetCancelLinkText}>მოგვიანებით</Text>
-        </Pressable>
       </BottomSheet>
 
       <BottomSheet
@@ -538,17 +603,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     marginBottom: spacing.sm + 2,
-  },
-  budgetBadge: {
-    backgroundColor: colors.secondary,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 4,
-  },
-  budgetBadgeText: {
-    ...typography.small,
-    color: colors.secondaryForeground,
-    fontWeight: '700',
   },
   urgentBadge: {
     flexDirection: 'row',
@@ -694,12 +748,67 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     textAlign: 'center',
   },
+  closedNote: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    fontStyle: 'italic',
+    marginBottom: spacing.sm + 2,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.xs + 2,
+    marginBottom: spacing.sm + 2,
+  },
+  sortLabel: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    fontWeight: '600',
+  },
+  sortChip: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
+  },
+  sortChipOn: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  sortChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.mutedForeground,
+  },
+  sortChipTextOn: {
+    color: colors.primaryForeground,
+  },
   providerCard: {
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.lg,
     padding: spacing.md,
+  },
+  priceRow: {
+    backgroundColor: colors.muted,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm + 4,
+    paddingVertical: spacing.xs + 4,
+    marginBottom: spacing.sm + 2,
+  },
+  priceRowText: {
+    ...typography.small,
+    color: colors.foreground,
+    fontWeight: '700',
+  },
+  priceRowTextMuted: {
+    color: colors.mutedForeground,
+    fontWeight: '500',
+    fontStyle: 'italic',
   },
   providerCardSelected: {
     borderColor: colors.primary,
@@ -974,6 +1083,19 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     fontStyle: 'italic',
     lineHeight: 18,
+  },
+  ratingPhotoRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm + 2,
+  },
+  ratingPhotoThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rateButton: {
     flexDirection: 'row',

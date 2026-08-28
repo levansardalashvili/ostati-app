@@ -36,7 +36,7 @@ export function CustomerProfileScreen({ navigation }: Props) {
 
   const handleMenuPress = (label: string) => {
     if (label === 'ჩემი მოთხოვნები') {
-      navigation.navigate('CustomerJobs');
+      navigation.navigate('MyJobsTab');
     } else if (label === 'პროფილის რედაქტირება' || label === 'edit') {
       navigation.navigate('CustomerEditProfile');
     } else if (label === 'შეტყობინებები') {

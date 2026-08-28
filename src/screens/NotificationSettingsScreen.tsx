@@ -17,7 +17,7 @@ const CUSTOMER_TOGGLES = [
 ];
 
 const PROVIDER_TOGGLES = [
-  'ახალი მოთხოვნები ჩემს რაიონში',
+  'ახალი მოთხოვნები ჩემს არეალში',
   'ახალი შეტყობინება ჩატში',
   'სამუშაოზე არჩევა',
   'მოთხოვნის სტატუსის ცვლილება',
@@ -57,7 +57,7 @@ export function NotificationSettingsScreen({ navigation, route }: Props) {
           <View style={styles.infoBanner}>
             <Text style={styles.infoEmoji}>ℹ️</Text>
             <Text style={styles.infoText}>
-              „ახალი მოთხოვნები ჩემს რაიონში" — ეს შეტყობინება მუშაობს მხოლოდ მაშინ, როდესაც ხელმისაწვდომობა ჩართულია
+              „ახალი მოთხოვნები ჩემს არეალში" — ეს შეტყობინება მუშაობს მხოლოდ მაშინ, როდესაც ხელმისაწვდომობა ჩართულია
               Provider Home-ზე.
             </Text>
           </View>

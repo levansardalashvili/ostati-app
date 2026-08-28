@@ -44,14 +44,14 @@ export function RegionAreaPickerScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <BackHeader title="სამუშაო რაიონები" onBack={() => navigation.goBack()} />
+      <BackHeader title="სამუშაო არეალი" onBack={() => navigation.goBack()} />
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         <RegionAreaAccordion selected={selected} onToggleDistrict={toggleDistrict} onToggleAllInRegion={toggleAllInRegion} />
       </ScrollView>
 
       <View style={styles.footer}>
         <Text style={styles.footerNote}>
-          {selected.size > 0 ? `არჩეულია ${selected.size} რაიონი` : 'რაიონი არ არის შერჩეული'}
+          {selected.size > 0 ? `არჩეულია ${selected.size} არეალი` : 'არეალი არ არის შერჩეული'}
         </Text>
         <Button label="შენახვა" onPress={handleSave} disabled={selected.size === 0} />
       </View>

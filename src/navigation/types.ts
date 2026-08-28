@@ -16,6 +16,7 @@ export type RootStackParamList = {
   CustomerHome: undefined;
   ProviderHome: undefined;
   ProviderJobDetail: { id: string; mode?: 'browse' | 'selected' | 'completed' };
+  ProviderJobFeed: undefined;
   PostJob: undefined;
   CustomerJobDetail: { jobId: string };
   ChatConversation: { chatId: string; name: string; initials: string; color: string; role: Role };
@@ -28,7 +29,6 @@ export type RootStackParamList = {
   ProviderCompletedJobs: undefined;
   ProviderReviews: undefined;
   ProviderMyJobs: undefined;
-  CustomerJobs: undefined;
   ViewProviderProfile: { id: string };
   CustomerCategories: undefined;
   CustomerCategory: { id: string };
@@ -42,11 +42,14 @@ export type RootStackParamList = {
   };
 };
 
-// Bottom Tab-ების route-ები (Home/ჩატები/პროფილი) — თითო tab navigator
-// როლის მიხედვით, RootStack-ის "CustomerHome"/"ProviderHome" route-ების
-// ქვეშ ჩალაგებული (product-spec.md: "Bottom navigation, 3 ჩანართი").
+// Bottom Tab-ების route-ები — თითო tab navigator როლის მიხედვით, RootStack-ის
+// "CustomerHome"/"ProviderHome" route-ების ქვეშ ჩალაგებული. Customer-ს 4
+// ჩანართი აქვს (product-spec.md-ის საწყისი "3 ჩანართის" წესზე override,
+// მომხმარებლის მოთხოვნით) — "MyJobsTab" არის ყოფილი root-stack "CustomerJobs"
+// ეკრანი (ახლა ტაბის სახით, არა push-ით პროფილიდან — იხ. CustomerJobsScreen.tsx).
 export type CustomerTabParamList = {
   Home: undefined;
+  MyJobsTab: undefined;
   Chats: undefined;
   Profile: undefined;
 };

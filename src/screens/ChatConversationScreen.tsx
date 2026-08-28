@@ -346,7 +346,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
           <TextInput
             value={offerAmount}
             onChangeText={(t) => setOfferAmount(t.replace(/[^0-9]/g, ''))}
-            placeholder="0"
+            placeholder="მიუთითეთ ფასი"
             placeholderTextColor={colors.mutedForeground}
             keyboardType="number-pad"
             style={styles.offerAmountInput}

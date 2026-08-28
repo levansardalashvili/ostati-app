@@ -13,7 +13,7 @@ type Props = {
 
 // RegionAreaAccordion — საქართველოს მხარეების/რაიონების არჩევის ბადე,
 // გამოიყენება როგორც ProviderSetup-ის რეგისტრაციის picker-ში (RegionAreaPicker
-// ეკრანი), ისე პროფილის "დაფარვის რაიონები" ეკრანზე პირდაპირ ჩაშენებული.
+// ეკრანი), ისე პროფილის "სამუშაო არეალი" ეკრანზე პირდაპირ ჩაშენებული.
 export function RegionAreaAccordion({ selected, onToggleDistrict, onToggleAllInRegion, defaultExpanded = ['tbilisi'] }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(defaultExpanded));
 

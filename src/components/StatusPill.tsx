@@ -4,10 +4,16 @@ import { colors, radius } from '../theme';
 
 export type JobStatus = 'active' | 'pending' | 'completed' | 'cancelled';
 
+// ძირითადი user-facing lifecycle (მომხმარებლის მოთხოვნით): "მომლოდინე"
+// (pending — Provider ჯერ არ არის არჩეული) → "დადასტურებულია" (active —
+// Customer-მა Provider აირჩია) → "დასრულებულია" (completed — Customer-მა
+// დაადასტურა დასრულება და შეაფასა). შიდა ტიპის key-ები (`active` და ა.შ.)
+// უცვლელია — მხოლოდ ნაჩვენები ტექსტი შეიცვალა. "გაუქმდა" ამ 3-საფეხურიან
+// lifecycle-ის ნაწილი არ არის (გამონაკლისი/terminal state), უცვლელია.
 const STATUS_MAP: Record<JobStatus, { label: string; bg: string; text: string; dot: string }> = {
-  active: { label: 'აქტიური', bg: colors.successBackground, text: colors.success, dot: colors.success },
-  pending: { label: 'მოლოდინი', bg: colors.warningBackground, text: colors.warning, dot: colors.warning },
-  completed: { label: 'დასრულდა', bg: colors.secondary, text: colors.secondaryForeground, dot: colors.primary },
+  active: { label: 'დადასტურებულია', bg: colors.successBackground, text: colors.success, dot: colors.success },
+  pending: { label: 'მომლოდინე', bg: colors.warningBackground, text: colors.warning, dot: colors.warning },
+  completed: { label: 'დასრულებულია', bg: colors.secondary, text: colors.secondaryForeground, dot: colors.primary },
   cancelled: { label: 'გაუქმდა', bg: colors.dangerBackground, text: colors.destructive, dot: colors.destructive },
 };
 

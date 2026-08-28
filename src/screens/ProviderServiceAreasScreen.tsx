@@ -11,7 +11,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderServiceAreas'>;
 
-// ProviderServiceAreas — "დაფარვის რაიონები" პროფილის მენიუდან. იგივე
+// ProviderServiceAreas — "სამუშაო არეალი" პროფილის მენიუდან. იგივე
 // მხარეების/რაიონების accordion, რაც რეგისტრაციის RegionAreaPicker-ში
 // (RegionAreaAccordion კომპონენტი გაზიარებულია ორივეს შორის).
 export function ProviderServiceAreasScreen({ navigation }: Props) {
@@ -48,15 +48,15 @@ export function ProviderServiceAreasScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <BackHeader title="დაფარვის რაიონები" onBack={() => navigation.goBack()} />
+      <BackHeader title="სამუშაო არეალი" onBack={() => navigation.goBack()} />
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-        <Text style={styles.intro}>აირჩიე რაიონები, სადაც სამუშაოს შესრულება შეგიძლია.</Text>
+        <Text style={styles.intro}>აირჩიე არეალები, სადაც სამუშაოს შესრულება შეგიძლია.</Text>
         <RegionAreaAccordion selected={selected} onToggleDistrict={toggleDistrict} onToggleAllInRegion={toggleAllInRegion} />
       </ScrollView>
 
       <View style={styles.footer}>
         <Text style={styles.footerNote}>
-          {selected.size > 0 ? `${selected.size} რაიონი შერჩეულია` : 'რაიონი არ არის შერჩეული'}
+          {selected.size > 0 ? `${selected.size} არეალი შერჩეულია` : 'არეალი არ არის შერჩეული'}
         </Text>
         <Button label={saved ? 'შენახულია!' : 'შენახვა'} onPress={handleSave} disabled={selected.size === 0 || saved} />
       </View>

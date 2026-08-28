@@ -61,7 +61,7 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
 
         <View style={{ gap: spacing.md }}>
           <TextField label="სახელი და გვარი" value={name} onChangeText={setName} error={nameErr} />
-          <TextField label="მისამართი" value={address} onChangeText={setAddress} placeholder="ქ., რაიონი" />
+          <TextField label="მისამართი" value={address} onChangeText={setAddress} placeholder="ქ., არეალი" />
           <View>
             <Text style={styles.infoLabel}>ანგარიშის ინფორმაცია</Text>
             <View style={styles.infoCard}>

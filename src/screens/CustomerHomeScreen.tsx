@@ -8,19 +8,20 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, FileText, LayoutGrid, MapPin, MessageCircle, Plus, Search, Star, X } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Bell, ChevronRight, LayoutGrid, MapPin, MessageCircle, Search, Star, X } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
+import { CategoryIcon } from '../components/CategoryIcon';
 import { Chip } from '../components/Chip';
 import { Skeleton } from '../components/Skeleton';
+import { StatusPill } from '../components/StatusPill';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
 import { TBILISI_AREAS as DISTRICTS } from '../data/districts';
-import { PROVIDERS, Provider } from '../data/mockHomeData';
+import { CUSTOMER_JOBS, PROVIDERS, Provider } from '../data/mockHomeData';
 import { getUnreadCount } from '../data/mockNotifications';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
@@ -36,6 +37,27 @@ const MOCK_UNREAD_COUNT = getUnreadCount('customer');
 // (დანარჩენი 12 კატეგორია "ყველა სერვისი" ღილაკის მიღმაა)
 const TOP_CATEGORY_IDS = ['plumbing', 'electrical', 'cleaning'];
 
+// "ტოპ ოსტატები" რანჟირება — არა უბრალო ბოლო რეგისტრაცია (მომხმარებლის
+// მოთხოვნით). Bayesian/წონიანი საშუალო (IMDB-ის რანჟირების პრინციპი):
+// მცირე რაოდენობის შეფასებას (მაგ. ერთი 5-ვარსკვლავიანი) არ შეუძლია
+// გადააჭარბოს ასობით კარგ შეფასებას — რაც მეტი შეფასებაა, მით უფრო
+// ენდობა ალგორითმი პროვაიდერის რეალურ საშუალოს (და არა baseline-ს).
+const RATING_PRIOR_COUNT = 15; // "ვირტუალური" ხმების რაოდენობა baseline-ის წონისთვის
+const RATING_PRIOR_MEAN = 4.3; // baseline საშუალო რეიტინგი, სანამ საკმარისი შეფასება დაგროვდება
+
+function providerRankScore(p: Provider): number {
+  const weightedRating =
+    (p.reviews / (p.reviews + RATING_PRIOR_COUNT)) * p.rating +
+    (RATING_PRIOR_COUNT / (p.reviews + RATING_PRIOR_COUNT)) * RATING_PRIOR_MEAN;
+  // დასრულებული სამუშაოების რაოდენობა — მცირე, log-სკალირებული წონა
+  const completedJobsBoost = Math.log10(p.jobs + 1) * 0.15;
+  // "საჭიროების შემთხვევაში" ბოლო აქტივობა — ამჟამინდელი mock მონაცემები
+  // "ბოლო აქტივობის დროს" არ ინახავს, ამიტომ `online`-ს ვიყენებთ უახლოეს
+  // პროქსად, მხოლოდ tie-breaker-ის დონეზე (მცირე წონა).
+  const recentActivityBoost = p.online ? 0.05 : 0;
+  return weightedRating + completedJobsBoost + recentActivityBoost;
+}
+
 // C1 — Customer Home / Browse (product-spec.md; დიზაინის რეფერენსის
 // CustomerHome-ის მიხედვით)
 export function CustomerHomeScreen({ navigation }: Props) {
@@ -43,8 +65,18 @@ export function CustomerHomeScreen({ navigation }: Props) {
   const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`;
   const [search, setSearch] = useState('');
   const [selCats, setSelCats] = useState<Set<string>>(new Set());
-  const [selDistrict, setSelDistrict] = useState<string | null>(null);
+  // 'mine' — სპეციალური სენტინელ მნიშვნელობა "ჩემი არეალი" ჩიპისთვის,
+  // არასდროს ემთხვევა რეალურ რაიონის სახელს.
+  const [selDistrict, setSelDistrict] = useState<string | 'mine' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Customer-ის საკუთარი რაიონი, დაცული მისამართიდან ამოღებული — DISTRICTS
+  // (TBILISI_AREAS)-ის ჩამონათვალის substring-შედარებით, რადგან
+  // defaultAddress თავისუფალი ტექსტია ("რაიონი, ქალაქი" ან პირიქით).
+  const myDistrict = useMemo(
+    () => DISTRICTS.find((d) => profile.defaultAddress.includes(d)) ?? null,
+    [profile.defaultAddress],
+  );
 
   useEffect(() => {
     const t = setTimeout(() => setIsLoading(false), 950);
@@ -59,17 +91,20 @@ export function CustomerHomeScreen({ navigation }: Props) {
     });
 
   const filtered = useMemo(() => {
+    const effectiveDistrict = selDistrict === 'mine' ? myDistrict : selDistrict;
     return PROVIDERS.filter((p) => {
       if (selCats.size > 0 && !selCats.has(p.category)) return false;
-      if (selDistrict && !p.location.includes(selDistrict)) return false;
+      // მთხოვნის მიხედვით — ოსტატის საცხოვრებელი მისამართის (`location`) ნაცვლად
+      // მისი სამუშაო არეალით (`areas`) ვფილტრავთ.
+      if (effectiveDistrict && !p.areas.includes(effectiveDistrict)) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
         const spec = (SPECIALTY_LABEL[p.category] ?? '').toLowerCase();
         if (!p.name.toLowerCase().includes(q) && !spec.includes(q)) return false;
       }
       return true;
-    });
-  }, [search, selCats, selDistrict]);
+    }).sort((a, b) => providerRankScore(b) - providerRankScore(a));
+  }, [search, selCats, selDistrict, myDistrict]);
 
   const clearFilters = () => {
     setSelCats(new Set());
@@ -92,9 +127,6 @@ export function CustomerHomeScreen({ navigation }: Props) {
       role: 'customer',
     });
   };
-  const handlePostJob = () => {
-    navigation.navigate('PostJob');
-  };
   const handleAllServices = () => {
     navigation.navigate('CustomerCategories');
   };
@@ -102,6 +134,16 @@ export function CustomerHomeScreen({ navigation }: Props) {
   const topCategories = TOP_CATEGORY_IDS.map((id) => CATEGORIES.find((c) => c.id === id)).filter(
     (c): c is (typeof CATEGORIES)[number] => !!c,
   );
+
+  // "მიმდინარე სამუშაო" — ჩანს მხოლოდ მაშინ, როცა Customer-მა კონკრეტულ
+  // Provider-ს აირჩია (status === 'active'). დაჭერისას იხსნება არსებული
+  // CustomerJobDetail ეკრანი — არა ცალკე duplicate დეტალის ეკრანი.
+  const currentJob = CUSTOMER_JOBS.find((j) => j.status === 'active') ?? null;
+  const currentJobCategory = currentJob ? CATEGORIES.find((c) => c.id === currentJob.category) : null;
+  const handleOpenCurrentJob = () => {
+    if (!currentJob) return;
+    navigation.navigate('CustomerJobDetail', { jobId: currentJob.id });
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -140,6 +182,26 @@ export function CustomerHomeScreen({ navigation }: Props) {
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+        {currentJob && currentJobCategory && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>მიმდინარე სამუშაო</Text>
+            <Pressable style={styles.currentJobCard} onPress={handleOpenCurrentJob}>
+              <CategoryIcon categoryId={currentJobCategory.id} size={44} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.currentJobCategory}>{currentJobCategory.label}</Text>
+                <Text style={styles.currentJobProvider} numberOfLines={1}>
+                  {currentJob.provider}
+                </Text>
+                <Text style={styles.currentJobDate}>{currentJob.date}</Text>
+              </View>
+              <View style={styles.currentJobRight}>
+                <StatusPill status={currentJob.status} />
+                <ChevronRight size={16} color={colors.mutedForeground} />
+              </View>
+            </Pressable>
+          </View>
+        )}
+
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>სერვისები</Text>
@@ -180,7 +242,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
 
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>რაიონი</Text>
+            <Text style={styles.sectionTitle}>არეალი</Text>
             {selDistrict && (
               <Pressable onPress={() => setSelDistrict(null)}>
                 <Text style={styles.clearLink}>გასუფთ.</Text>
@@ -189,6 +251,14 @@ export function CustomerHomeScreen({ navigation }: Props) {
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
             <Chip variant="filled" label="ყველა" selected={!selDistrict} onPress={() => setSelDistrict(null)} />
+            {myDistrict && (
+              <Chip
+                variant="filled"
+                label="ჩემი არეალი"
+                selected={selDistrict === 'mine'}
+                onPress={() => setSelDistrict(selDistrict === 'mine' ? null : 'mine')}
+              />
+            )}
             {DISTRICTS.map((d) => (
               <Chip
                 key={d}
@@ -203,7 +273,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
 
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.resultsTitle}>ხელმისაწვდომი ოსტატები</Text>
+            <Text style={styles.resultsTitle}>ტოპ ოსტატები შენს არეალში</Text>
             {!isLoading && (
               <View style={styles.countBadge}>
                 <Text style={styles.countBadgeText}>{filtered.length}</Text>
@@ -223,7 +293,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
                 <Search size={24} color={colors.mutedForeground} />
               </View>
               <Text style={styles.emptyTitle}>ოსტატები ვერ მოიძებნა</Text>
-              <Text style={styles.emptySubtitle}>სცადე სხვა კატეგორიის ან რაიონის არჩევა.</Text>
+              <Text style={styles.emptySubtitle}>სცადე სხვა კატეგორიის ან არეალის არჩევა.</Text>
               <Pressable style={styles.emptyButton} onPress={clearFilters}>
                 <Text style={styles.emptyButtonText}>ფილტრების შეცვლა</Text>
               </Pressable>
@@ -240,31 +310,6 @@ export function CustomerHomeScreen({ navigation }: Props) {
               ))}
             </View>
           )}
-        </View>
-
-        <View style={styles.ctaSection}>
-          <LinearGradient
-            colors={['#2563EB', '#1D4ED8']}
-            style={styles.ctaCard}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={styles.ctaRow}>
-              <View style={styles.ctaIcon}>
-                <FileText size={18} color="#FFFFFF" />
-              </View>
-              <View style={styles.ctaTextWrap}>
-                <Text style={styles.ctaTitle}>ვერ იპოვე სასურველი ოსტატი?</Text>
-                <Text style={styles.ctaSubtitle}>
-                  გამოაქვეყნე მოთხოვნა და დაინტ. ოსტატები თავად გამოგეხმ.
-                </Text>
-              </View>
-            </View>
-            <Pressable style={styles.ctaButton} onPress={handlePostJob}>
-              <Plus size={18} color={colors.primary} strokeWidth={2.5} />
-              <Text style={styles.ctaButtonText}>მოთხოვნის გამოქვეყნება</Text>
-            </Pressable>
-          </LinearGradient>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -446,6 +491,36 @@ const styles = StyleSheet.create({
   chipRow: {
     gap: spacing.sm,
     paddingRight: spacing.lg,
+  },
+  currentJobCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  currentJobCategory: {
+    ...typography.small,
+    color: colors.mutedForeground,
+  },
+  currentJobProvider: {
+    ...typography.bodyMedium,
+    color: colors.foreground,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  currentJobDate: {
+    ...typography.small,
+    color: colors.primary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  currentJobRight: {
+    alignItems: 'flex-end',
+    gap: spacing.xs + 2,
   },
   serviceGrid: {
     flexDirection: 'row',
@@ -655,53 +730,6 @@ const styles = StyleSheet.create({
   messageButtonText: {
     ...typography.small,
     color: colors.primaryForeground,
-    fontWeight: '700',
-  },
-  ctaSection: {
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-  },
-  ctaCard: {
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-  },
-  ctaRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  ctaIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaTextWrap: {
-    flex: 1,
-  },
-  ctaTitle: {
-    ...typography.bodyMedium,
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-  ctaSubtitle: {
-    ...typography.small,
-    color: '#BFDBFE',
-  },
-  ctaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: '#FFFFFF',
-    borderRadius: radius.md,
-    paddingVertical: spacing.md - 2,
-  },
-  ctaButtonText: {
-    ...typography.bodyMedium,
-    color: colors.primary,
     fontWeight: '700',
   },
 });

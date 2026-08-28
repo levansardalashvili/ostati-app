@@ -7,17 +7,23 @@ type Props = {
   title: string;
   onBack: () => void;
   right?: React.ReactNode;
+  showBack?: boolean;
 };
 
 // უკან ისარი + სათაური + არასავალდებულო მარჯვენა ელემენტი (დიზაინის
 // რეფერენსის BackHeader-ის მიხედვით) — გამოიყენება Job Detail-ის მსგავს
-// ქვედონეების ეკრანებზე.
-export function BackHeader({ title, onBack, right }: Props) {
+// ქვედონეების ეკრანებზე. showBack={false} — მაგ. სავალდებულო ეკრანებზე
+// (RatingScreen), სადაც უკან დაბრუნება დაბლოკილია.
+export function BackHeader({ title, onBack, right, showBack = true }: Props) {
   return (
     <View style={styles.container}>
-      <Pressable style={styles.iconButton} onPress={onBack}>
-        <ArrowLeft size={18} color={colors.foreground} />
-      </Pressable>
+      {showBack ? (
+        <Pressable style={styles.iconButton} onPress={onBack}>
+          <ArrowLeft size={18} color={colors.foreground} />
+        </Pressable>
+      ) : (
+        <View style={styles.iconButton} />
+      )}
       <Text style={styles.title}>{title}</Text>
       {right ?? <View style={styles.iconButton} />}
     </View>
