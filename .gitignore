@@ -30,6 +30,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
+# temporary debug artifacts (screenshots, uiautomator dumps, etc.)
+.tmp_*
+
 # local env files
 .env*.local
 
