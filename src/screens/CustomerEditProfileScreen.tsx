@@ -21,16 +21,19 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CustomerEditProfile'>;
 // უბრალოდ იკარგებოდა navigation.goBack()-ზე).
 export function CustomerEditProfileScreen({ navigation }: Props) {
   const { profile, setProfile } = useCustomerProfile();
-  const [name, setName] = useState(`${profile.firstName} ${profile.lastName}`.trim());
+  const [firstName, setFirstName] = useState(profile.firstName);
+  const [lastName, setLastName] = useState(profile.lastName);
   const [address, setAddress] = useState(profile.defaultAddress);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const attemptRef = useRef(0);
 
-  const nameErr = !name.trim() ? 'ეს ველი სავალდებულოა' : '';
+  const firstNameErr = !firstName.trim() ? 'ეს ველი სავალდებულოა' : '';
+  const lastNameErr = !lastName.trim() ? 'ეს ველი სავალდებულოა' : '';
+  const canSave = !!firstName.trim() && !!lastName.trim();
 
   const handleSave = () => {
-    if (!name.trim() || isSaving) return;
+    if (!canSave || isSaving) return;
     setSaveError(false);
     setIsSaving(true);
     setTimeout(() => {
@@ -39,8 +42,7 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
         setSaveError(true);
         attemptRef.current += 1;
       } else {
-        const [firstName, ...lastNameParts] = name.trim().split(' ');
-        setProfile({ firstName, lastName: lastNameParts.join(' '), defaultAddress: address.trim() });
+        setProfile({ firstName: firstName.trim(), lastName: lastName.trim(), defaultAddress: address.trim() });
         navigation.goBack();
       }
     }, 1000);
@@ -60,7 +62,14 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
         </View>
 
         <View style={{ gap: spacing.md }}>
-          <TextField label="სახელი და გვარი" value={name} onChangeText={setName} error={nameErr} />
+          <View style={styles.nameRow}>
+            <View style={{ flex: 1 }}>
+              <TextField label="სახელი" value={firstName} onChangeText={setFirstName} error={firstNameErr} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <TextField label="გვარი" value={lastName} onChangeText={setLastName} error={lastNameErr} />
+            </View>
+          </View>
           <TextField label="მისამართი" value={address} onChangeText={setAddress} placeholder="ქ., არეალი" />
           <View>
             <Text style={styles.infoLabel}>ანგარიშის ინფორმაცია</Text>
@@ -77,7 +86,7 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
         {saveError && (
           <InlineBanner type="error" msg="ცვლილებების შენახვა ვერ მოხერხდა" action="თავიდან ცდა" onAction={handleSave} />
         )}
-        <Button label="ცვლილებების შენახვა" onPress={handleSave} disabled={!name.trim()} loading={isSaving} loadingLabel="ინახება..." />
+        <Button label="ცვლილებების შენახვა" onPress={handleSave} disabled={!canSave} loading={isSaving} loadingLabel="ინახება..." />
       </View>
     </SafeAreaView>
   );
@@ -98,6 +107,10 @@ const styles = StyleSheet.create({
   avatarRow: {
     alignItems: 'center',
     marginBottom: spacing.xl,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    gap: spacing.sm + 2,
   },
   avatarWrap: {
     position: 'relative',

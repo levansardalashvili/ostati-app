@@ -19,6 +19,7 @@ import { SpecialtyPickerField, type SpecialtyOption } from '../components/Specia
 import { SqmPriceField } from '../components/SqmPriceField';
 import { colors, radius, spacing, typography } from '../theme';
 import { isSqmPriced } from '../data/specialties';
+import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderSetup'>;
@@ -28,6 +29,7 @@ const ABOUT_MAX = 300;
 // A4 — პროფილის შევსება (Provider) (product-spec.md; დიზაინის რეფერენსის
 // ProviderSetupScreen-ის მიხედვით)
 export function ProviderSetupScreen({ navigation }: Props) {
+  const { setProfile } = useProviderProfile();
   const [specialty, setSpecialty] = useState<SpecialtyOption[]>([]);
   const [experience, setExperience] = useState<string | null>(null);
   const [areas, setAreas] = useState<string[]>([]);
@@ -59,10 +61,11 @@ export function ProviderSetupScreen({ navigation }: Props) {
   const handleContinue = () => {
     if (!canSave) return;
     setLoading(true);
-    // TODO: პროვაიდერის პროფილის შენახვა Firestore-ში (specialty, areas,
-    // experience, about, certificates, portfolio, sqmPrices)
+    // TODO: პროვაიდერის პროფილის საბოლოო შენახვა Firestore-ში — ჯერჯერობით
+    // მხოლოდ ProviderProfileContext-ში (ლოკალური, არა persist).
     setTimeout(() => {
       setLoading(false);
+      setProfile({ specialty, areas, experience, about, hasPhoto, certificates, portfolio, sqmPrices });
       navigation.reset({ index: 0, routes: [{ name: 'ProviderHome' }] });
     }, 1200);
   };

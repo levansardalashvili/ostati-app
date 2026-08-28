@@ -9,14 +9,16 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Check, Mail, MapPin } from 'lucide-react-native';
+import { ArrowLeft, Check, Mail } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AddressAutocompleteField } from '../components/AddressAutocompleteField';
 import { Button } from '../components/Button';
 import { GoogleButton } from '../components/GoogleButton';
 import { ProgressBar } from '../components/ProgressBar';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
+import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
@@ -31,6 +33,7 @@ const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 export function RegisterScreen({ navigation, route }: Props) {
   const { role } = route.params;
   const { setProfile } = useCustomerProfile();
+  const { setProfile: setProviderProfile } = useProviderProfile();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -80,6 +83,7 @@ export function RegisterScreen({ navigation, route }: Props) {
     setTimeout(() => {
       setLoading(false);
       if (role === 'provider') {
+        setProviderProfile({ firstName: firstName.trim(), lastName: lastName.trim() });
         navigation.replace('ProviderSetup');
       } else {
         setProfile({
@@ -156,14 +160,13 @@ export function RegisterScreen({ navigation, route }: Props) {
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            <TextField
+            <AddressAutocompleteField
               label="მისამართი"
               value={address}
               onChangeText={setAddress}
               onBlur={() => touch('address')}
-              placeholder="მაგ. თბილისი, ვაკე"
+              placeholder="მაგ. ჭავჭავაძის 48"
               error={errors.address}
-              icon={MapPin}
             />
             <TextField
               label="პაროლი"

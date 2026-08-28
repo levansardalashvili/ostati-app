@@ -25,7 +25,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { DatePickerField } from '../components/DatePickerField';
 import { colors, radius, spacing, typography } from '../theme';
-import { SPECIALTIES } from '../data/specialties';
+import { CATEGORIES } from '../data/categories';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -66,7 +66,7 @@ export function PostJobScreen({ navigation }: Props) {
         ? 'ეს ველი სავალდებულოა'
         : '';
   const canSubmit = !!category && description.trim().length >= DESCRIPTION_MIN;
-  const selectedSpecialty = SPECIALTIES.find((sp) => sp.id === category) ?? null;
+  const selectedCategory = CATEGORIES.find((c) => c.id === category) ?? null;
 
   const handlePublish = () => {
     setSubmitTouched(true);
@@ -127,9 +127,9 @@ export function PostJobScreen({ navigation }: Props) {
             style={[styles.categoryButton, categoryError && styles.inputError]}
             onPress={() => setCategorySheetOpen(true)}
           >
-            <Text style={styles.categoryButtonIcon}>{selectedSpecialty?.icon ?? '🛠️'}</Text>
-            <Text style={[styles.categoryButtonText, !selectedSpecialty && styles.categoryButtonPlaceholder]} numberOfLines={1}>
-              {selectedSpecialty?.label ?? 'აირჩიე კატეგორია'}
+            <Text style={styles.categoryButtonIcon}>{selectedCategory?.icon ?? '🛠️'}</Text>
+            <Text style={[styles.categoryButtonText, !selectedCategory && styles.categoryButtonPlaceholder]} numberOfLines={1}>
+              {selectedCategory?.label ?? 'აირჩიე კატეგორია'}
             </Text>
             <ChevronRight size={16} color={colors.mutedForeground} />
           </Pressable>
@@ -241,23 +241,25 @@ export function PostJobScreen({ navigation }: Props) {
 
       <BottomSheet visible={categorySheetOpen} onClose={() => setCategorySheetOpen(false)}>
         <Text style={styles.sheetTitle}>კატეგორია</Text>
-        {SPECIALTIES.map((sp) => {
-          const on = category === sp.id;
-          return (
-            <Pressable
-              key={sp.id}
-              onPress={() => {
-                setCategory(sp.id);
-                setCategorySheetOpen(false);
-              }}
-              style={styles.categorySheetRow}
-            >
-              <Text style={styles.categoryIcon}>{sp.icon}</Text>
-              <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{sp.label}</Text>
-              {on && <Check size={16} color={colors.primary} strokeWidth={3} />}
-            </Pressable>
-          );
-        })}
+        <ScrollView style={styles.categorySheetList} showsVerticalScrollIndicator={false}>
+          {CATEGORIES.map((c) => {
+            const on = category === c.id;
+            return (
+              <Pressable
+                key={c.id}
+                onPress={() => {
+                  setCategory(c.id);
+                  setCategorySheetOpen(false);
+                }}
+                style={styles.categorySheetRow}
+              >
+                <Text style={styles.categoryIcon}>{c.icon}</Text>
+                <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{c.label}</Text>
+                {on && <Check size={16} color={colors.primary} strokeWidth={3} />}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </BottomSheet>
 
       <BottomSheet visible={timeSheetOpen} onClose={() => setTimeSheetOpen(false)}>
@@ -391,6 +393,9 @@ const styles = StyleSheet.create({
   categoryButtonPlaceholder: {
     color: colors.mutedForeground,
     fontWeight: '400',
+  },
+  categorySheetList: {
+    maxHeight: 420,
   },
   categorySheetRow: {
     flexDirection: 'row',

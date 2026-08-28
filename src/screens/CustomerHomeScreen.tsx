@@ -24,6 +24,7 @@ import { TBILISI_AREAS as DISTRICTS } from '../data/districts';
 import { CUSTOMER_JOBS, PROVIDERS, Provider } from '../data/mockHomeData';
 import { getUnreadCount } from '../data/mockNotifications';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
+import { isNewProvider, providerRankScore } from '../utils/providerRank';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -38,25 +39,8 @@ const MOCK_UNREAD_COUNT = getUnreadCount('customer');
 const TOP_CATEGORY_IDS = ['plumbing', 'electrical', 'cleaning'];
 
 // "ტოპ ოსტატები" რანჟირება — არა უბრალო ბოლო რეგისტრაცია (მომხმარებლის
-// მოთხოვნით). Bayesian/წონიანი საშუალო (IMDB-ის რანჟირების პრინციპი):
-// მცირე რაოდენობის შეფასებას (მაგ. ერთი 5-ვარსკვლავიანი) არ შეუძლია
-// გადააჭარბოს ასობით კარგ შეფასებას — რაც მეტი შეფასებაა, მით უფრო
-// ენდობა ალგორითმი პროვაიდერის რეალურ საშუალოს (და არა baseline-ს).
-const RATING_PRIOR_COUNT = 15; // "ვირტუალური" ხმების რაოდენობა baseline-ის წონისთვის
-const RATING_PRIOR_MEAN = 4.3; // baseline საშუალო რეიტინგი, სანამ საკმარისი შეფასება დაგროვდება
-
-function providerRankScore(p: Provider): number {
-  const weightedRating =
-    (p.reviews / (p.reviews + RATING_PRIOR_COUNT)) * p.rating +
-    (RATING_PRIOR_COUNT / (p.reviews + RATING_PRIOR_COUNT)) * RATING_PRIOR_MEAN;
-  // დასრულებული სამუშაოების რაოდენობა — მცირე, log-სკალირებული წონა
-  const completedJobsBoost = Math.log10(p.jobs + 1) * 0.15;
-  // "საჭიროების შემთხვევაში" ბოლო აქტივობა — ამჟამინდელი mock მონაცემები
-  // "ბოლო აქტივობის დროს" არ ინახავს, ამიტომ `online`-ს ვიყენებთ უახლოეს
-  // პროქსად, მხოლოდ tie-breaker-ის დონეზე (მცირე წონა).
-  const recentActivityBoost = p.online ? 0.05 : 0;
-  return weightedRating + completedJobsBoost + recentActivityBoost;
-}
+// მოთხოვნით), წონიანი/Bayesian ფორმულით (src/utils/providerRank.ts) —
+// მანიპულაციისგან დაცული (5.0/1 შეფასება ვერ გადააჭარბებს 4.9/180-ს).
 
 // C1 — Customer Home / Browse (product-spec.md; დიზაინის რეფერენსის
 // CustomerHome-ის მიხედვით)
@@ -343,11 +327,17 @@ function ProviderCard({
             {specialty} • {provider.years} წ. გამოცდ.
           </Text>
           <View style={styles.providerStatsRow}>
-            <View style={styles.ratingRow}>
-              <Star size={12} color="#FBBF24" fill="#FBBF24" />
-              <Text style={styles.ratingText}>{provider.rating}</Text>
-              <Text style={styles.reviewsText}>({provider.reviews} შეფ.)</Text>
-            </View>
+            {isNewProvider(provider) ? (
+              <View style={styles.newProviderBadge}>
+                <Text style={styles.newProviderBadgeText}>ახალი ოსტატი</Text>
+              </View>
+            ) : (
+              <View style={styles.ratingRow}>
+                <Star size={12} color="#FBBF24" fill="#FBBF24" />
+                <Text style={styles.ratingText}>{provider.rating}</Text>
+                <Text style={styles.reviewsText}>({provider.reviews} შეფ.)</Text>
+              </View>
+            )}
             <Text style={styles.dotSeparator}>•</Text>
             <View style={styles.locationRow}>
               <MapPin size={11} color={colors.mutedForeground} />
@@ -666,6 +656,17 @@ const styles = StyleSheet.create({
   reviewsText: {
     ...typography.small,
     color: colors.mutedForeground,
+  },
+  newProviderBadge: {
+    backgroundColor: colors.secondary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: 1,
+  },
+  newProviderBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.secondaryForeground,
   },
   dotSeparator: {
     color: colors.border,

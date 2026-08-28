@@ -121,6 +121,27 @@ export const PROVIDERS: Provider[] = [
     certificates: [],
     portfolio: [],
   },
+  {
+    id: 'p5',
+    name: 'ლუკა მამულაშვილი',
+    category: 'ac',
+    years: 1,
+    rating: 0,
+    reviews: 0,
+    location: 'გლდანი, თბილისი',
+    areas: ['გლდანი', 'ნაძალადევი'],
+    price: '35–70₾/სთ',
+    jobs: 0,
+    verified: false,
+    online: true,
+    initials: 'ლმ',
+    color: '#0D9488',
+    bio: 'ახლახან დავიწყე დამოუკიდებლად მუშაობა. კონდიციონერების მონტაჟსა და სერვისში ვარ სპეციალიზებული.',
+    skills: ['კონდიციონერის მონტაჟი', 'გაწმენდა/სერვისი'],
+    specialties: ['კონდიციონერის მონტაჟი / სერვისი'],
+    certificates: [],
+    portfolio: [],
+  },
 ];
 
 export type FeedJob = {

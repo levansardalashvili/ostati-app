@@ -16,10 +16,10 @@ import { CATEGORIES } from '../data/categories';
 import { FeedJob, PROVIDER_FEED } from '../data/mockHomeData';
 import { getUnreadCount } from '../data/mockNotifications';
 import { CURRENT_PROVIDER_ID, getOpenProviderFeed } from '../data/providerFeedFilters';
-import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
+import type { ProviderTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
-  BottomTabScreenProps<CustomerTabParamList, 'Home'>,
+  BottomTabScreenProps<ProviderTabParamList, 'Home'>,
   NativeStackScreenProps<RootStackParamList>
 >;
 
@@ -135,7 +135,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
             <View style={styles.statsRow}>
               {MOCK_STATS.map((s) =>
                 s.label === 'სამ.' ? (
-                  <Pressable key={s.label} style={styles.statBox} onPress={() => navigation.navigate('ProviderMyJobs')}>
+                  <Pressable key={s.label} style={styles.statBox} onPress={() => navigation.navigate('MyJobsTab')}>
                     <Text style={styles.statValue}>{s.value}</Text>
                     <Text style={styles.statLabel}>{s.label}</Text>
                   </Pressable>

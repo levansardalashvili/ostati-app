@@ -6,6 +6,7 @@ import {
   Briefcase,
   Camera,
   ChevronRight,
+  ClipboardList,
   Eye,
   HelpCircle,
   LogOut,
@@ -23,17 +24,20 @@ import { Button } from '../components/Button';
 import { ProfileMenuRow } from '../components/ProfileMenuRow';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
+import { EXPERIENCE_OPTIONS } from '../data/experience';
 import { getUnreadCount } from '../data/mockNotifications';
-import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
+import { computeCompleteness, useProviderProfile } from '../state/ProviderProfileContext';
+import type { ProviderTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
-  BottomTabScreenProps<CustomerTabParamList, 'Profile'>,
+  BottomTabScreenProps<ProviderTabParamList, 'Profile'>,
   NativeStackScreenProps<RootStackParamList>
 >;
 
 const MENU = [
   { icon: Pencil, label: 'პროფილის რედაქტირება', bg: '#EFF6FF', color: '#2563EB', badge: 0 },
   { icon: MapPin, label: 'სამუშაო არეალი', bg: '#ECFDF5', color: '#059669', badge: 0 },
+  { icon: ClipboardList, label: 'ჩემი სამუშაო', bg: '#FFF7ED', color: '#EA580C', badge: 0 },
   { icon: Briefcase, label: 'შესრულებული სამუშაოები', bg: '#F5F3FF', color: '#7C3AED', badge: 312 },
   { icon: Star, label: 'შეფასებები', bg: '#FFFBEB', color: '#D97706', badge: 127 },
   { icon: Bell, label: 'შეტყობინებები', bg: colors.muted, color: colors.mutedForeground, badge: getUnreadCount('provider') },
@@ -50,7 +54,12 @@ const STATS = [
 // E1 — Provider-ის პროფილის ეკრანი (product-spec.md; დიზაინის რეფერენსის
 // ProviderProfile-ის მიხედვით)
 export function ProviderProfileScreen({ navigation }: Props) {
+  const { profile } = useProviderProfile();
   const [logoutSheetOpen, setLogoutSheetOpen] = useState(false);
+  const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`;
+  const specialtyLabel = profile.specialty[0]?.label ?? '';
+  const experienceLabel = EXPERIENCE_OPTIONS.find((e) => e.id === profile.experience)?.label ?? '';
+  const completeness = computeCompleteness(profile);
 
   const handleMenuPress = (label: string) => {
     if (label === 'preview') {
@@ -59,6 +68,8 @@ export function ProviderProfileScreen({ navigation }: Props) {
       navigation.navigate('ProviderEditProfile');
     } else if (label === 'სამუშაო არეალი') {
       navigation.navigate('ProviderServiceAreas');
+    } else if (label === 'ჩემი სამუშაო') {
+      navigation.navigate('MyJobsTab');
     } else if (label === 'შესრულებული სამუშაოები') {
       navigation.navigate('ProviderCompletedJobs');
     } else if (label === 'შეფასებები') {
@@ -82,18 +93,20 @@ export function ProviderProfileScreen({ navigation }: Props) {
         <Text style={styles.title}>პროფილი</Text>
         <View style={styles.profileRow}>
           <View style={styles.avatarWrap}>
-            <Avatar initials="გბ" color={colors.primary} size={72} online />
+            <Avatar initials={initials} color={colors.primary} size={72} online />
             <Pressable style={styles.cameraBadge} onPress={() => handleMenuPress('photo')}>
               <Camera size={10} color={colors.primaryForeground} />
             </Pressable>
           </View>
           <View style={{ flex: 1 }}>
             <View style={styles.nameRow}>
-              <Text style={styles.name}>გიორგი ბერიძე</Text>
+              <Text style={styles.name}>
+                {profile.firstName} {profile.lastName}
+              </Text>
               <VerifiedBadge size={15} />
             </View>
-            <Text style={styles.specialty}>სანტექნიკოსი</Text>
-            <Text style={styles.experience}>15 წელი გამოცდილება</Text>
+            {!!specialtyLabel && <Text style={styles.specialty}>{specialtyLabel}</Text>}
+            {!!experienceLabel && <Text style={styles.experience}>{experienceLabel} გამოცდილება</Text>}
             <View style={styles.ratingRow}>
               <Star size={12} color="#FBBF24" fill="#FBBF24" />
               <Text style={styles.ratingValue}>4.9</Text>
@@ -118,6 +131,28 @@ export function ProviderProfileScreen({ navigation }: Props) {
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+        {completeness.percent < 100 && (
+          <Pressable style={styles.completenessCard} onPress={() => navigation.navigate('ProviderEditProfile')}>
+            <View style={styles.completenessHeaderRow}>
+              <Text style={styles.completenessTitle}>პროფილის სისრულე</Text>
+              <Text style={styles.completenessPercent}>{completeness.percent}%</Text>
+            </View>
+            <View style={styles.completenessTrack}>
+              <View style={[styles.completenessFill, { width: `${completeness.percent}%` }]} />
+            </View>
+            <View style={styles.completenessMissingRow}>
+              {completeness.missing.map((item) => (
+                <View key={item.key} style={[styles.completenessChip, item.optional && styles.completenessChipOptional]}>
+                  <Text style={[styles.completenessChipText, item.optional && styles.completenessChipTextOptional]}>
+                    {item.label}
+                    {item.optional ? ' (სურვილისამებრ)' : ''}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </Pressable>
+        )}
+
         <Pressable style={styles.previewButton} onPress={() => handleMenuPress('preview')}>
           <View style={styles.previewLeft}>
             <View style={styles.previewIcon}>
@@ -284,6 +319,67 @@ const styles = StyleSheet.create({
   bodyContent: {
     padding: spacing.lg,
     gap: spacing.sm + 2,
+  },
+  completenessCard: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  completenessHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  completenessTitle: {
+    ...typography.captionMedium,
+    color: colors.foreground,
+    fontWeight: '700',
+  },
+  completenessPercent: {
+    ...typography.captionMedium,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  completenessTrack: {
+    height: 8,
+    borderRadius: radius.full,
+    backgroundColor: colors.muted,
+    overflow: 'hidden',
+    marginBottom: spacing.sm + 2,
+  },
+  completenessFill: {
+    height: '100%',
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+  },
+  completenessMissingRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs + 2,
+  },
+  completenessChip: {
+    backgroundColor: colors.warningBackground,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs + 2,
+  },
+  completenessChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.warning,
+  },
+  completenessChipOptional: {
+    backgroundColor: colors.muted,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+  },
+  completenessChipTextOptional: {
+    color: colors.mutedForeground,
   },
   previewButton: {
     flexDirection: 'row',

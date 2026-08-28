@@ -1,8 +1,9 @@
 import React from 'react';
 import { View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, MessageCircle, User } from 'lucide-react-native';
+import { ClipboardList, Home, MessageCircle, User } from 'lucide-react-native';
 import { ProviderHomeScreen } from '../screens/ProviderHomeScreen';
+import { ProviderMyJobsScreen } from '../screens/ProviderMyJobsScreen';
 import { ChatsListScreen } from '../screens/ChatsListScreen';
 import { ProviderProfileScreen } from '../screens/ProviderProfileScreen';
 import { colors, radius, typography } from '../theme';
@@ -13,8 +14,10 @@ const Tab = createBottomTabNavigator<ProviderTabParamList>();
 
 const unreadChats = CHATS_LIST.filter((c) => c.unread > 0).length;
 
-// Bottom Navigation — Provider (product-spec.md: "Home / ჩატები / პროფილი",
-// დიზაინის რეფერენსის BottomNav-ის მიხედვით)
+// Bottom Navigation — Provider (product-spec.md-ის საწყისი "Home / ჩატები /
+// პროფილი" 3 ჩანართი გაფართოვდა "სამუშაოები" ჩანართით — ეს ყოფილი
+// root-stack "ProviderMyJobs" ("ჩემი სამუშაოები") ეკრანია, ახლა ტაბის
+// სახით, Customer-ის "MyJobsTab"-ის იგივე ლოგიკით (CustomerTabs.tsx))
 export function ProviderTabs() {
   return (
     <Tab.Navigator
@@ -38,6 +41,14 @@ export function ProviderTabs() {
         options={{
           tabBarLabel: 'მთავარი',
           tabBarIcon: ({ color, focused }) => <Home size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />,
+        }}
+      />
+      <Tab.Screen
+        name="MyJobsTab"
+        component={ProviderMyJobsScreen}
+        options={{
+          tabBarLabel: 'სამუშაოები',
+          tabBarIcon: ({ color, focused }) => <ClipboardList size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />,
         }}
       />
       <Tab.Screen

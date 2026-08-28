@@ -107,7 +107,7 @@ export function SpecialtyPickerField({ value, onChange }: Props) {
         )}
 
         <View style={styles.doneWrap}>
-          <Button label="დასრულება" onPress={() => setOpen(false)} />
+          <Button label="არჩევა" onPress={() => setOpen(false)} />
         </View>
       </BottomSheet>
     </>

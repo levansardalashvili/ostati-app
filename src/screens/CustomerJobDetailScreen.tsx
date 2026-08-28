@@ -26,6 +26,7 @@ import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
 import { CUSTOMER_JOBS, INTERESTED_PROVIDERS, PHOTO_COLORS, Provider, RatingData, SUBMITTED_RATINGS } from '../data/mockHomeData';
+import { isNewProvider, weightedRating } from '../utils/providerRank';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerJobDetail'>;
@@ -66,7 +67,10 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     if (!sortBy) return interestedList;
     const copy = [...interestedList];
     if (sortBy === 'price') copy.sort((a, b) => priceValue(a) - priceValue(b));
-    if (sortBy === 'rating') copy.sort((a, b) => b.provider.rating - a.provider.rating);
+    // წონიანი რეიტინგი (src/utils/providerRank.ts) — არა უბრალო `rating`,
+    // რომ ერთმა 5-ვარსკვლავიანმა შეფასებამ ვერ გადააჭარბოს ასობით კარგ
+    // შეფასებას მანიპულაციით.
+    if (sortBy === 'rating') copy.sort((a, b) => weightedRating(b.provider) - weightedRating(a.provider));
     if (sortBy === 'experience') copy.sort((a, b) => b.provider.years - a.provider.years);
     return copy;
   }, [interestedList, sortBy]);
@@ -384,11 +388,15 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
                             {SPECIALTY_LABEL[prov.category] ?? prov.category} · {prov.years} წელი
                           </Text>
                           <View style={styles.providerStatsRow}>
-                            <View style={styles.providerStat}>
-                              <Star size={11} color="#FBBF24" fill="#FBBF24" />
-                              <Text style={styles.providerStatText}>{prov.rating}</Text>
-                            </View>
-                            <Text style={styles.providerStatMuted}>{prov.reviews} შეფ.</Text>
+                            {isNewProvider(prov) ? (
+                              <Text style={styles.providerStatMuted}>ახალი ოსტატი</Text>
+                            ) : (
+                              <View style={styles.providerStat}>
+                                <Star size={11} color="#FBBF24" fill="#FBBF24" />
+                                <Text style={styles.providerStatText}>{prov.rating}</Text>
+                              </View>
+                            )}
+                            {!isNewProvider(prov) && <Text style={styles.providerStatMuted}>{prov.reviews} შეფ.</Text>}
                             <Text style={styles.providerStatMuted}>{prov.jobs} სამ.</Text>
                           </View>
                         </View>

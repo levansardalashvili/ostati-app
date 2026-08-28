@@ -28,8 +28,8 @@ export type RootStackParamList = {
   ProviderServiceAreas: undefined;
   ProviderCompletedJobs: undefined;
   ProviderReviews: undefined;
-  ProviderMyJobs: undefined;
   ViewProviderProfile: { id: string };
+  SavedProviders: undefined;
   CustomerCategories: undefined;
   CustomerCategory: { id: string };
   RegionAreaPicker: { selected: string[]; onSave: (areas: string[]) => void };
@@ -43,10 +43,12 @@ export type RootStackParamList = {
 };
 
 // Bottom Tab-ების route-ები — თითო tab navigator როლის მიხედვით, RootStack-ის
-// "CustomerHome"/"ProviderHome" route-ების ქვეშ ჩალაგებული. Customer-ს 4
+// "CustomerHome"/"ProviderHome" route-ების ქვეშ ჩალაგებული. ორივე როლს 4
 // ჩანართი აქვს (product-spec.md-ის საწყისი "3 ჩანართის" წესზე override,
-// მომხმარებლის მოთხოვნით) — "MyJobsTab" არის ყოფილი root-stack "CustomerJobs"
-// ეკრანი (ახლა ტაბის სახით, არა push-ით პროფილიდან — იხ. CustomerJobsScreen.tsx).
+// მომხმარებლის მოთხოვნით) — "MyJobsTab" ორივე მხარეს ყოფილი root-stack
+// ეკრანია (Customer-ისთვის "CustomerJobs", Provider-ისთვის "ProviderMyJobs"),
+// ახლა ტაბის სახით, არა push-ით პროფილიდან/Home-იდან (იხ. CustomerJobsScreen.tsx
+// და ProviderMyJobsScreen.tsx).
 export type CustomerTabParamList = {
   Home: undefined;
   MyJobsTab: undefined;
@@ -56,6 +58,7 @@ export type CustomerTabParamList = {
 
 export type ProviderTabParamList = {
   Home: undefined;
+  MyJobsTab: undefined;
   Chats: undefined;
   Profile: undefined;
 };

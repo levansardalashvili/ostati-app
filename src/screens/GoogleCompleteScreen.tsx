@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Check, MapPin } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AddressAutocompleteField } from '../components/AddressAutocompleteField';
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { ProgressBar } from '../components/ProgressBar';
-import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
+import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GoogleComplete'>;
@@ -27,6 +28,7 @@ const MOCK_GOOGLE_LAST_NAME = MOCK_GOOGLE_LAST_NAME_PARTS.join(' ');
 export function GoogleCompleteScreen({ navigation, route }: Props) {
   const { role } = route.params;
   const { setProfile } = useCustomerProfile();
+  const { setProfile: setProviderProfile } = useProviderProfile();
 
   const [address, setAddress] = useState('');
   const [touched, setTouched] = useState(false);
@@ -42,6 +44,7 @@ export function GoogleCompleteScreen({ navigation, route }: Props) {
     setTimeout(() => {
       setLoading(false);
       if (role === 'provider') {
+        setProviderProfile({ firstName: MOCK_GOOGLE_FIRST_NAME, lastName: MOCK_GOOGLE_LAST_NAME });
         navigation.replace('ProviderSetup');
       } else {
         setProfile({
@@ -82,14 +85,13 @@ export function GoogleCompleteScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.field}>
-          <TextField
+          <AddressAutocompleteField
             label="მისამართი"
             value={address}
             onChangeText={setAddress}
             onBlur={() => setTouched(true)}
-            placeholder="მაგ. თბილისი, ვაკე"
+            placeholder="მაგ. ჭავჭავაძის 48"
             error={addressError}
-            icon={MapPin}
           />
         </View>
 
@@ -175,5 +177,6 @@ const styles = StyleSheet.create({
   },
   field: {
     marginBottom: spacing.lg,
+    zIndex: 10,
   },
 });

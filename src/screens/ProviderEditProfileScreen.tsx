@@ -15,34 +15,31 @@ import { SqmPriceField } from '../components/SqmPriceField';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
 import { isSqmPriced } from '../data/specialties';
+import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
-
-const INITIAL_CERTIFICATES: MediaItem[] = [{ id: 1, bg: '#DBEAFE' }];
-const INITIAL_PORTFOLIO: MediaItem[] = [
-  { id: 1, bg: '#D1FAE5' },
-  { id: 2, bg: '#FEF3C7' },
-  { id: 3, bg: '#FCE7F3' },
-];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderEditProfile'>;
 
 // ProviderEditProfile — ზუსტად ზიპის App.tsx-ის ProviderEditProfile-ის
-// მიხედვით. პირველი შენახვა შეგნებულად ვარდება (error-state
-// დემონსტრირებისთვის), მეორე ცდაზე წარმატებული.
+// მიხედვით. საწყისი მნიშვნელობები ProviderProfileContext-იდან იტვირთება
+// (ProviderSetupScreen-ის მიერ დაწერილი) — CustomerEditProfileScreen-ის
+// იგივე "edit ფორმა, კონტექსტიდან seed-ილი" პატერნით. პირველი შენახვა
+// შეგნებულად ვარდება (error-state დემონსტრირებისთვის), მეორე ცდაზე
+// წარმატებული — მხოლოდ მაშინ იწერება უკან კონტექსტში.
 export function ProviderEditProfileScreen({ navigation }: Props) {
-  const [firstName, setFirstName] = useState('გიორგი');
-  const [lastName, setLastName] = useState('ბერიძე');
-  const [specialty, setSpecialty] = useState<SpecialtyOption[]>([{ id: 'plumber', label: 'სანტექნიკოსი' }]);
-  const [areas, setAreas] = useState<string[]>(['ვაკე', 'საბურთალო', 'ვერა']);
-  const [experience, setExperience] = useState<string | null>('10plus');
-  const [about, setAbout] = useState(
-    'ვარ სანტექნიკოსი 15 წლიანი გამოცდილებით. ვასრულებ ყველა სახის სანტექნიკის სამუშაოს სწრაფად და ხარისხიანად.',
-  );
-  const [certificates, setCertificates] = useState<MediaItem[]>(INITIAL_CERTIFICATES);
-  const [portfolio, setPortfolio] = useState<MediaItem[]>(INITIAL_PORTFOLIO);
+  const { profile, setProfile } = useProviderProfile();
+  const [firstName, setFirstName] = useState(profile.firstName);
+  const [lastName, setLastName] = useState(profile.lastName);
+  const [specialty, setSpecialty] = useState<SpecialtyOption[]>(profile.specialty);
+  const [areas, setAreas] = useState<string[]>(profile.areas);
+  const [experience, setExperience] = useState<string | null>(profile.experience);
+  const [about, setAbout] = useState(profile.about);
+  const [hasPhoto, setHasPhoto] = useState(profile.hasPhoto);
+  const [certificates, setCertificates] = useState<MediaItem[]>(profile.certificates);
+  const [portfolio, setPortfolio] = useState<MediaItem[]>(profile.portfolio);
   const [previewCert, setPreviewCert] = useState<MediaItem | null>(null);
   const [previewPortfolio, setPreviewPortfolio] = useState<MediaItem | null>(null);
-  const [sqmPrices, setSqmPrices] = useState<Record<string, string>>({});
+  const [sqmPrices, setSqmPrices] = useState<Record<string, string>>(profile.sqmPrices);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const attemptRef = useRef(0);
@@ -70,6 +67,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
         setSaveError(true);
         attemptRef.current += 1;
       } else {
+        setProfile({ firstName, lastName, specialty, areas, experience, about, hasPhoto, certificates, portfolio, sqmPrices });
         navigation.goBack();
       }
     }, 1000);
@@ -82,7 +80,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
         <View style={styles.avatarRow}>
           <View style={styles.avatarWrap}>
             <Avatar initials={`${firstName.charAt(0)}${lastName.charAt(0)}`} color={colors.primary} size={88} />
-            <Pressable style={styles.cameraBadge}>
+            <Pressable style={styles.cameraBadge} onPress={() => setHasPhoto((p) => !p)}>
               <Camera size={14} color={colors.primaryForeground} />
             </Pressable>
           </View>

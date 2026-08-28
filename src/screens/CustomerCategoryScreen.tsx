@@ -9,6 +9,7 @@ import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
 import { PROVIDERS } from '../data/mockHomeData';
+import { isNewProvider } from '../utils/providerRank';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerCategory'>;
@@ -58,11 +59,15 @@ export function CustomerCategoryScreen({ navigation, route }: Props) {
                   </Text>
                 </View>
                 <View style={styles.statsRow}>
-                  <View style={styles.statItem}>
-                    <Star size={12} color="#FBBF24" fill="#FBBF24" />
-                    <Text style={styles.statValue}>{p.rating}</Text>
-                    <Text style={styles.statMuted}>({p.reviews} შეფ.)</Text>
-                  </View>
+                  {isNewProvider(p) ? (
+                    <Text style={styles.newProviderText}>ახალი ოსტატი</Text>
+                  ) : (
+                    <View style={styles.statItem}>
+                      <Star size={12} color="#FBBF24" fill="#FBBF24" />
+                      <Text style={styles.statValue}>{p.rating}</Text>
+                      <Text style={styles.statMuted}>({p.reviews} შეფ.)</Text>
+                    </View>
+                  )}
                   <Text style={styles.dot}>·</Text>
                   <View style={styles.statItem}>
                     <Briefcase size={11} color={colors.mutedForeground} />
@@ -146,6 +151,11 @@ const styles = StyleSheet.create({
   statMuted: {
     ...typography.small,
     color: colors.mutedForeground,
+  },
+  newProviderText: {
+    ...typography.small,
+    color: colors.secondaryForeground,
+    fontWeight: '700',
   },
   dot: {
     color: colors.border,

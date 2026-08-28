@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Briefcase, Camera, HelpCircle, LogOut, MapPin, Pencil, Settings } from 'lucide-react-native';
+import { Bell, Briefcase, Camera, Heart, HelpCircle, LogOut, MapPin, Pencil, Settings } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -12,6 +12,7 @@ import { ProfileMenuRow } from '../components/ProfileMenuRow';
 import { colors, radius, spacing, typography } from '../theme';
 import { getUnreadCount } from '../data/mockNotifications';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
+import { useFavoriteProviders } from '../state/FavoriteProvidersContext';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -19,24 +20,28 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-const MENU = [
-  { icon: Briefcase, label: 'ჩემი მოთხოვნები', bg: '#EFF6FF', color: '#2563EB', badge: 3 },
-  { icon: Pencil, label: 'პროფილის რედაქტირება', bg: '#F5F3FF', color: '#7C3AED', badge: 0 },
-  { icon: Bell, label: 'შეტყობინებები', bg: '#FFFBEB', color: '#D97706', badge: getUnreadCount('customer') },
-  { icon: HelpCircle, label: 'დახმარება', bg: '#ECFDF5', color: '#059669', badge: 0 },
-  { icon: Settings, label: 'ანგარიშის პარამეტრები', bg: colors.muted, color: colors.mutedForeground, badge: 0 },
-];
-
 // E2 — Customer-ის პროფილის ეკრანი (product-spec.md; დიზაინის რეფერენსის
 // CustomerProfile-ის მიხედვით)
 export function CustomerProfileScreen({ navigation }: Props) {
   const { profile } = useCustomerProfile();
+  const { favoriteIds } = useFavoriteProviders();
   const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`;
   const [logoutSheetOpen, setLogoutSheetOpen] = useState(false);
+
+  const MENU = [
+    { icon: Briefcase, label: 'ჩემი მოთხოვნები', bg: '#EFF6FF', color: '#2563EB', badge: 3 },
+    { icon: Heart, label: 'შენახული ოსტატები', bg: '#FEF2F2', color: '#DC2626', badge: favoriteIds.size },
+    { icon: Pencil, label: 'პროფილის რედაქტირება', bg: '#F5F3FF', color: '#7C3AED', badge: 0 },
+    { icon: Bell, label: 'შეტყობინებები', bg: '#FFFBEB', color: '#D97706', badge: getUnreadCount('customer') },
+    { icon: HelpCircle, label: 'დახმარება', bg: '#ECFDF5', color: '#059669', badge: 0 },
+    { icon: Settings, label: 'ანგარიშის პარამეტრები', bg: colors.muted, color: colors.mutedForeground, badge: 0 },
+  ];
 
   const handleMenuPress = (label: string) => {
     if (label === 'ჩემი მოთხოვნები') {
       navigation.navigate('MyJobsTab');
+    } else if (label === 'შენახული ოსტატები') {
+      navigation.navigate('SavedProviders');
     } else if (label === 'პროფილის რედაქტირება' || label === 'edit') {
       navigation.navigate('CustomerEditProfile');
     } else if (label === 'შეტყობინებები') {

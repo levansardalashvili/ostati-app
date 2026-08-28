@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Award, Image as ImageIcon, MapPin, MessageCircle, Share2, Star } from 'lucide-react-native';
+import { ArrowLeft, Award, Heart, Image as ImageIcon, MapPin, MessageCircle, Share2, Star } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
@@ -11,19 +11,28 @@ import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
 import { PROVIDERS } from '../data/mockHomeData';
 import { PROVIDER_REVIEWS } from '../data/mockReviews';
+import { CURRENT_PROVIDER_ID } from '../data/providerFeedFilters';
+import { useFavoriteProviders } from '../state/FavoriteProvidersContext';
+import { isNewProvider } from '../utils/providerRank';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ViewProviderProfile'>;
 
 // ViewProviderProfile — ოსტატის საჯარო პროფილი Customer-ის თვალით (ზუსტად
 // ზიპის App.tsx-ის ViewProviderProfile-ის მიხედვით). Provider-ისთვისაც
-// გამოიყენება საკუთარი პროფილის "თვალით" წინასწარი ნახვისთვის.
+// გამოიყენება საკუთარი პროფილის "თვალით" წინასწარი ნახვისთვის — ამ
+// შემთხვევაში ❤️ ღილაკი არ ჩანს (საკუთარი თავის "შენახვა" აზრი არ აქვს),
+// `p.id === CURRENT_PROVIDER_ID`-ით ვარკვევთ (ProviderProfileScreen-ის
+// preview ყოველთვის 'p1'-ს, ანუ "მიმდინარე" Provider-ს, ხსნის).
 export function ViewProviderProfileScreen({ navigation, route }: Props) {
   const p = PROVIDERS.find((x) => x.id === route.params.id) ?? PROVIDERS[0];
   const specialty = SPECIALTY_LABEL[p.category] ?? p.category;
   const reviews = PROVIDER_REVIEWS[p.id] ?? [];
   const [previewCert, setPreviewCert] = useState<MediaItem | null>(null);
   const [previewPortfolio, setPreviewPortfolio] = useState<MediaItem | null>(null);
+  const { isFavorite, toggleFavorite } = useFavoriteProviders();
+  const isSelfPreview = p.id === CURRENT_PROVIDER_ID;
+  const favorite = isFavorite(p.id);
 
   const handleChat = () => {
     navigation.navigate('ChatConversation', {
@@ -42,9 +51,16 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
           <ArrowLeft size={18} color={colors.foreground} />
         </Pressable>
         <Text style={styles.headerTitle}>ოსტატის პროფილი</Text>
-        <Pressable style={styles.iconButton}>
-          <Share2 size={17} color={colors.mutedForeground} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          {!isSelfPreview && (
+            <Pressable style={styles.iconButton} onPress={() => toggleFavorite(p.id)}>
+              <Heart size={17} color={favorite ? colors.destructive : colors.mutedForeground} fill={favorite ? colors.destructive : 'transparent'} />
+            </Pressable>
+          )}
+          <Pressable style={styles.iconButton}>
+            <Share2 size={17} color={colors.mutedForeground} />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
@@ -74,11 +90,20 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
 
           <View style={styles.statsCard}>
             <View style={styles.statBox}>
-              <View style={styles.statRatingRow}>
-                <Star size={13} color="#FBBF24" fill="#FBBF24" />
-                <Text style={styles.statValue}>{p.rating}</Text>
-              </View>
-              <Text style={styles.statLabel}>{p.reviews} შეფასება</Text>
+              {isNewProvider(p) ? (
+                <>
+                  <Text style={styles.statValue}>—</Text>
+                  <Text style={styles.statLabel}>ახალი ოსტატი</Text>
+                </>
+              ) : (
+                <>
+                  <View style={styles.statRatingRow}>
+                    <Star size={13} color="#FBBF24" fill="#FBBF24" />
+                    <Text style={styles.statValue}>{p.rating}</Text>
+                  </View>
+                  <Text style={styles.statLabel}>{p.reviews} შეფასება</Text>
+                </>
+              )}
             </View>
             <View style={[styles.statBox, styles.statBoxBordered]}>
               <Text style={styles.statValue}>{p.years}</Text>
@@ -253,6 +278,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.muted,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   headerTitle: {
     ...typography.bodyMedium,

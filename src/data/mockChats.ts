@@ -35,7 +35,6 @@ export type ChatEntry = {
   jobDistrict?: string;
   jobDate?: string;
   jobStatus?: JobStatus;
-  jobBudget?: string;
 };
 
 export const CHATS_LIST: ChatEntry[] = [
@@ -54,7 +53,6 @@ export const CHATS_LIST: ChatEntry[] = [
     jobDistrict: 'ვაკე',
     jobDate: 'დღეს, 16:00',
     jobStatus: 'active',
-    jobBudget: '120₾',
   },
   {
     id: 'p2',
@@ -71,7 +69,6 @@ export const CHATS_LIST: ChatEntry[] = [
     jobDistrict: 'საბ.',
     jobDate: '20 დეკ.',
     jobStatus: 'pending',
-    jobBudget: '300₾',
   },
   {
     id: 'p3',
@@ -88,7 +85,6 @@ export const CHATS_LIST: ChatEntry[] = [
     jobDistrict: 'დიდუბე',
     jobDate: '5 დეკ.',
     jobStatus: 'completed',
-    jobBudget: '200₾',
   },
 ];
 

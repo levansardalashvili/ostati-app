@@ -2,26 +2,35 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check, Clock, MapPin, User } from 'lucide-react-native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { BackHeader } from '../components/BackHeader';
 import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
 import { PROVIDER_MY_JOBS_ACTIVE, PROVIDER_MY_JOBS_DONE } from '../data/mockReviews';
-import type { RootStackParamList } from '../navigation/types';
+import type { ProviderTabParamList, RootStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'ProviderMyJobs'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<ProviderTabParamList, 'MyJobsTab'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 type Tab = 'active' | 'done';
 
 // ProviderMyJobs — ზუსტად ზიპის App.tsx-ის ProviderMyJobs-ის მიხედვით.
-// ზიპშივე ეს ეკრანი არსად არ იყო რეალურად ჩართული (orphan) — ჩვენთან
-// ProviderHome-ის სტატისტიკის "სამ." უჯრიდან ვხსნით.
-export function ProviderMyJobsScreen({ navigation }: Props) {
+// Bottom Tab-ის ("MyJobsTab") საკუთარი ეკრანია — აღარ არის root-stack-ზე
+// push-ილი (მომხმარებლის მოთხოვნით, Customer-ის "MyJobsTab"-ის იგივე
+// ლოგიკით — CustomerJobsScreen.tsx). ProviderHome-ის სტატისტიკის "სამ."
+// უჯრა და Profile-ის "ჩემი სამუშაო" მენიუც ამავე ტაბზე გადადიან push-ის
+// ნაცვლად.
+export function ProviderMyJobsScreen({}: Props) {
   const [tab, setTab] = useState<Tab>('active');
   const items = tab === 'active' ? PROVIDER_MY_JOBS_ACTIVE : PROVIDER_MY_JOBS_DONE;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <BackHeader title="ჩემი სამუშაოები" onBack={() => navigation.goBack()} />
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>ჩემი სამუშაოები</Text>
+      </View>
       <View style={styles.tabsRow}>
         {(
           [
@@ -76,6 +85,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  header: {
+    backgroundColor: colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: {
+    ...typography.h2,
+    color: colors.foreground,
   },
   tabsRow: {
     flexDirection: 'row',

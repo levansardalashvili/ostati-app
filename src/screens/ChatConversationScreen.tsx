@@ -59,6 +59,21 @@ export function ChatConversationScreen({ navigation, route }: Props) {
 
   const jobDetailScreen = role === 'provider' ? 'ProviderJobDetail' : 'CustomerJobDetail';
 
+  // ჩატის ზედა ბანერზე ფასის სტატუსი ბოლო 'offer' შეტყობინებიდან
+  // გამოითვლება დინამიურად (არა სტატიკური mock ველი) — "მომლოდინე"
+  // (offerStatus==='pending'), "თქვენი შეთავაზება"/"შეთავაზებული ფასი"
+  // (ვინ გაგზავნა), ან "ფასი შეთანხმებულია"/"ფასი უარყოფილია".
+  const latestOffer = [...messages].reverse().find((m) => m.type === 'offer');
+  const offerStatusText = !latestOffer
+    ? null
+    : latestOffer.offerStatus === 'accepted'
+      ? `ფასი შეთანხმებულია: ${latestOffer.amount} ₾`
+      : latestOffer.offerStatus === 'declined'
+        ? 'ფასი უარყოფილია'
+        : latestOffer.from === 'me'
+          ? `თქვენი შეთავაზება: ${latestOffer.amount} ₾`
+          : `შეთავაზებული ფასი: ${latestOffer.amount} ₾`;
+
   const sendMsg = () => {
     const text = msgText.trim();
     if (!text) return;
@@ -158,8 +173,12 @@ export function ChatConversationScreen({ navigation, route }: Props) {
             </Text>
             <Text style={styles.jobMeta} numberOfLines={1}>
               {chatEntry.jobDistrict} · {chatEntry.jobDate}
-              {chatEntry.jobBudget ? ` · ${chatEntry.jobBudget}` : ''}
             </Text>
+            {offerStatusText && (
+              <Text style={styles.jobOfferText} numberOfLines={1}>
+                {offerStatusText}
+              </Text>
+            )}
           </View>
           <View style={styles.jobActions}>
             {chatEntry.jobStatus && <StatusPill status={chatEntry.jobStatus} />}
@@ -461,6 +480,12 @@ const styles = StyleSheet.create({
   jobMeta: {
     ...typography.small,
     color: colors.mutedForeground,
+  },
+  jobOfferText: {
+    ...typography.small,
+    color: colors.primary,
+    fontWeight: '700',
+    marginTop: 1,
   },
   jobActions: {
     alignItems: 'flex-end',

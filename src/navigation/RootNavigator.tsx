@@ -23,8 +23,8 @@ import { ProviderEditProfileScreen } from '../screens/ProviderEditProfileScreen'
 import { ProviderServiceAreasScreen } from '../screens/ProviderServiceAreasScreen';
 import { ProviderCompletedJobsScreen } from '../screens/ProviderCompletedJobsScreen';
 import { ProviderReviewsScreen } from '../screens/ProviderReviewsScreen';
-import { ProviderMyJobsScreen } from '../screens/ProviderMyJobsScreen';
 import { ViewProviderProfileScreen } from '../screens/ViewProviderProfileScreen';
+import { SavedProvidersScreen } from '../screens/SavedProvidersScreen';
 import { RatingScreen } from '../screens/RatingScreen';
 import { CustomerCategoriesScreen } from '../screens/CustomerCategoriesScreen';
 import { CustomerCategoryScreen } from '../screens/CustomerCategoryScreen';
@@ -62,8 +62,8 @@ export function RootNavigator() {
       <Stack.Screen name="ProviderServiceAreas" component={ProviderServiceAreasScreen} />
       <Stack.Screen name="ProviderCompletedJobs" component={ProviderCompletedJobsScreen} />
       <Stack.Screen name="ProviderReviews" component={ProviderReviewsScreen} />
-      <Stack.Screen name="ProviderMyJobs" component={ProviderMyJobsScreen} />
       <Stack.Screen name="ViewProviderProfile" component={ViewProviderProfileScreen} />
+      <Stack.Screen name="SavedProviders" component={SavedProvidersScreen} />
       <Stack.Screen name="RatingScreen" component={RatingScreen} />
       <Stack.Screen name="CustomerCategories" component={CustomerCategoriesScreen} />
       <Stack.Screen name="CustomerCategory" component={CustomerCategoryScreen} />
