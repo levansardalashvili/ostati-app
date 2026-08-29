@@ -1,39 +1,202 @@
 import { supabase } from './supabaseClient';
 
-export type UserMediaKind = 'certificate' | 'portfolio' | 'rating' | 'profile' | 'chat';
+export type UserMediaKind =
+  | 'certificate'
+  | 'portfolio'
+  | 'profile';
+
+const PRIVATE_BUCKET = 'private-media';
+const PRIVATE_PREFIX = 'private-media://';
 
 export interface StorageService {
-  // Supabase Storage-ის რეალური ატვირთვა (#61, "Storage ეტაპი A" —
-  // job post-ის ფოტოები, `job-photos` bucket). ლოკალური ფაილის URI-დან
-  // (expo-image-picker-ის შედეგი) აბრუნებს საჯარო URL-ს.
+  // Public job photos — existing behavior.
   uploadJobPhoto(uid: string, localUri: string): Promise<string>;
 
-  // "Storage ეტაპი B" (#62) — Provider-ის სერთიფიკატები/ნამუშევრები,
-  // RatingScreen-ის დასრულების ფოტოები, პროფილის ფოტო (#65) და ჩატის
-  // სურათები (#68) — ყველა საერთო `user-media` bucket-ში, `kind`-ის
-  // მიხედვით ცალკე "საქაღალდით" (`{kind}/{uid}/...`).
-  uploadUserMedia(uid: string, localUri: string, kind: UserMediaKind): Promise<string>;
-}
+  // Public Provider media.
+  uploadUserMedia(
+    uid: string,
+    localUri: string,
+    kind: UserMediaKind,
+  ): Promise<string>;
 
-async function uploadToBucket(bucket: string, path: string, localUri: string): Promise<string> {
-  const response = await fetch(localUri);
-  const blob = await response.blob();
-  const { error } = await supabase.storage.from(bucket).upload(path, blob, { contentType: blob.type || 'image/jpeg' });
-  if (error) throw error;
-  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+  // Private chat image.
+  uploadPrivateChatImage(
+    customerId: string,
+    providerId: string,
+    uploaderId: string,
+    localUri: string,
+  ): Promise<string>;
+
+  // Private completion/rating image.
+  uploadPrivateCompletionPhoto(
+    jobId: string,
+    uploaderId: string,
+    localUri: string,
+  ): Promise<string>;
+
+  // Converts private-media://... into a temporary signed URL.
+  // Normal http/public URLs pass through unchanged.
+  getDisplayUrl(reference: string): Promise<string>;
+
+  isPrivateReference(reference?: string | null): boolean;
 }
 
 function extOf(localUri: string): string {
-  return localUri.split('.').pop()?.split('?')[0] || 'jpg';
+  const withoutQuery = localUri.split('?')[0];
+  const ext = withoutQuery.split('.').pop()?.toLowerCase();
+
+  if (!ext || ext.length > 5) {
+    return 'jpg';
+  }
+
+  return ext;
+}
+
+function createFilename(localUri: string): string {
+  return `${Date.now()}-${Math.round(
+    Math.random() * 1_000_000,
+  )}.${extOf(localUri)}`;
+}
+
+async function localUriToBlob(localUri: string): Promise<Blob> {
+  const response = await fetch(localUri);
+
+  if (!response.ok) {
+    throw new Error('ფაილის წაკითხვა ვერ მოხერხდა');
+  }
+
+  return response.blob();
+}
+
+async function uploadPublic(
+  bucket: string,
+  path: string,
+  localUri: string,
+): Promise<string> {
+  const blob = await localUriToBlob(localUri);
+
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(path, blob, {
+      contentType: blob.type || 'image/jpeg',
+      upsert: false,
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}
+
+async function uploadPrivate(
+  path: string,
+  localUri: string,
+): Promise<string> {
+  const blob = await localUriToBlob(localUri);
+
+  const { error } = await supabase.storage
+    .from(PRIVATE_BUCKET)
+    .upload(path, blob, {
+      contentType: blob.type || 'image/jpeg',
+      upsert: false,
+    });
+
+  if (error) {
+    throw error;
+  }
+
+  // IMPORTANT:
+  // DB stores stable Storage reference, NOT temporary signed URL.
+  return `${PRIVATE_PREFIX}${path}`;
+}
+
+function privatePathFromReference(reference: string): string | null {
+  if (!reference.startsWith(PRIVATE_PREFIX)) {
+    return null;
+  }
+
+  const path = reference.slice(PRIVATE_PREFIX.length);
+
+  return path.length > 0 ? path : null;
 }
 
 export const storageService: StorageService = {
   async uploadJobPhoto(uid, localUri) {
-    const path = `${uid}/${Date.now()}-${Math.round(Math.random() * 1e6)}.${extOf(localUri)}`;
-    return uploadToBucket('job-photos', path, localUri);
+    const path = `${uid}/${createFilename(localUri)}`;
+
+    return uploadPublic(
+      'job-photos',
+      path,
+      localUri,
+    );
   },
+
   async uploadUserMedia(uid, localUri, kind) {
-    const path = `${kind}/${uid}/${Date.now()}-${Math.round(Math.random() * 1e6)}.${extOf(localUri)}`;
-    return uploadToBucket('user-media', path, localUri);
+    const path = `${kind}/${uid}/${createFilename(localUri)}`;
+
+    return uploadPublic(
+      'user-media',
+      path,
+      localUri,
+    );
+  },
+
+  async uploadPrivateChatImage(
+    customerId,
+    providerId,
+    uploaderId,
+    localUri,
+  ) {
+    const path =
+      `chat/${customerId}/${providerId}/${uploaderId}/` +
+      createFilename(localUri);
+
+    return uploadPrivate(path, localUri);
+  },
+
+  async uploadPrivateCompletionPhoto(
+    jobId,
+    uploaderId,
+    localUri,
+  ) {
+    const path =
+      `completion/${jobId}/${uploaderId}/` +
+      createFilename(localUri);
+
+    return uploadPrivate(path, localUri);
+  },
+
+  async getDisplayUrl(reference) {
+    const privatePath = privatePathFromReference(reference);
+
+    // Legacy/current public URL.
+    if (!privatePath) {
+      return reference;
+    }
+
+    const { data, error } = await supabase.storage
+      .from(PRIVATE_BUCKET)
+      .createSignedUrl(
+        privatePath,
+        60 * 15, // 15 minutes
+      );
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data?.signedUrl) {
+      throw new Error('სურათის დროებითი ბმული ვერ შეიქმნა');
+    }
+
+    return data.signedUrl;
+  },
+
+  isPrivateReference(reference) {
+    return Boolean(
+      reference &&
+        reference.startsWith(PRIVATE_PREFIX),
+    );
   },
 };

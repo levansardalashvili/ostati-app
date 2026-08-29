@@ -14,7 +14,11 @@ type ReviewRow = {
   stars: number;
   review_text: string;
   chips: string[];
-  photos: { id: number; bg: string }[] | null;
+  photos: {
+    id: number;
+    bg: string;
+    uri?: string;
+  }[] | null;
   created_at: string;
 };
 

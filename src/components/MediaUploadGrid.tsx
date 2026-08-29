@@ -1,7 +1,8 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Camera, Image as ImageIcon, X, type LucideIcon } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
+import { SecureStorageImage } from './SecureStorageImage';
 
 // `uri` — არასავალდებულო, ლოკალური ან Supabase Storage-ის საჯარო URL (#62) —
 // თუ არსებობს, რეალური სურათი რენდერდება ფერადი placeholder-ის ნაცვლად.
@@ -42,11 +43,17 @@ export function MediaUploadGrid({
     <View style={styles.row}>
       {items.map((item) => (
         <Pressable key={item.id} style={[styles.thumb, { backgroundColor: item.bg }]} onPress={() => onPreview(item)}>
-          {item.uri ? (
-            <Image source={{ uri: item.uri }} style={styles.thumbImage} />
-          ) : (
-            <Icon size={20} color="rgba(100,116,139,0.5)" />
-          )}
+         {item.uri ? (
+  <SecureStorageImage
+    reference={item.uri}
+    style={styles.thumbImage}
+  />
+) : (
+  <Icon
+    size={20}
+    color="rgba(100,116,139,0.5)"
+  />
+)}
           <Pressable style={styles.remove} onPress={() => onRemove(item.id)} hitSlop={8}>
             <X size={10} color="#FFFFFF" strokeWidth={2.5} />
           </Pressable>

@@ -30,7 +30,13 @@ const STAR_LABELS = ['', 'ძალიან ცუდი', 'ცუდი', 'ს
 // გაგზავნის შემდეგ Customer პირდაპირ Customer Home-ზე ბრუნდება
 // (`navigation.reset`), არა CustomerJobDetailScreen-ზე უკან.
 export function RatingScreen({ navigation, route }: Props) {
-  const { providerName, providerInitials, providerColor, onRate } = route.params;
+ const {
+  jobId,
+  providerName,
+  providerInitials,
+  providerColor,
+  onRate,
+} = route.params;
 
   const [stars, setStars] = useState(0);
   const [review, setReview] = useState('');
@@ -80,9 +86,24 @@ export function RatingScreen({ navigation, route }: Props) {
       try {
         uploadedPhotos = await Promise.all(
           photos.map(async (item) => {
-            if (!item.uri || item.uri.startsWith('http')) return item;
-            const url = await storageService.uploadUserMedia(uid, item.uri, 'rating');
-            return { ...item, uri: url };
+           if (
+  !item.uri ||
+  item.uri.startsWith('http') ||
+  storageService.isPrivateReference(item.uri)
+) {
+  return item;
+}
+            const privateReference =
+  await storageService.uploadPrivateCompletionPhoto(
+    jobId,
+    uid,
+    item.uri,
+  );
+
+return {
+  ...item,
+  uri: privateReference,
+};
           }),
         );
       } catch {

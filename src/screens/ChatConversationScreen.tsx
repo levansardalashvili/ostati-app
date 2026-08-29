@@ -35,6 +35,8 @@ import { chatService } from '../services/chatService';
 import { storageService } from '../services/storageService';
 import type { ChatMsg, MsgState } from '../types/chat';
 import type { RootStackParamList } from '../navigation/types';
+import { SecureStorageImage } from '../components/SecureStorageImage';
+
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChatConversation'>;
 
@@ -152,8 +154,8 @@ export function ChatConversationScreen({ navigation, route }: Props) {
 
     if (!customerId || !providerId || !myUid) return;
     try {
-      const uploadedUrl = await storageService.uploadUserMedia(myUid, localUri, 'chat');
-      const real = await chatService.sendRealImage(customerId, providerId, myUid, uploadedUrl);
+      const privateReference = await storageService.uploadPrivateChatImage( customerId, providerId, myUid, localUri, );
+      const real = await chatService.sendRealImage( customerId, providerId, myUid, privateReference,);
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...real, state: 'sent' } : m)));
     } catch {
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'failed' } : m)));
@@ -217,10 +219,20 @@ export function ChatConversationScreen({ navigation, route }: Props) {
         // უკვე რეალური http(s) URL-ია — ხელახლა აღარ ვტვირთავთ (image
         // payload-ის შენარჩუნება). თუ ლოკალური file URI-ღაა, ატვირთვაც
         // ხელახლა სჭირდება.
-        let uploadedUrl = msg.imageUrl ?? '';
-        if (uploadedUrl && !/^https?:\/\//.test(uploadedUrl)) {
-          uploadedUrl = await storageService.uploadUserMedia(myUid, uploadedUrl, 'chat');
-        }
+       let uploadedUrl = msg.imageUrl ?? '';
+
+if (
+  uploadedUrl &&
+  !/^https?:\/\//.test(uploadedUrl) &&
+  !storageService.isPrivateReference(uploadedUrl)
+) {
+  uploadedUrl = await storageService.uploadPrivateChatImage(
+    customerId,
+    providerId,
+    myUid,
+    uploadedUrl,
+  );
+}
         real = await chatService.sendRealImage(customerId, providerId, myUid, uploadedUrl);
       } else {
         retryingRef.current.delete(id);
@@ -357,7 +369,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
                   <View>
                     {m.imageUrl ? (
                       <Pressable onPress={() => setImgPreview(m.imageUrl ?? null)}>
-                        <Image source={{ uri: m.imageUrl }} style={styles.imageMsg} />
+                        <SecureStorageImage reference={ m.imageUrl } style={styles.imageMsg} />
                       </Pressable>
                     ) : (
                       <View style={[styles.imageMsg, { backgroundColor: m.imgColor ?? '#DBEAFE' }]}>
