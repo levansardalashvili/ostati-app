@@ -28,12 +28,15 @@ export function ProviderReviewsScreen({ navigation }: Props) {
       return;
     }
     let cancelled = false;
-    reviewService.listRealReviewsForProvider(uid).then((real) => {
-      if (!cancelled) {
-        setReviews(real);
-        setIsLoading(false);
-      }
-    });
+    reviewService
+      .listRealReviewsForProvider(uid)
+      .then((real) => {
+        if (!cancelled) setReviews(real);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
     return () => {
       cancelled = true;
     };

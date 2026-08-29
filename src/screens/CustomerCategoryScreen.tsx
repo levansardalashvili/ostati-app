@@ -23,9 +23,12 @@ export function CustomerCategoryScreen({ navigation, route }: Props) {
   const [allProviders, setAllProviders] = useState<Provider[]>([]);
   useEffect(() => {
     let cancelled = false;
-    userService.listRealProviders().then((real) => {
-      if (!cancelled) setAllProviders(real);
-    });
+    userService
+      .listRealProviders()
+      .then((real) => {
+        if (!cancelled) setAllProviders(real);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };

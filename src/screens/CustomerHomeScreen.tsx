@@ -58,9 +58,12 @@ export function CustomerHomeScreen({ navigation }: Props) {
   const [providers, setProviders] = useState<Provider[]>([]);
   useEffect(() => {
     let cancelled = false;
-    userService.listRealProviders().then((real) => {
-      if (!cancelled) setProviders(real);
-    });
+    userService
+      .listRealProviders()
+      .then((real) => {
+        if (!cancelled) setProviders(real);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -139,9 +142,12 @@ export function CustomerHomeScreen({ navigation }: Props) {
     const uid = authService.getCurrentUser()?.uid;
     if (!uid) return;
     let cancelled = false;
-    jobService.listMyJobPosts(uid).then((real) => {
-      if (!cancelled) setMyJobs(real);
-    });
+    jobService
+      .listMyJobPosts(uid)
+      .then((real) => {
+        if (!cancelled) setMyJobs(real);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };

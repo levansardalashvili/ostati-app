@@ -103,9 +103,12 @@ export function ProviderHomeScreen({ navigation }: Props) {
     const uid = authService.getCurrentUser()?.uid;
     if (!uid) return;
     let cancelled = false;
-    userService.getRealProviderById(uid).then((real) => {
-      if (!cancelled && real) setStats({ jobs: real.jobs, rating: real.rating, reviews: real.reviews });
-    });
+    userService
+      .getRealProviderById(uid)
+      .then((real) => {
+        if (!cancelled && real) setStats({ jobs: real.jobs, rating: real.rating, reviews: real.reviews });
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };

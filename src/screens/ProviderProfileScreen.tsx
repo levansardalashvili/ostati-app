@@ -53,9 +53,12 @@ export function ProviderProfileScreen({ navigation }: Props) {
   useEffect(() => {
     if (!uid) return;
     let cancelled = false;
-    userService.getRealProviderById(uid).then((real) => {
-      if (!cancelled && real) setStats({ rating: real.rating, reviews: real.reviews, jobs: real.jobs });
-    });
+    userService
+      .getRealProviderById(uid)
+      .then((real) => {
+        if (!cancelled && real) setStats({ rating: real.rating, reviews: real.reviews, jobs: real.jobs });
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };

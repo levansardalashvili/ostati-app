@@ -86,9 +86,12 @@ export function ChatConversationScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (!customerId || !providerId || !myUid) return;
     let cancelled = false;
-    chatService.listRealMessages(customerId, providerId, myUid).then((real) => {
-      if (!cancelled) setMessages(real);
-    });
+    chatService
+      .listRealMessages(customerId, providerId, myUid)
+      .then((real) => {
+        if (!cancelled) setMessages(real);
+      })
+      .catch(() => {});
     chatService.markConversationRead(customerId, providerId, role).catch(() => {});
     return () => {
       cancelled = true;

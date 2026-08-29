@@ -76,11 +76,18 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     }
     let cancelled = false;
     setJobLoading(true);
-    jobService.getJobPostById(route.params.jobId).then((real) => {
-      if (cancelled) return;
-      if (real) setJob(real);
-      setJobLoading(false);
-    });
+    jobService
+      .getJobPostById(route.params.jobId)
+      .then((real) => {
+        if (!cancelled && real) setJob(real);
+      })
+      .catch(() => {
+        // ჩავარდნისას EMPTY_JOB-ზე ვრჩებით — loading მაინც უნდა მოიხსნას,
+        // რომ ეკრანი დაკიდებული არ დარჩეს.
+      })
+      .finally(() => {
+        if (!cancelled) setJobLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -90,9 +97,12 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (!job.id) return;
     let cancelled = false;
-    quoteService.listResponsesForJob(job.id).then((real) => {
-      if (!cancelled) setInterestedList(real);
-    });
+    quoteService
+      .listResponsesForJob(job.id)
+      .then((real) => {
+        if (!cancelled) setInterestedList(real);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -147,9 +157,12 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (!job.id) return;
     let cancelled = false;
-    reviewService.getReviewByJobId(job.id).then((real) => {
-      if (!cancelled && real) setRatingData(real);
-    });
+    reviewService
+      .getReviewByJobId(job.id)
+      .then((real) => {
+        if (!cancelled && real) setRatingData(real);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -264,29 +277,30 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     }
   };
 
-  if (jobLoading) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <BackHeader title="მოთხოვნის დეტალები" onBack={() => navigation.goBack()} />
-        <View style={styles.bodyContent}>
-          <Skeleton width="100%" height={140} borderRadius={radius.lg} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
+  // ერთი მუდმივი JSX ხე jobLoading→loaded გადასვლისას (არა ორი ცალკე
+  // `return` სხვადასხვა SafeAreaView-ით) — Fabric-ის ("addViewAt: failed
+  // to insert view" / "child already has a parent") crash-ის თავიდან
+  // ასაცილებლად, რომელიც ხდება, როცა ერთი კომპონენტის ორ render-ს შორის
+  // მთელი ზედა-დონის ხე იცვლება navigation-transition-ის დროს.
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader
         title="მოთხოვნის დეტალები"
         onBack={() => navigation.goBack()}
         right={
-          <Pressable style={styles.iconButton} onPress={() => setMenuOpen(true)}>
-            <MoreVertical size={18} color={colors.foreground} />
-          </Pressable>
+          jobLoading ? undefined : (
+            <Pressable style={styles.iconButton} onPress={() => setMenuOpen(true)}>
+              <MoreVertical size={18} color={colors.foreground} />
+            </Pressable>
+          )
         }
       />
 
+      {jobLoading ? (
+        <View style={styles.bodyContent}>
+          <Skeleton width="100%" height={140} borderRadius={radius.lg} />
+        </View>
+      ) : (
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         <View style={styles.jobCard}>
           <View style={styles.jobHeaderRow}>
@@ -551,6 +565,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
           )}
         </View>
       </ScrollView>
+      )}
 
       <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)}>
         {effectiveStatus === 'pending' && (

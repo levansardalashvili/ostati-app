@@ -35,9 +35,12 @@ export function CustomerProfileScreen({ navigation }: Props) {
   useEffect(() => {
     if (!uid) return;
     let cancelled = false;
-    jobService.listMyJobPosts(uid).then((jobs) => {
-      if (!cancelled) setMyJobsCount(jobs.length);
-    });
+    jobService
+      .listMyJobPosts(uid)
+      .then((jobs) => {
+        if (!cancelled) setMyJobsCount(jobs.length);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };

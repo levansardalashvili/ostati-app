@@ -54,11 +54,15 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     }
     let cancelled = false;
     setJobLoading(true);
-    jobService.getFeedJobPostById(id).then((real) => {
-      if (cancelled) return;
-      if (real) setJob(real);
-      setJobLoading(false);
-    });
+    jobService
+      .getFeedJobPostById(id)
+      .then((real) => {
+        if (!cancelled && real) setJob(real);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setJobLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -76,9 +80,12 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     const uid = authService.getCurrentUser()?.uid;
     if (!uid || !job.id) return;
     let cancelled = false;
-    quoteService.listMyResponseJobIds(uid).then((ids) => {
-      if (!cancelled && ids.has(job.id)) setExpressed(true);
-    });
+    quoteService
+      .listMyResponseJobIds(uid)
+      .then((ids) => {
+        if (!cancelled && ids.has(job.id)) setExpressed(true);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -128,9 +135,12 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       return;
     }
     let cancelled = false;
-    reviewService.getReviewByJobId(job.id).then((real) => {
-      if (!cancelled) setReceivedRating(real);
-    });
+    reviewService
+      .getReviewByJobId(job.id)
+      .then((real) => {
+        if (!cancelled) setReceivedRating(real);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -173,29 +183,29 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       });
   };
 
-  if (jobLoading) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <BackHeader title="განცხადება" onBack={() => navigation.goBack()} />
-        <View style={styles.bodyContent}>
-          <Skeleton width="100%" height={140} borderRadius={radius.lg} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
+  // ერთი მუდმივი JSX ხე jobLoading→loaded გადასვლისას (Fabric-ის "child
+  // already has a parent" crash-ის თავიდან ასაცილებლად — CustomerJobDetailScreen-ის
+  // იგივე პრინციპი).
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader
         title="განცხადება"
         onBack={() => navigation.goBack()}
         right={
-          <Pressable style={styles.iconButton} onPress={handleMore}>
-            <MoreVertical size={16} color={colors.foreground} />
-          </Pressable>
+          jobLoading ? undefined : (
+            <Pressable style={styles.iconButton} onPress={handleMore}>
+              <MoreVertical size={16} color={colors.foreground} />
+            </Pressable>
+          )
         }
       />
 
+      {jobLoading ? (
+        <View style={styles.bodyContent}>
+          <Skeleton width="100%" height={140} borderRadius={radius.lg} />
+        </View>
+      ) : (
+      <>
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         {variant === 'active' && (
           <View style={styles.selectedBanner}>
@@ -380,6 +390,8 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
             <Text style={styles.reviewsButtonText}>ჩემი შეფასებები</Text>
           </Pressable>
         </View>
+      )}
+      </>
       )}
 
       <BottomSheet visible={offerSheetOpen} onClose={() => setOfferSheetOpen(false)}>

@@ -56,16 +56,30 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    userService.getRealProviderById(route.params.id).then((real) => {
-      if (cancelled) return;
-      if (real) {
-        setP(real);
-        reviewService.listRealReviewsForProvider(real.id).then((r) => {
-          if (!cancelled) setReviews(r);
-        });
-      }
-      setLoading(false);
-    });
+    userService
+      .getRealProviderById(route.params.id)
+      .then((real) => {
+        if (cancelled) return;
+        if (real) {
+          setP(real);
+          reviewService
+            .listRealReviewsForProvider(real.id)
+            .then((r) => {
+              if (!cancelled) setReviews(r);
+            })
+            .catch(() => {
+              // შეფასებების ჩატვირთვის ჩავარდნისას პროფილს მაინც ვაჩვენებთ,
+              // მხოლოდ "შეფასებები" სექცია რჩება ცარიელი.
+            });
+        }
+      })
+      .catch(() => {
+        // Provider ვერ ჩაიტვირთა — ცარიელ (EMPTY_PROVIDER) მდგომარეობაზე
+        // ვრჩებით loading-ის მოხსნის შემდეგ, ეკრანი დაკიდებული აღარ რჩება.
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -88,23 +102,13 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
     });
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <Pressable style={styles.iconButton} onPress={() => navigation.goBack()}>
-            <ArrowLeft size={18} color={colors.foreground} />
-          </Pressable>
-          <Text style={styles.headerTitle}>ოსტატის პროფილი</Text>
-          <View style={styles.headerActions} />
-        </View>
-        <View style={{ padding: spacing.lg }}>
-          <Skeleton width="100%" height={160} borderRadius={radius.lg} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
+  // ერთი მუდმივი JSX ხე loading→loaded გადასვლისას (არა ორი ცალკე `return`
+  // სხვადასხვა SafeAreaView-ით) — Fabric-ის (RN-ის ახალი render engine)
+  // ცნობილი crash-ი ("addViewAt: failed to insert view" / "child already
+  // has a parent") სწორედ მაშინ ხდება, როცა ერთი კომპონენტის ორ render-ს
+  // შორის მთელი ზედა-დონის ხე იცვლება navigation-transition-ის დროს —
+  // ეს განსაკუთრებით ხშირია, როცა fetch თითქმის მყისიერად სრულდება
+  // (screen mount-ისთანავე).
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -113,7 +117,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
         </Pressable>
         <Text style={styles.headerTitle}>ოსტატის პროფილი</Text>
         <View style={styles.headerActions}>
-          {!isSelfPreview && (
+          {!loading && !isSelfPreview && (
             <Pressable style={styles.iconButton} onPress={() => toggleFavorite(p.id)}>
               <Heart size={17} color={favorite ? colors.destructive : colors.mutedForeground} fill={favorite ? colors.destructive : 'transparent'} />
             </Pressable>
@@ -124,6 +128,12 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
         </View>
       </View>
 
+      {loading ? (
+        <View style={{ padding: spacing.lg }}>
+          <Skeleton width="100%" height={160} borderRadius={radius.lg} />
+        </View>
+      ) : (
+        <>
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         <View style={styles.hero}>
           <View style={styles.heroContent}>
@@ -310,6 +320,8 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
         </Pressable>
         <Text style={styles.footerNote}>საკონტაქტო ინფორმაცია დაცულია და ავტომატურად არ არის გაზიარებული.</Text>
       </View>
+        </>
+      )}
 
       <MediaPreviewModal item={previewCert} icon={Award} onClose={() => setPreviewCert(null)} />
       <MediaPreviewModal item={previewPortfolio} icon={ImageIcon} onClose={() => setPreviewPortfolio(null)} />
