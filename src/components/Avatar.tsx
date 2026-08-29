@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { colors, radius } from '../theme';
 
 type Props = {
@@ -7,20 +7,27 @@ type Props = {
   color?: string;
   size?: number;
   online?: boolean;
+  // რეალური პროფილის ფოტოს URL (#65) — თუ არსებობს, ინიციალების ნაცვლად
+  // რენდერდება.
+  uri?: string;
 };
 
 // მრგვალი ავატარი ინიციალებით (დიზაინის რეფერენსის Avi კომპონენტის მიხედვით) —
 // გამოიყენება პროფილში, ჩატში, Google-ის ანგარიშის ბარათში და ა.შ.
-export function Avatar({ initials, color = colors.primary, size = 44, online = false }: Props) {
+export function Avatar({ initials, color = colors.primary, size = 44, online = false, uri }: Props) {
   return (
     <View style={{ width: size, height: size }}>
       <View
         style={[
           styles.circle,
-          { width: size, height: size, borderRadius: radius.full, backgroundColor: color },
+          { width: size, height: size, borderRadius: radius.full, backgroundColor: color, overflow: 'hidden' },
         ]}
       >
-        <Text style={[styles.initials, { fontSize: size * 0.34 }]}>{initials}</Text>
+        {uri ? (
+          <Image source={{ uri }} style={{ width: size, height: size }} />
+        ) : (
+          <Text style={[styles.initials, { fontSize: size * 0.34 }]}>{initials}</Text>
+        )}
       </View>
       {online && (
         <View

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Heart, MapPin, MessageCircle, Star } from 'lucide-react-native';
@@ -24,7 +24,17 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SavedProviders'>;
 // მენიუდან იხსნება.
 export function SavedProvidersScreen({ navigation }: Props) {
   const { favoriteIds, toggleFavorite } = useFavoriteProviders();
-  const saved = userService.listProviders().filter((p) => favoriteIds.has(p.id));
+  const [allProviders, setAllProviders] = useState<Provider[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    userService.listRealProviders().then((real) => {
+      if (!cancelled) setAllProviders(real);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const saved = allProviders.filter((p) => favoriteIds.has(p.id));
 
   const openProfile = (id: string) => navigation.navigate('ViewProviderProfile', { id });
   const openChat = (p: Provider) => {
@@ -58,7 +68,7 @@ export function SavedProvidersScreen({ navigation }: Props) {
             return (
               <View key={p.id} style={styles.card}>
                 <Pressable style={styles.cardBody} onPress={() => openProfile(p.id)}>
-                  <Avatar initials={p.initials} color={p.color} size={54} online={p.online} />
+                  <Avatar initials={p.initials} color={p.color} size={54} online={p.online} uri={p.photoUrl} />
                   <View style={styles.info}>
                     <View style={styles.nameRow}>
                       <Text style={styles.name} numberOfLines={1}>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Briefcase, Camera, Heart, HelpCircle, LogOut, MapPin, Pencil, Settings } from 'lucide-react-native';
@@ -10,7 +10,9 @@ import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { ProfileMenuRow } from '../components/ProfileMenuRow';
 import { colors, radius, spacing, typography } from '../theme';
-import { getUnreadCount } from '../data/mockNotifications';
+import { authService } from '../services/authService';
+import { jobService } from '../services/jobService';
+import { notificationService } from '../services/notificationService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useFavoriteProviders } from '../state/FavoriteProvidersContext';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
@@ -28,11 +30,30 @@ export function CustomerProfileScreen({ navigation }: Props) {
   const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`;
   const [logoutSheetOpen, setLogoutSheetOpen] = useState(false);
 
+  const uid = authService.getCurrentUser()?.uid ?? null;
+  const [myJobsCount, setMyJobsCount] = useState(0);
+  useEffect(() => {
+    if (!uid) return;
+    let cancelled = false;
+    jobService.listMyJobPosts(uid).then((jobs) => {
+      if (!cancelled) setMyJobsCount(jobs.length);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [uid]);
+
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  useEffect(() => {
+    if (!uid) return;
+    return notificationService.subscribeToUnreadCount(uid, setUnreadNotifCount);
+  }, [uid]);
+
   const MENU = [
-    { icon: Briefcase, label: 'ჩემი მოთხოვნები', bg: '#EFF6FF', color: '#2563EB', badge: 3 },
+    { icon: Briefcase, label: 'ჩემი მოთხოვნები', bg: '#EFF6FF', color: '#2563EB', badge: myJobsCount },
     { icon: Heart, label: 'შენახული ოსტატები', bg: '#FEF2F2', color: '#DC2626', badge: favoriteIds.size },
     { icon: Pencil, label: 'პროფილის რედაქტირება', bg: '#F5F3FF', color: '#7C3AED', badge: 0 },
-    { icon: Bell, label: 'შეტყობინებები', bg: '#FFFBEB', color: '#D97706', badge: getUnreadCount('customer') },
+    { icon: Bell, label: 'შეტყობინებები', bg: '#FFFBEB', color: '#D97706', badge: unreadNotifCount },
     { icon: HelpCircle, label: 'დახმარება', bg: '#ECFDF5', color: '#059669', badge: 0 },
     { icon: Settings, label: 'ანგარიშის პარამეტრები', bg: colors.muted, color: colors.mutedForeground, badge: 0 },
   ];
@@ -54,6 +75,9 @@ export function CustomerProfileScreen({ navigation }: Props) {
 
   const confirmLogout = () => {
     setLogoutSheetOpen(false);
+    // navigation reset-ს ჯერ ვასრულებთ, სამუშაო UI-ს (fire-and-forget) —
+    // signOut()-ის დასრულების დალოდება აქ საჭირო არაა, უკვე Welcome-ზეა.
+    authService.signOut();
     navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Welcome' }] });
   };
 

@@ -1,6 +1,108 @@
-import type { CustomerProfile } from '../types/user';
+import { supabase } from './supabaseClient';
+import type { CustomerProfile, UserRecord } from '../types/user';
 import type { Provider, ProviderProfile } from '../types/provider';
-import { PROVIDERS } from '../data/mockHomeData';
+
+// `users` ცხრილის Postgres-ის row shape (snake_case) — UserRecord (camelCase)
+// TS-ის მხარეს უცვლელი რჩება, კონვერტაცია ხდება ამ ფაილშივე, სერვისის
+// საზღვარზე. იხ. supabase/README.md ცხრილის SQL-ისთვის.
+type UserRow = {
+  id: string;
+  role: UserRecord['role'];
+  first_name: string;
+  last_name: string;
+  email: string;
+  default_address: string;
+};
+
+function fromRow(row: UserRow): UserRecord {
+  return {
+    role: row.role,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    defaultAddress: row.default_address,
+  };
+}
+
+// `provider_profiles` ცხრილის Postgres row shape. `first_name`/`last_name`
+// **დუბლირებულია** აქაც (#60-ის მიხედვით, #53-ის თავდაპირველი "მხოლოდ
+// users-ში" გადაწყვეტილების override) — საჯარო Provider დირექტორიის (#60)
+// უსაფრთხო public-read-ისთვის: `users`-ს არასდროს არ შეიძლება გაეხსნას
+// საჯარო SELECT (email/მისამართი შეიცავს Customer-ებისთვისაც), ამიტომ
+// `provider_profiles`-ს (რომელიც არაფერს მგრძნობიარეს არ შეიცავს) ეს ორი
+// ველი დაემატა, რომ დირექტორია `users`-თან join-ის გარეშე აშენდეს.
+type ProviderProfileRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  specialty: ProviderProfile['specialty'];
+  areas: string[];
+  experience: string | null;
+  about: string;
+  photo_url: string | null;
+  certificates: ProviderProfile['certificates'];
+  portfolio: ProviderProfile['portfolio'];
+  sqm_prices: Record<string, string>;
+};
+
+function fromProviderProfileRow(row: ProviderProfileRow): ProviderProfile {
+  return {
+    firstName: row.first_name,
+    lastName: row.last_name,
+    specialty: row.specialty,
+    areas: row.areas,
+    experience: row.experience,
+    about: row.about,
+    photoUrl: row.photo_url ?? undefined,
+    certificates: row.certificates,
+    portfolio: row.portfolio,
+    sqmPrices: row.sqm_prices,
+  };
+}
+
+// EXPERIENCE_OPTIONS-ის id (მაგ. '10plus') → წარმომადგენელი წლების
+// რიცხვი, `Provider.years`-ისთვის (დახარისხების/ჩვენების მიზნით).
+const EXPERIENCE_YEARS: Record<string, number> = { lt1: 0, '1-2': 1, '3-5': 3, '6-10': 6, '10plus': 10 };
+
+// `provider_stats` view-ის row — `reviews`-იდან დათვლილი (avg_rating/
+// review_count, #64) და `job_posts`-იდან დათვლილი (completed_jobs, #67,
+// job-ის Provider-ზე რეალური "მინიჭების"/დასრულების state machine-ის
+// Supabase-ზე დაკავშირების შემდეგ).
+type ProviderStatsRow = { provider_id: string; avg_rating: number; review_count: number; completed_jobs: number };
+
+// `provider_profiles`-ის row → საჯარო დირექტორიის `Provider` ობიექტი
+// (#60), `stats`-ის (#64) არასავალდებულო overlay-ით. `jobs`/`verified`/
+// `online`/`price`/`skills` კვლავ ნაგულისხმევებზეა; `isNewProvider`/
+// `weightedRating` (#42/#43) გამართულად ამუშავებენ `reviews === 0`-ს
+// "ახალი ოსტატი"-დ, crash-ის გარეშე.
+function fromProviderProfileRowToPublicProvider(row: ProviderProfileRow, stats?: ProviderStatsRow): Provider {
+  const name = `${row.first_name} ${row.last_name}`.trim();
+  const initials = `${row.first_name.charAt(0)}${row.last_name.charAt(0)}`.toUpperCase();
+  const sqmValues = Object.values(row.sqm_prices);
+  return {
+    id: row.id,
+    name,
+    category: row.specialty[0]?.id ?? '',
+    years: row.experience ? (EXPERIENCE_YEARS[row.experience] ?? 0) : 0,
+    rating: stats?.avg_rating ?? 0,
+    reviews: stats?.review_count ?? 0,
+    location: row.areas[0] ?? '',
+    areas: row.areas,
+    price: '',
+    jobs: stats?.completed_jobs ?? 0,
+    verified: false,
+    online: false,
+    initials,
+    color: '#2563EB',
+    bio: row.about,
+    skills: [],
+    certificates: row.certificates,
+    portfolio: row.portfolio,
+    sqmPrice: sqmValues[0],
+    specialties: row.specialty.map((s) => s.label),
+    photoUrl: row.photo_url ?? undefined,
+  };
+}
 
 const DEFAULT_CUSTOMER_PROFILE: CustomerProfile = {
   firstName: 'ნინო',
@@ -16,7 +118,6 @@ const DEFAULT_PROVIDER_PROFILE: ProviderProfile = {
   areas: ['ვაკე', 'საბურთალო', 'ვერა'],
   experience: '10plus',
   about: 'ვარ სანტექნიკოსი 15 წლიანი გამოცდილებით. ვასრულებ ყველა სახის სანტექნიკის სამუშაოს სწრაფად და ხარისხიანად.',
-  hasPhoto: false,
   certificates: [{ id: 1, bg: '#DBEAFE' }],
   portfolio: [
     { id: 1, bg: '#D1FAE5' },
@@ -39,14 +140,34 @@ export interface UserService {
   updateCustomerProfile(patch: Partial<CustomerProfile>): CustomerProfile;
   getProviderProfile(): ProviderProfile;
   updateProviderProfile(patch: Partial<ProviderProfile>): ProviderProfile;
-  // საჯარო Provider დირექტორია (Customer-ის მხრიდან ხილული ოსტატები).
-  listProviders(): Provider[];
-  getProviderById(id: string): Provider | undefined;
+
+  // Supabase-ის `users` ცხრილი — ანგარიშის საბაზისო ჩანაწერი (role +
+  // identity). Register/GoogleComplete წერს, Login კითხულობს (რომ იცოდეს
+  // სად გადაიყვანოს — CustomerHome თუ ProviderHome), CustomerEditProfile
+  // ცვლილებას ინახავს. ეს არის პირველი ნამდვილი (არა mock) backend
+  // persistence ამ აპში — providerProfiles/jobPosts/... ჯერ არ არსებობს.
+  createUserRecord(uid: string, record: UserRecord): Promise<void>;
+  getUserRecord(uid: string): Promise<UserRecord | null>;
+  updateUserRecord(uid: string, patch: Partial<UserRecord>): Promise<void>;
+
+  // Supabase-ის `provider_profiles` ცხრილი — Provider-ის საკუთარი,
+  // რედაქტირებადი პროფილის გაფართოება (`users`-ის მეტი: specialty, areas,
+  // experience, about, ფოტო/სერთიფიკატი/portfolio, sqm ფასები). #52-ის
+  // მეორე ეტაპი — `users`-ის შემდეგ. `upsert`, რადგან ProviderSetupScreen
+  // პირველად ქმნის ჩანაწერს, ProviderEditProfileScreen შემდეგ ანახლებს —
+  // ორივე იმავე მეთოდით მუშაობს.
+  getProviderProfileRecord(uid: string): Promise<ProviderProfile | null>;
+  upsertProviderProfileRecord(uid: string, record: ProviderProfile): Promise<void>;
+
+  // საჯარო Provider დირექტორია, რეალურად Supabase-ზე (#60) — `provider_profiles`-ის
+  // ყველა row-ს კითხულობს (public-read RLS, #60-ის SQL).
+  listRealProviders(): Promise<Provider[]>;
+  // ერთი Provider-ის პირდაპირი წაკითხვა id-ით (#71) — `listRealProviders()`-ის
+  // filter-ის ნაცვლად, სადაც მხოლოდ ერთი კონკრეტული Provider-ია საჭირო
+  // (ViewProviderProfileScreen-ის deep-link ან პირდაპირი id-ით გახსნა).
+  getRealProviderById(id: string): Promise<Provider | null>;
 }
 
-// TODO: ჩანაცვლდება Firestore-ის users/{uid} და providerProfiles/{uid}
-// დოკუმენტებით (auth-ის დაკავშირების შემდეგ). დღეს — ლოკალური mock state
-// + PROVIDERS-ის საჯარო დირექტორია.
 export const userService: UserService = {
   getCustomerProfile: () => customerProfile,
   updateCustomerProfile: (patch) => {
@@ -58,6 +179,76 @@ export const userService: UserService = {
     providerProfile = { ...providerProfile, ...patch };
     return providerProfile;
   },
-  listProviders: () => PROVIDERS,
-  getProviderById: (id) => PROVIDERS.find((p) => p.id === id),
+  async createUserRecord(uid, record) {
+    const { error } = await supabase.from('users').insert({
+      id: uid,
+      role: record.role,
+      first_name: record.firstName,
+      last_name: record.lastName,
+      email: record.email,
+      default_address: record.defaultAddress,
+    });
+    if (error) throw error;
+  },
+  async getUserRecord(uid) {
+    const { data, error } = await supabase.from('users').select('*').eq('id', uid).maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return fromRow(data as UserRow);
+  },
+  async updateUserRecord(uid, patch) {
+    const row: Partial<UserRow> = {};
+    if (patch.role !== undefined) row.role = patch.role;
+    if (patch.firstName !== undefined) row.first_name = patch.firstName;
+    if (patch.lastName !== undefined) row.last_name = patch.lastName;
+    if (patch.email !== undefined) row.email = patch.email;
+    if (patch.defaultAddress !== undefined) row.default_address = patch.defaultAddress;
+    const { error } = await supabase.from('users').update(row).eq('id', uid);
+    if (error) throw error;
+  },
+
+  async getProviderProfileRecord(uid) {
+    const { data, error } = await supabase.from('provider_profiles').select('*').eq('id', uid).maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return fromProviderProfileRow(data as ProviderProfileRow);
+  },
+  async upsertProviderProfileRecord(uid, record) {
+    const { error } = await supabase.from('provider_profiles').upsert({
+      id: uid,
+      first_name: record.firstName,
+      last_name: record.lastName,
+      specialty: record.specialty,
+      areas: record.areas,
+      experience: record.experience,
+      about: record.about,
+      photo_url: record.photoUrl ?? null,
+      certificates: record.certificates,
+      portfolio: record.portfolio,
+      sqm_prices: record.sqmPrices,
+    });
+    if (error) throw error;
+  },
+  async listRealProviders() {
+    const [{ data, error }, statsResult] = await Promise.all([
+      supabase.from('provider_profiles').select('*'),
+      supabase.from('provider_stats').select('*'),
+    ]);
+    if (error) throw error;
+    const statsMap = new Map<string, ProviderStatsRow>();
+    if (!statsResult.error) {
+      (statsResult.data as ProviderStatsRow[]).forEach((s) => statsMap.set(s.provider_id, s));
+    }
+    return (data as ProviderProfileRow[]).map((row) => fromProviderProfileRowToPublicProvider(row, statsMap.get(row.id)));
+  },
+  async getRealProviderById(id) {
+    const [{ data, error }, statsResult] = await Promise.all([
+      supabase.from('provider_profiles').select('*').eq('id', id).maybeSingle(),
+      supabase.from('provider_stats').select('*').eq('provider_id', id).maybeSingle(),
+    ]);
+    if (error) throw error;
+    if (!data) return null;
+    const stats = !statsResult.error && statsResult.data ? (statsResult.data as ProviderStatsRow) : undefined;
+    return fromProviderProfileRowToPublicProvider(data as ProviderProfileRow, stats);
+  },
 };

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,9 +10,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Award, Camera, ChevronRight, Image as ImageIcon, MapPin, User } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
 import { ExperiencePickerField } from '../components/ExperiencePickerField';
+import { InlineBanner } from '../components/InlineBanner';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
 import { MediaUploadGrid, nextMediaItem, type MediaItem } from '../components/MediaUploadGrid';
 import { ProgressBar } from '../components/ProgressBar';
@@ -19,6 +22,9 @@ import { SpecialtyPickerField, type SpecialtyOption } from '../components/Specia
 import { SqmPriceField } from '../components/SqmPriceField';
 import { colors, radius, spacing, typography } from '../theme';
 import { isSqmPriced } from '../data/specialties';
+import { authService } from '../services/authService';
+import { storageService, type UserMediaKind } from '../services/storageService';
+import { userService } from '../services/userService';
 import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -29,18 +35,21 @@ const ABOUT_MAX = 300;
 // A4 — პროფილის შევსება (Provider) (product-spec.md; დიზაინის რეფერენსის
 // ProviderSetupScreen-ის მიხედვით)
 export function ProviderSetupScreen({ navigation }: Props) {
-  const { setProfile } = useProviderProfile();
+  const { profile: providerProfile, setProfile } = useProviderProfile();
   const [specialty, setSpecialty] = useState<SpecialtyOption[]>([]);
   const [experience, setExperience] = useState<string | null>(null);
   const [areas, setAreas] = useState<string[]>([]);
   const [about, setAbout] = useState('');
   const [loading, setLoading] = useState(false);
-  const [hasPhoto, setHasPhoto] = useState(false);
+  // ლოკალური URI (#65) — Storage-ში იტვირთება "პროფილის შექმნა"-ზე
+  // დაჭერისას, certificates/portfolio-ს იგივე "ატვირთვა შენახვისას" პრინციპით.
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [certificates, setCertificates] = useState<MediaItem[]>([]);
   const [portfolio, setPortfolio] = useState<MediaItem[]>([]);
   const [previewCert, setPreviewCert] = useState<MediaItem | null>(null);
   const [previewPortfolio, setPreviewPortfolio] = useState<MediaItem | null>(null);
   const [sqmPrices, setSqmPrices] = useState<Record<string, string>>({});
+  const [saveError, setSaveError] = useState(false);
 
   // კვ.მ-ზე ფასიანი სპეციალობები, provider-ის შერჩეულთაგან — ერთი ველი
   // თითო სპეციალობაზე, საერთო მნიშვნელობის ნაცვლად (მომხმარებლის მოთხოვნით).
@@ -51,6 +60,48 @@ export function ProviderSetupScreen({ navigation }: Props) {
   // არასავალდებულოა და canSave-ს არ მოქმედებს.
   const canSave = specialty.length > 0 && areas.length > 0;
 
+  // რეალური კამერა/გალერეის picker (#62) — ლოკალური URI მაშინვე ემატება
+  // ბადეს (მყისიერი preview), Storage-ში ატვირთვა კი შენახვისას ხდება
+  // (handleContinue), ერთხელ, ყველა ფოტოსთვის ერთად.
+  const pickMedia = async (source: 'camera' | 'gallery', setItems: React.Dispatch<React.SetStateAction<MediaItem[]>>) => {
+    const perm =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
+    if (!result.canceled && result.assets[0]) {
+      setItems((prev) => [...prev, { ...nextMediaItem(prev), uri: result.assets[0].uri }]);
+    }
+  };
+
+  const uploadPendingMedia = async (uid: string, items: MediaItem[], kind: UserMediaKind): Promise<MediaItem[]> =>
+    Promise.all(
+      items.map(async (item) => {
+        if (!item.uri || item.uri.startsWith('http')) return item;
+        const url = await storageService.uploadUserMedia(uid, item.uri, kind);
+        return { ...item, uri: url };
+      }),
+    );
+
+  const pickProfilePhoto = async (source: 'camera' | 'gallery') => {
+    const perm =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
+    if (!result.canceled && result.assets[0]) {
+      setPhotoUri(result.assets[0].uri);
+    }
+  };
+
   const openAreaPicker = () => {
     navigation.navigate('RegionAreaPicker', {
       selected: areas,
@@ -58,16 +109,50 @@ export function ProviderSetupScreen({ navigation }: Props) {
     });
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!canSave) return;
+    setSaveError(false);
     setLoading(true);
-    // TODO: პროვაიდერის პროფილის საბოლოო შენახვა Firestore-ში — ჯერჯერობით
-    // მხოლოდ ProviderProfileContext-ში (ლოკალური, არა persist).
-    setTimeout(() => {
-      setLoading(false);
-      setProfile({ specialty, areas, experience, about, hasPhoto, certificates, portfolio, sqmPrices });
+    const uid = authService.getCurrentUser()?.uid;
+    try {
+      let uploadedCerts = certificates;
+      let uploadedPortfolio = portfolio;
+      let uploadedPhotoUrl: string | undefined;
+      if (uid) {
+        uploadedCerts = await uploadPendingMedia(uid, certificates, 'certificate');
+        uploadedPortfolio = await uploadPendingMedia(uid, portfolio, 'portfolio');
+        if (photoUri) {
+          uploadedPhotoUrl = await storageService.uploadUserMedia(uid, photoUri, 'profile');
+        }
+        await userService.upsertProviderProfileRecord(uid, {
+          firstName: providerProfile.firstName,
+          lastName: providerProfile.lastName,
+          specialty,
+          areas,
+          experience,
+          about,
+          photoUrl: uploadedPhotoUrl,
+          certificates: uploadedCerts,
+          portfolio: uploadedPortfolio,
+          sqmPrices,
+        });
+      }
+      setProfile({
+        specialty,
+        areas,
+        experience,
+        about,
+        photoUrl: uploadedPhotoUrl,
+        certificates: uploadedCerts,
+        portfolio: uploadedPortfolio,
+        sqmPrices,
+      });
       navigation.reset({ index: 0, routes: [{ name: 'ProviderHome' }] });
-    }, 1200);
+    } catch {
+      setSaveError(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -86,22 +171,22 @@ export function ProviderSetupScreen({ navigation }: Props) {
         <View style={styles.photoSection}>
           <View style={styles.avatarWrap}>
             <View style={styles.avatar}>
-              {hasPhoto ? (
-                <Text style={styles.avatarInitials}>ო</Text>
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={styles.avatarImage} />
               ) : (
                 <User size={32} color={colors.primary} />
               )}
             </View>
-            <Pressable style={styles.cameraBadge} onPress={() => setHasPhoto((p) => !p)}>
+            <Pressable style={styles.cameraBadge} onPress={() => pickProfilePhoto('camera')}>
               <Camera size={13} color={colors.primaryForeground} />
             </Pressable>
           </View>
           <View style={styles.photoActions}>
-            <Pressable style={styles.photoActionButton} onPress={() => setHasPhoto(true)}>
+            <Pressable style={styles.photoActionButton} onPress={() => pickProfilePhoto('camera')}>
               <Camera size={12} color={colors.mutedForeground} />
               <Text style={styles.photoActionText}>ფოტოს გადაღება</Text>
             </Pressable>
-            <Pressable style={styles.photoActionButton} onPress={() => setHasPhoto(true)}>
+            <Pressable style={styles.photoActionButton} onPress={() => pickProfilePhoto('gallery')}>
               <User size={12} color={colors.mutedForeground} />
               <Text style={styles.photoActionText}>გალერეიდან არჩევა</Text>
             </Pressable>
@@ -170,7 +255,8 @@ export function ProviderSetupScreen({ navigation }: Props) {
           <MediaUploadGrid
             items={certificates}
             icon={Award}
-            onAdd={() => setCertificates((c) => [...c, nextMediaItem(c)])}
+            onAddCamera={() => pickMedia('camera', setCertificates)}
+            onAddGallery={() => pickMedia('gallery', setCertificates)}
             onRemove={(id) => setCertificates((c) => c.filter((it) => it.id !== id))}
             onPreview={setPreviewCert}
           />
@@ -182,7 +268,8 @@ export function ProviderSetupScreen({ navigation }: Props) {
           <MediaUploadGrid
             items={portfolio}
             icon={ImageIcon}
-            onAdd={() => setPortfolio((p) => [...p, nextMediaItem(p)])}
+            onAddCamera={() => pickMedia('camera', setPortfolio)}
+            onAddGallery={() => pickMedia('gallery', setPortfolio)}
             onRemove={(id) => setPortfolio((p) => p.filter((it) => it.id !== id))}
             onPreview={setPreviewPortfolio}
           />
@@ -190,6 +277,9 @@ export function ProviderSetupScreen({ navigation }: Props) {
       </ScrollView>
 
       <View style={styles.footer}>
+        {saveError && (
+          <InlineBanner type="error" msg="პროფილის შენახვა ვერ მოხერხდა" action="თავიდან ცდა" onAction={handleContinue} />
+        )}
         <Button
           label="პროფილის შექმნა"
           loadingLabel="შენახვა..."
@@ -268,11 +358,11 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  avatarInitials: {
-    fontSize: 30,
-    fontWeight: '700',
-    color: colors.primary,
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   cameraBadge: {
     position: 'absolute',
@@ -357,5 +447,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
+    gap: spacing.sm + 2,
   },
 });

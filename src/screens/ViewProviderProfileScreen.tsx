@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Award, Heart, Image as ImageIcon, MapPin, MessageCircle, Share2, Star } from 'lucide-react-native';
@@ -6,32 +6,76 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
 import type { MediaItem } from '../components/MediaUploadGrid';
+import { Skeleton } from '../components/Skeleton';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
-import { CURRENT_PROVIDER_ID } from '../services/jobService';
+import { authService } from '../services/authService';
 import { reviewService } from '../services/reviewService';
 import { userService } from '../services/userService';
 import { useFavoriteProviders } from '../state/FavoriteProvidersContext';
+import type { Provider } from '../types/provider';
+import type { Review } from '../types/review';
 import { isNewProvider } from '../utils/providerRank';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ViewProviderProfile'>;
 
-// ViewProviderProfile — ოსტატის საჯარო პროფილი Customer-ის თვალით (ზუსტად
-// ზიპის App.tsx-ის ViewProviderProfile-ის მიხედვით). Provider-ისთვისაც
+const EMPTY_PROVIDER: Provider = {
+  id: '',
+  name: '',
+  category: '',
+  years: 0,
+  rating: 0,
+  reviews: 0,
+  location: '',
+  areas: [],
+  price: '',
+  jobs: 0,
+  verified: false,
+  online: false,
+  initials: '',
+  color: colors.primary,
+  bio: '',
+  skills: [],
+  certificates: [],
+  portfolio: [],
+  specialties: [],
+};
+
+// ViewProviderProfile — ოსტატის საჯარო პროფილი Customer-ის თვალით. Provider-ისთვისაც
 // გამოიყენება საკუთარი პროფილის "თვალით" წინასწარი ნახვისთვის — ამ
 // შემთხვევაში ❤️ ღილაკი არ ჩანს (საკუთარი თავის "შენახვა" აზრი არ აქვს),
-// `p.id === CURRENT_PROVIDER_ID`-ით ვარკვევთ (ProviderProfileScreen-ის
-// preview ყოველთვის 'p1'-ს, ანუ "მიმდინარე" Provider-ს, ხსნის).
+// `p.id === auth uid`-ით ვარკვევთ (#71 — ProviderProfileScreen-ის preview
+// ახლა რეალურ, ავტორიზებულ uid-ს ხსნის, არა mock 'p1'-ს).
 export function ViewProviderProfileScreen({ navigation, route }: Props) {
-  const p = userService.getProviderById(route.params.id) ?? userService.listProviders()[0];
+  const [p, setP] = useState<Provider>(EMPTY_PROVIDER);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    userService.getRealProviderById(route.params.id).then((real) => {
+      if (cancelled) return;
+      if (real) {
+        setP(real);
+        reviewService.listRealReviewsForProvider(real.id).then((r) => {
+          if (!cancelled) setReviews(r);
+        });
+      }
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [route.params.id]);
+
   const specialty = SPECIALTY_LABEL[p.category] ?? p.category;
-  const reviews = reviewService.getReviewsForProvider(p.id);
   const [previewCert, setPreviewCert] = useState<MediaItem | null>(null);
   const [previewPortfolio, setPreviewPortfolio] = useState<MediaItem | null>(null);
   const { isFavorite, toggleFavorite } = useFavoriteProviders();
-  const isSelfPreview = p.id === CURRENT_PROVIDER_ID;
+  const isSelfPreview = !!p.id && p.id === authService.getCurrentUser()?.uid;
   const favorite = isFavorite(p.id);
 
   const handleChat = () => {
@@ -43,6 +87,23 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
       role: 'customer',
     });
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <Pressable style={styles.iconButton} onPress={() => navigation.goBack()}>
+            <ArrowLeft size={18} color={colors.foreground} />
+          </Pressable>
+          <Text style={styles.headerTitle}>ოსტატის პროფილი</Text>
+          <View style={styles.headerActions} />
+        </View>
+        <View style={{ padding: spacing.lg }}>
+          <Skeleton width="100%" height={160} borderRadius={radius.lg} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -67,7 +128,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
         <View style={styles.hero}>
           <View style={styles.heroContent}>
             <View style={styles.avatarWrap}>
-              <Avatar initials={p.initials} color={p.color} size={88} />
+              <Avatar initials={p.initials} color={p.color} size={88} uri={p.photoUrl} />
               {p.online && <View style={styles.onlineDot} />}
             </View>
             <View style={styles.nameRow}>

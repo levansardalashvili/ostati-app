@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { FilePlus2, Home, MessageCircle, User } from 'lucide-react-native';
@@ -7,12 +7,11 @@ import { CustomerJobsScreen } from '../screens/CustomerJobsScreen';
 import { ChatsListScreen } from '../screens/ChatsListScreen';
 import { CustomerProfileScreen } from '../screens/CustomerProfileScreen';
 import { colors, radius, typography } from '../theme';
+import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
 import type { CustomerTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
-
-const unreadChats = chatService.listChats().filter((c) => c.unread > 0).length;
 
 // Bottom Navigation — Customer (product-spec.md-ის საწყისი "Home / ჩატები /
 // პროფილი" 3 ჩანართი გაფართოვდა "განცხადებები" ჩანართით — ეს ყოფილი
@@ -21,6 +20,14 @@ const unreadChats = chatService.listChats().filter((c) => c.unread > 0).length;
 // მოთხოვნით, ცალკე "მოთხოვნის გამოქვეყნება"-ზე გადამისამართებადი ცარიელი
 // ტაბის ნაცვლად).
 export function CustomerTabs() {
+  const [unreadChats, setUnreadChats] = useState(0);
+
+  useEffect(() => {
+    const uid = authService.getCurrentUser()?.uid;
+    if (!uid) return;
+    return chatService.subscribeToUnreadCount(uid, 'customer', setUnreadChats);
+  }, []);
+
   return (
     <Tab.Navigator
       screenOptions={{

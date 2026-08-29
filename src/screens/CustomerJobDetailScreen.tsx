@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Briefcase,
@@ -11,7 +11,6 @@ import {
   Pencil,
   Star,
   X,
-  Zap,
   Image as ImageIcon,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -20,23 +19,46 @@ import { BackHeader } from '../components/BackHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { CategoryIcon } from '../components/CategoryIcon';
+import { Skeleton } from '../components/Skeleton';
 import { StatusPill, type JobStatus } from '../components/StatusPill';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
-import { PHOTO_COLORS } from '../data/mockHomeData';
+import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
+import { notificationService } from '../services/notificationService';
 import { quoteService } from '../services/quoteService';
 import { reviewService } from '../services/reviewService';
+import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useJobStatus } from '../state/JobStatusContext';
+import type { CustomerJob } from '../types/job';
 import type { Provider } from '../types/provider';
+import type { JobQuote } from '../types/quote';
 import type { RatingData } from '../types/review';
 import { isNewProvider, weightedRating } from '../utils/providerRank';
+import { isUuid } from '../utils/isUuid';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerJobDetail'>;
 
 const PROBLEM_OPTIONS = ['ოსტატი ჯერ არ მოსულა', 'სამუშაო ჯერ არ დასრულებულა', 'სამუშაოს ხარისხი დაბალია', 'სხვა'];
+
+// route-ს job param-ის არარსებობისას (ჩატის/Home-ის/notification-ის
+// deep-link, სადაც მხოლოდ jobId ცნობილია) — placeholder, სანამ რეალური
+// fetch (jobService.getJobPostById) არ დასრულდება. ცარიელი id (`''`) არასდროს
+// ემთხვევა რეალურ job-ს, ამიტომ ქვემოთ hook-ების `[job.id]`-ზე დამოკიდებული
+// fetch-ები უსაფრთხოდ no-op-ობენ, სანამ ნამდვილი job არ ჩაიტვირთება.
+const EMPTY_JOB: CustomerJob = {
+  id: '',
+  title: '',
+  category: '',
+  status: 'pending',
+  provider: null,
+  date: '',
+  address: '',
+  desc: '',
+  photos: [],
+};
 
 // C3 — Job-ის დეტალი + დაინტერესებული ოსტატების სია, და C4 — ოსტატის
 // არჩევის დადასტურება (product-spec.md; დიზაინის რეფერენსში ეს ორივე ერთი
@@ -44,12 +66,39 @@ const PROBLEM_OPTIONS = ['ოსტატი ჯერ არ მოსულა
 // ავაშენეთ). სამუშაოს დასრულების დადასტურება/შეფასების ნაკადი (product-spec.md
 // პუნქტი #14) — ზუსტად ზიპის App.tsx-ის CustomerJobDetail-ის მიხედვით.
 export function CustomerJobDetailScreen({ navigation, route }: Props) {
-  const job = useMemo(
-    () => jobService.getCustomerJobById(route.params.jobId) ?? jobService.listCustomerJobs()[1],
-    [route.params.jobId],
-  );
-  const interestedList = quoteService.getQuotesForJob(job.id);
+  const [job, setJob] = useState<CustomerJob>(() => route.params.job ?? EMPTY_JOB);
+  const [jobLoading, setJobLoading] = useState(!route.params.job);
+  useEffect(() => {
+    if (route.params.job) {
+      setJob(route.params.job);
+      setJobLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setJobLoading(true);
+    jobService.getJobPostById(route.params.jobId).then((real) => {
+      if (cancelled) return;
+      if (real) setJob(real);
+      setJobLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [route.params.job, route.params.jobId]);
+
+  const [interestedList, setInterestedList] = useState<JobQuote[]>([]);
+  useEffect(() => {
+    if (!job.id) return;
+    let cancelled = false;
+    quoteService.listResponsesForJob(job.id).then((real) => {
+      if (!cancelled) setInterestedList(real);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [job.id]);
   const { getStatus, setStatus } = useJobStatus();
+  const { profile: customerProfile } = useCustomerProfile();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelSheetOpen, setCancelSheetOpen] = useState(false);
@@ -94,7 +143,17 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const [problemSheetOpen, setProblemSheetOpen] = useState(false);
   const [problemOption, setProblemOption] = useState<string | null>(null);
   const [problemOther, setProblemOther] = useState('');
-  const [ratingData, setRatingData] = useState<RatingData | null>(() => reviewService.getSubmittedRating(job.id) ?? null);
+  const [ratingData, setRatingData] = useState<RatingData | null>(null);
+  useEffect(() => {
+    if (!job.id) return;
+    let cancelled = false;
+    reviewService.getReviewByJobId(job.id).then((real) => {
+      if (!cancelled && real) setRatingData(real);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [job.id]);
 
   const sharedStatus = getStatus(job.id) ?? job.status;
   const effectiveStatus: JobStatus = cancelled ? 'cancelled' : sharedStatus;
@@ -125,7 +184,18 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const confirmSelection = () => {
     if (!confirmProvider) return;
     setSelectedProvider(confirmProvider);
-    setStatus(job.id, 'active'); // provider_selected
+    setStatus(job.id, 'active', confirmProvider.id, confirmProvider.name); // provider_selected
+    if (isUuid(confirmProvider.id)) {
+      notificationService
+        .create(confirmProvider.id, {
+          title: 'შენ აგირჩიეს სამუშაოსთვის',
+          body: job.title,
+          iconEmoji: '🏆',
+          iconBg: '#059669',
+          target: { screen: 'ProviderJobDetail', id: job.id, mode: 'selected' },
+        })
+        .catch(() => {});
+    }
     setConfirmProvider(null);
   };
   const confirmCancel = () => {
@@ -148,6 +218,32 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       onRate: (data) => {
         setRatingData(data);
         setStatus(job.id, 'completed');
+        const uid = authService.getCurrentUser()?.uid;
+        if (uid && selectedProvider && isUuid(selectedProvider.id) && isUuid(job.id)) {
+          reviewService
+            .submitReview(
+              job.id,
+              uid,
+              selectedProvider.id,
+              `${customerProfile.firstName} ${customerProfile.lastName}`.trim(),
+              data,
+            )
+            .catch(() => {
+              // ლოკალურ state-ში ("შენი შეფასება" სექცია) უკვე ასახულია —
+              // Supabase-ის ჩავარდნისას UI-ს არ ვბლოკავთ.
+            });
+        }
+        if (selectedProvider && isUuid(selectedProvider.id)) {
+          notificationService
+            .create(selectedProvider.id, {
+              title: 'სამუშაო დასრულებულად დადასტურდა',
+              body: job.title,
+              iconEmoji: '✅',
+              iconBg: '#059669',
+              target: { screen: 'ProviderJobDetail', id: job.id, mode: 'completed' },
+            })
+            .catch(() => {});
+        }
       },
     });
   };
@@ -155,7 +251,29 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     if (!problemOption || (problemOption === 'სხვა' && !problemOther.trim())) return;
     setProblemSheetOpen(false);
     setStatus(job.id, 'disputed');
+    if (selectedProvider && isUuid(selectedProvider.id)) {
+      notificationService
+        .create(selectedProvider.id, {
+          title: 'მომხმარებელმა პრობლემა აღნიშნა',
+          body: job.title,
+          iconEmoji: '⚠️',
+          iconBg: '#DC2626',
+          target: { screen: 'ProviderJobDetail', id: job.id, mode: 'selected' },
+        })
+        .catch(() => {});
+    }
   };
+
+  if (jobLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <BackHeader title="მოთხოვნის დეტალები" onBack={() => navigation.goBack()} />
+        <View style={styles.bodyContent}>
+          <Skeleton width="100%" height={140} borderRadius={radius.lg} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -191,22 +309,13 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
             </View>
           </View>
 
-          {job.id === 'j1' && (
-            <View style={styles.budgetRow}>
-              <View style={styles.urgentBadge}>
-                <Zap size={11} color={colors.destructive} />
-                <Text style={styles.urgentBadgeText}>გადაუდებელი</Text>
-              </View>
-            </View>
-          )}
-
           <Text style={styles.jobDesc}>{job.desc}</Text>
 
-          {job.id !== 'j3' && (
+          {job.photos && job.photos.length > 0 && (
             <View style={styles.photoRow}>
-              {[0, 1].map((i) => (
-                <View key={i} style={[styles.photoThumb, { backgroundColor: PHOTO_COLORS[i] }]}>
-                  <ImageIcon size={20} color="rgba(100,116,139,0.6)" />
+              {job.photos.map((uri) => (
+                <View key={uri} style={styles.photoThumb}>
+                  <Image source={{ uri }} style={styles.photoThumbImage} />
                 </View>
               ))}
             </View>
@@ -602,26 +711,6 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
   },
-  budgetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm + 2,
-  },
-  urgentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.dangerBackground,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 4,
-  },
-  urgentBadgeText: {
-    ...typography.small,
-    color: colors.destructive,
-    fontWeight: '700',
-  },
   jobDesc: {
     ...typography.caption,
     color: colors.mutedForeground,
@@ -637,6 +726,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  photoThumbImage: {
+    width: '100%',
+    height: '100%',
   },
   section: {
     backgroundColor: colors.card,

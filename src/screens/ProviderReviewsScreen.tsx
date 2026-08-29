@@ -6,23 +6,37 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
 import { Skeleton } from '../components/Skeleton';
 import { colors, radius, spacing, typography } from '../theme';
+import { authService } from '../services/authService';
 import { reviewService } from '../services/reviewService';
+import type { Review } from '../types/review';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderReviews'>;
 
-// ProviderReviewsScreen — ზუსტად ზიპის App.tsx-ის ProviderReviewsScreen-ის
-// მიხედვით (ყოველთვის საკუთარი პროფილის — p1 — შეფასებები, ისევე როგორც
-// ზიპშია, mode/id param-ის გარეშე).
+// ProviderReviewsScreen — ყოველთვის საკუთარი, ავტორიზებული Provider-ის
+// (auth uid) შეფასებები, Supabase-ის `reviews`-იდან (#58).
 export function ProviderReviewsScreen({ navigation }: Props) {
-  const reviews = reviewService.getReviewsForProvider('p1');
+  const [reviews, setReviews] = useState<Review[]>([]);
   const avg = reviews.length ? reviews.reduce((s, r) => s + r.stars, 0) / reviews.length : 0;
   const avgLabel = avg.toFixed(1);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 850);
-    return () => clearTimeout(t);
+    const uid = authService.getCurrentUser()?.uid;
+    if (!uid) {
+      setIsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    reviewService.listRealReviewsForProvider(uid).then((real) => {
+      if (!cancelled) {
+        setReviews(real);
+        setIsLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

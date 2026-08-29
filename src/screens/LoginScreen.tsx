@@ -15,7 +15,10 @@ import { Button } from '../components/Button';
 import { GoogleButton } from '../components/GoogleButton';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
-import { authService } from '../services/authService';
+import { authService, getAuthErrorMessage } from '../services/authService';
+import { userService } from '../services/userService';
+import { useCustomerProfile } from '../state/CustomerProfileContext';
+import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
@@ -30,6 +33,8 @@ export function LoginScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [gLoading, setGLoading] = useState(false);
   const [credError, setCredError] = useState('');
+  const { setProfile } = useCustomerProfile();
+  const { setProfile: setProviderProfile } = useProviderProfile();
 
   const emailError = touched.email
     ? !email
@@ -41,25 +46,64 @@ export function LoginScreen({ navigation }: Props) {
   const passError = touched.pass && !pass ? 'ეს ველი სავალდებულოა' : '';
   const canSubmit = email && isEmail(email) && pass && !loading;
 
-  const handleLogin = () => {
+  // საავტორიზაციო call-ის წარმატების შემდეგ საერთო ნაბიჯი (email-ითაც,
+  // Google-ითაც) — users/{uid}-დან როლის წაკითხვა, შესაბამისი Context-ის
+  // ჰიდრატაცია და სწორ Home-ზე გადასვლა. თუ ჩანაწერი არ მოიძებნა (ეს
+  // ანგარიში ჯერ არასდროს დარეგისტრირებულა ამ აპში), უკან ვასვლით.
+  const completeSignIn = async () => {
+    const user = authService.getCurrentUser();
+    if (!user) {
+      setCredError('ავტორიზაცია ვერ დასრულდა — სცადე თავიდან.');
+      return;
+    }
+    const record = await userService.getUserRecord(user.uid);
+    if (!record) {
+      await authService.signOut();
+      setCredError('ეს ანგარიში ჯერ არ არის დარეგისტრირებული — ჯერ დარეგისტრირდი.');
+      return;
+    }
+    if (record.role === 'provider') {
+      setProviderProfile({ firstName: record.firstName, lastName: record.lastName });
+      const providerProfile = await userService.getProviderProfileRecord(user.uid);
+      if (providerProfile) setProviderProfile(providerProfile);
+      navigation.reset({ index: 0, routes: [{ name: 'ProviderHome' }] });
+    } else {
+      setProfile({
+        firstName: record.firstName,
+        lastName: record.lastName,
+        email: record.email,
+        defaultAddress: record.defaultAddress,
+      });
+      navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
+    }
+  };
+
+  const handleLogin = async () => {
     setTouched({ email: true, pass: true });
     setCredError('');
     if (!canSubmit) return;
     setLoading(true);
-    authService.signInWithEmail({ email: email.trim(), password: pass });
-    setTimeout(() => {
+    try {
+      await authService.signInWithEmail({ email: email.trim(), password: pass });
+      await completeSignIn();
+    } catch (error) {
+      setCredError(getAuthErrorMessage(error));
+    } finally {
       setLoading(false);
-      // წარმატების შემდეგ: როლის მიხედვით Home ეკრანზე გადასვლა
-    }, 1200);
+    }
   };
 
-  const handleGoogle = () => {
+  const handleGoogle = async () => {
+    setCredError('');
     setGLoading(true);
-    authService.signInWithGoogle();
-    setTimeout(() => {
+    try {
+      await authService.signInWithGoogle();
+      await completeSignIn();
+    } catch (error) {
+      setCredError(getAuthErrorMessage(error));
+    } finally {
       setGLoading(false);
-      // Google Sign-In წარმატების შემდეგ: არსებული ანგარიშის როლის მიხედვით Home ეკრანზე
-    }, 1200);
+    }
   };
 
   return (

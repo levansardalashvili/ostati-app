@@ -1,9 +1,11 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Camera, Image as ImageIcon, X, type LucideIcon } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
 
-export type MediaItem = { id: number; bg: string };
+// `uri` — არასავალდებულო, ლოკალური ან Supabase Storage-ის საჯარო URL (#62) —
+// თუ არსებობს, რეალური სურათი რენდერდება ფერადი placeholder-ის ნაცვლად.
+export type MediaItem = { id: number; bg: string; uri?: string };
 
 export const MEDIA_BG = ['#DBEAFE', '#D1FAE5', '#FEF3C7', '#FCE7F3', '#EDE9FE'];
 
@@ -13,7 +15,8 @@ export function nextMediaItem(items: MediaItem[]): MediaItem {
 
 type Props = {
   items: MediaItem[];
-  onAdd: () => void;
+  onAddCamera: () => void;
+  onAddGallery: () => void;
   onRemove: (id: number) => void;
   onPreview: (item: MediaItem) => void;
   icon: LucideIcon;
@@ -21,12 +24,14 @@ type Props = {
   addLabelSecondary?: string;
 };
 
-// ერთი გაზიარებული ბადე ატვირთული ფაილებისთვის (სერთიფიკატები/ნამუშევრები) —
-// mock ატვირთვა (ფერადი ჩანაცვლების ფირფიტა), preview/დამატება/წაშლა
-// PostJobScreen-ის ფოტოს ატვირთვის იგივე ვიზუალური ენით.
+// ერთი გაზიარებული ბადე ატვირთული ფაილებისთვის (სერთიფიკატები/ნამუშევრები/
+// RatingScreen-ის ფოტოები) — რეალური კამერა/გალერეის picker-ით (#62),
+// preview/დამატება/წაშლა PostJobScreen-ის ფოტოს ატვირთვის იგივე
+// ვიზუალური ენით.
 export function MediaUploadGrid({
   items,
-  onAdd,
+  onAddCamera,
+  onAddGallery,
   onRemove,
   onPreview,
   icon: Icon,
@@ -37,17 +42,21 @@ export function MediaUploadGrid({
     <View style={styles.row}>
       {items.map((item) => (
         <Pressable key={item.id} style={[styles.thumb, { backgroundColor: item.bg }]} onPress={() => onPreview(item)}>
-          <Icon size={20} color="rgba(100,116,139,0.5)" />
+          {item.uri ? (
+            <Image source={{ uri: item.uri }} style={styles.thumbImage} />
+          ) : (
+            <Icon size={20} color="rgba(100,116,139,0.5)" />
+          )}
           <Pressable style={styles.remove} onPress={() => onRemove(item.id)} hitSlop={8}>
             <X size={10} color="#FFFFFF" strokeWidth={2.5} />
           </Pressable>
         </Pressable>
       ))}
-      <Pressable style={styles.addButton} onPress={onAdd}>
+      <Pressable style={styles.addButton} onPress={onAddCamera}>
         <Camera size={18} color={colors.mutedForeground} />
         <Text style={styles.addText}>{addLabelPrimary}</Text>
       </Pressable>
-      <Pressable style={styles.addButton} onPress={onAdd}>
+      <Pressable style={styles.addButton} onPress={onAddGallery}>
         <ImageIcon size={18} color={colors.mutedForeground} />
         <Text style={styles.addText}>{addLabelSecondary}</Text>
       </Pressable>
@@ -69,6 +78,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  thumbImage: {
+    width: '100%',
+    height: '100%',
   },
   remove: {
     position: 'absolute',

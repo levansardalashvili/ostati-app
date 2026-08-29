@@ -8,58 +8,76 @@ import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { ProgressBar } from '../components/ProgressBar';
 import { colors, radius, spacing, typography } from '../theme';
+import { authService, getAuthErrorMessage } from '../services/authService';
+import { userService } from '../services/userService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GoogleComplete'>;
 
-// TODO: რეალური მონაცემები Google Sign-In-იდან ჩანაცვლდება, როცა
-// @react-native-google-signin/google-signin დაუკავშირდება (ტექნიკური შენიშვნა, product-spec.md)
-const MOCK_GOOGLE_USER = {
-  name: 'ნინო სულაბერიძე',
-  email: 'nino.sulaberidze@gmail.com',
-  initials: 'ნს',
-};
-const [MOCK_GOOGLE_FIRST_NAME, ...MOCK_GOOGLE_LAST_NAME_PARTS] = MOCK_GOOGLE_USER.name.split(' ');
-const MOCK_GOOGLE_LAST_NAME = MOCK_GOOGLE_LAST_NAME_PARTS.join(' ');
-
 // A3 — Google-ის ანგარიშით პროფილის დასრულება (product-spec.md, create-account-form.md).
 // Provider-ისთვის მისამართის ველი არ ჩანს/არ სავალდებულოა — RegisterScreen-ის
 // იგივე წესით (Provider-ს საცხოვრებელი მისამართი საერთოდ არ სჭირდება,
-// სამუშაო არეალს მოგვიანებით ProviderSetup-ზე ირჩევს).
+// სამუშაო არეალს მოგვიანებით ProviderSetup-ზე ირჩევს). Google-ის რეალური
+// ავტორიზაცია უკვე მოხდა წინა ეკრანზე (RegisterScreen-ის Google ღილაკი) —
+// აქ უბრალოდ ვკითხულობთ უკვე შესულ Firebase მომხმარებელს
+// (authService.getCurrentUser()) და ვასრულებთ პროფილს.
 export function GoogleCompleteScreen({ navigation, route }: Props) {
   const { role } = route.params;
   const isProvider = role === 'provider';
   const { setProfile } = useCustomerProfile();
   const { setProfile: setProviderProfile } = useProviderProfile();
 
+  const googleUser = authService.getCurrentUser();
+  const displayName = googleUser?.displayName?.trim() || 'ახალი მომხმარებელი';
+  const [googleFirstName, ...googleLastNameParts] = displayName.split(' ');
+  const googleLastName = googleLastNameParts.join(' ');
+  const googleEmail = googleUser?.email ?? '';
+  const initials = `${googleFirstName.charAt(0)}${googleLastName.charAt(0) || ''}`.toUpperCase();
+
   const [address, setAddress] = useState('');
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const addressError = !isProvider && touched && !address.trim() ? 'ეს ველი სავალდებულოა' : '';
   const canContinue = (isProvider || address.trim()) && !loading;
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     setTouched(true);
+    setSubmitError('');
     if (!isProvider && !address.trim()) return;
+    if (!googleUser) {
+      setSubmitError('Google სესია ვერ მოიძებნა — დაბრუნდი და სცადე თავიდან.');
+      return;
+    }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const defaultAddress = isProvider ? '' : address.trim();
+      await userService.createUserRecord(googleUser.uid, {
+        role,
+        firstName: googleFirstName,
+        lastName: googleLastName,
+        email: googleEmail,
+        defaultAddress,
+      });
       if (role === 'provider') {
-        setProviderProfile({ firstName: MOCK_GOOGLE_FIRST_NAME, lastName: MOCK_GOOGLE_LAST_NAME });
+        setProviderProfile({ firstName: googleFirstName, lastName: googleLastName });
         navigation.replace('ProviderSetup');
       } else {
         setProfile({
-          firstName: MOCK_GOOGLE_FIRST_NAME,
-          lastName: MOCK_GOOGLE_LAST_NAME,
-          email: MOCK_GOOGLE_USER.email,
-          defaultAddress: address.trim(),
+          firstName: googleFirstName,
+          lastName: googleLastName,
+          email: googleEmail,
+          defaultAddress,
         });
-        navigation.replace('CustomerSetup', { userName: MOCK_GOOGLE_USER.name });
+        navigation.replace('CustomerSetup', { userName: displayName });
       }
-    }, 1000);
+    } catch (error) {
+      setSubmitError(getAuthErrorMessage(error));
+      setLoading(false);
+    }
   };
 
   return (
@@ -77,16 +95,22 @@ export function GoogleCompleteScreen({ navigation, route }: Props) {
         <View style={styles.googleCard}>
           <Text style={styles.googleCardLabel}>Google-ის ანგარიშიდან</Text>
           <View style={styles.googleCardRow}>
-            <Avatar initials={MOCK_GOOGLE_USER.initials} size={52} />
+            <Avatar initials={initials} size={52} />
             <View style={styles.googleCardText}>
-              <Text style={styles.googleCardName}>{MOCK_GOOGLE_USER.name}</Text>
-              <Text style={styles.googleCardEmail}>{MOCK_GOOGLE_USER.email}</Text>
+              <Text style={styles.googleCardName}>{displayName}</Text>
+              <Text style={styles.googleCardEmail}>{googleEmail}</Text>
             </View>
             <View style={styles.checkBadge}>
               <Check size={13} color={colors.success} strokeWidth={3} />
             </View>
           </View>
         </View>
+
+        {submitError ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorBannerText}>{submitError}</Text>
+          </View>
+        ) : null}
 
         {!isProvider && (
           <View style={styles.field}>
@@ -184,5 +208,15 @@ const styles = StyleSheet.create({
   field: {
     marginBottom: spacing.lg,
     zIndex: 10,
+  },
+  errorBanner: {
+    backgroundColor: colors.dangerBackground,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  errorBannerText: {
+    ...typography.caption,
+    color: colors.destructive,
   },
 });

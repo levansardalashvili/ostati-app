@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCircle, Image as ImageIcon, Star } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
@@ -9,6 +10,8 @@ import { Button } from '../components/Button';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
 import { MediaUploadGrid, nextMediaItem, type MediaItem } from '../components/MediaUploadGrid';
 import { colors, radius, spacing, typography } from '../theme';
+import { authService } from '../services/authService';
+import { storageService } from '../services/storageService';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RatingScreen'>;
@@ -33,6 +36,7 @@ export function RatingScreen({ navigation, route }: Props) {
   const [photos, setPhotos] = useState<MediaItem[]>([]);
   const [previewPhoto, setPreviewPhoto] = useState<MediaItem | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useLayoutEffect(() => {
     navigation.setOptions({ gestureEnabled: false });
@@ -49,9 +53,43 @@ export function RatingScreen({ navigation, route }: Props) {
     setChips((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
   };
 
-  const handleSubmit = () => {
-    if (stars === 0) return;
-    onRate?.({ stars, review, chips, photos: photos.length > 0 ? photos : undefined });
+  // რეალური კამერა/გალერეის picker (#62) — ProviderSetup-ის იგივე პატერნით.
+  const pickMedia = async (source: 'camera' | 'gallery') => {
+    const perm =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
+    if (!result.canceled && result.assets[0]) {
+      setPhotos((prev) => [...prev, { ...nextMediaItem(prev), uri: result.assets[0].uri }]);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (stars === 0 || submitting) return;
+    setSubmitting(true);
+    const uid = authService.getCurrentUser()?.uid;
+    let uploadedPhotos = photos;
+    if (uid && photos.length > 0) {
+      try {
+        uploadedPhotos = await Promise.all(
+          photos.map(async (item) => {
+            if (!item.uri || item.uri.startsWith('http')) return item;
+            const url = await storageService.uploadUserMedia(uid, item.uri, 'rating');
+            return { ...item, uri: url };
+          }),
+        );
+      } catch {
+        // ატვირთვა ჩავარდა — შეფასებას მაინც ვაგზავნით ფოტოების გარეშე
+        // ვერ დაბლოკვის მაგივრად ლოკალურ (ატვირთვამდელ) URI-ებით.
+      }
+    }
+    onRate?.({ stars, review, chips, photos: uploadedPhotos.length > 0 ? uploadedPhotos : undefined });
+    setSubmitting(false);
     setSubmitted(true);
   };
 
@@ -139,7 +177,8 @@ export function RatingScreen({ navigation, route }: Props) {
           <MediaUploadGrid
             items={photos}
             icon={ImageIcon}
-            onAdd={() => setPhotos((p) => [...p, nextMediaItem(p)])}
+            onAddCamera={() => pickMedia('camera')}
+            onAddGallery={() => pickMedia('gallery')}
             onRemove={(id) => setPhotos((p) => p.filter((it) => it.id !== id))}
             onPreview={setPreviewPhoto}
           />
@@ -147,7 +186,13 @@ export function RatingScreen({ navigation, route }: Props) {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button label="შეფასების გაგზავნა" onPress={handleSubmit} disabled={stars === 0} />
+        <Button
+          label="შეფასების გაგზავნა"
+          loadingLabel="იგზავნება..."
+          onPress={handleSubmit}
+          disabled={stars === 0}
+          loading={submitting}
+        />
       </View>
 
       <MediaPreviewModal

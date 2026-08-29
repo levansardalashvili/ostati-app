@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -22,34 +22,19 @@ import { Avatar } from '../components/Avatar';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { ProfileMenuRow } from '../components/ProfileMenuRow';
-import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { EXPERIENCE_OPTIONS } from '../data/experience';
-import { getUnreadCount } from '../data/mockNotifications';
+import { authService } from '../services/authService';
+import { notificationService } from '../services/notificationService';
+import { userService } from '../services/userService';
 import { computeCompleteness, useProviderProfile } from '../state/ProviderProfileContext';
+import { isNewProvider } from '../utils/providerRank';
 import type { ProviderTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<ProviderTabParamList, 'Profile'>,
   NativeStackScreenProps<RootStackParamList>
 >;
-
-const MENU = [
-  { icon: Pencil, label: 'პროფილის რედაქტირება', bg: '#EFF6FF', color: '#2563EB', badge: 0 },
-  { icon: MapPin, label: 'სამუშაო არეალი', bg: '#ECFDF5', color: '#059669', badge: 0 },
-  { icon: ClipboardList, label: 'ჩემი სამუშაო', bg: '#FFF7ED', color: '#EA580C', badge: 0 },
-  { icon: Briefcase, label: 'შესრულებული სამუშაოები', bg: '#F5F3FF', color: '#7C3AED', badge: 312 },
-  { icon: Star, label: 'შეფასებები', bg: '#FFFBEB', color: '#D97706', badge: 127 },
-  { icon: Bell, label: 'შეტყობინებები', bg: colors.muted, color: colors.mutedForeground, badge: getUnreadCount('provider') },
-  { icon: HelpCircle, label: 'დახმარება', bg: '#ECFEFF', color: '#0891B2', badge: 0 },
-  { icon: Settings, label: 'ანგარიშის პარამეტრები', bg: colors.muted, color: colors.mutedForeground, badge: 0 },
-];
-
-const STATS = [
-  { value: '4.9★', label: '127 შეფ.' },
-  { value: '312', label: 'შესრულ. სამ.' },
-  { value: '15 წ.', label: 'გამოცდ.' },
-];
 
 // E1 — Provider-ის პროფილის ეკრანი (product-spec.md; დიზაინის რეფერენსის
 // ProviderProfile-ის მიხედვით)
@@ -61,9 +46,41 @@ export function ProviderProfileScreen({ navigation }: Props) {
   const experienceLabel = EXPERIENCE_OPTIONS.find((e) => e.id === profile.experience)?.label ?? '';
   const completeness = computeCompleteness(profile);
 
+  // რეალური rating/reviews/jobs (#71) — ადრე ჰარდქოდილი "4.9★/127 შეფ./312
+  // სამ." იყო, ანგარიშის რეალურ მდგომარეობასთან დაუკავშირებელი.
+  const uid = authService.getCurrentUser()?.uid ?? null;
+  const [stats, setStats] = useState({ rating: 0, reviews: 0, jobs: 0 });
+  useEffect(() => {
+    if (!uid) return;
+    let cancelled = false;
+    userService.getRealProviderById(uid).then((real) => {
+      if (!cancelled && real) setStats({ rating: real.rating, reviews: real.reviews, jobs: real.jobs });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [uid]);
+
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  useEffect(() => {
+    if (!uid) return;
+    return notificationService.subscribeToUnreadCount(uid, setUnreadNotifCount);
+  }, [uid]);
+
+  const MENU = [
+    { icon: Pencil, label: 'პროფილის რედაქტირება', bg: '#EFF6FF', color: '#2563EB', badge: 0 },
+    { icon: MapPin, label: 'სამუშაო არეალი', bg: '#ECFDF5', color: '#059669', badge: 0 },
+    { icon: ClipboardList, label: 'ჩემი სამუშაო', bg: '#FFF7ED', color: '#EA580C', badge: 0 },
+    { icon: Briefcase, label: 'შესრულებული სამუშაოები', bg: '#F5F3FF', color: '#7C3AED', badge: stats.jobs },
+    { icon: Star, label: 'შეფასებები', bg: '#FFFBEB', color: '#D97706', badge: stats.reviews },
+    { icon: Bell, label: 'შეტყობინებები', bg: colors.muted, color: colors.mutedForeground, badge: unreadNotifCount },
+    { icon: HelpCircle, label: 'დახმარება', bg: '#ECFEFF', color: '#0891B2', badge: 0 },
+    { icon: Settings, label: 'ანგარიშის პარამეტრები', bg: colors.muted, color: colors.mutedForeground, badge: 0 },
+  ];
+
   const handleMenuPress = (label: string) => {
     if (label === 'preview') {
-      navigation.navigate('ViewProviderProfile', { id: 'p1' });
+      if (uid) navigation.navigate('ViewProviderProfile', { id: uid });
     } else if (label === 'პროფილის რედაქტირება' || label === 'photo') {
       navigation.navigate('ProviderEditProfile');
     } else if (label === 'სამუშაო არეალი') {
@@ -84,6 +101,7 @@ export function ProviderProfileScreen({ navigation }: Props) {
 
   const confirmLogout = () => {
     setLogoutSheetOpen(false);
+    authService.signOut();
     navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Welcome' }] });
   };
 
@@ -93,7 +111,7 @@ export function ProviderProfileScreen({ navigation }: Props) {
         <Text style={styles.title}>პროფილი</Text>
         <View style={styles.profileRow}>
           <View style={styles.avatarWrap}>
-            <Avatar initials={initials} color={colors.primary} size={72} online />
+            <Avatar initials={initials} color={colors.primary} size={72} online uri={profile.photoUrl} />
             <Pressable style={styles.cameraBadge} onPress={() => handleMenuPress('photo')}>
               <Camera size={10} color={colors.primaryForeground} />
             </Pressable>
@@ -103,25 +121,38 @@ export function ProviderProfileScreen({ navigation }: Props) {
               <Text style={styles.name}>
                 {profile.firstName} {profile.lastName}
               </Text>
-              <VerifiedBadge size={15} />
             </View>
             {!!specialtyLabel && <Text style={styles.specialty}>{specialtyLabel}</Text>}
             {!!experienceLabel && <Text style={styles.experience}>{experienceLabel} გამოცდილება</Text>}
             <View style={styles.ratingRow}>
-              <Star size={12} color="#FBBF24" fill="#FBBF24" />
-              <Text style={styles.ratingValue}>4.9</Text>
-              <Text style={styles.ratingMeta}>· 127 შეფ. · 312 სამ.</Text>
+              {isNewProvider({ reviews: stats.reviews }) ? (
+                <Text style={styles.ratingMeta}>ახალი ოსტატი</Text>
+              ) : (
+                <>
+                  <Star size={12} color="#FBBF24" fill="#FBBF24" />
+                  <Text style={styles.ratingValue}>{stats.rating.toFixed(1)}</Text>
+                  <Text style={styles.ratingMeta}>
+                    · {stats.reviews} შეფ. · {stats.jobs} სამ.
+                  </Text>
+                </>
+              )}
             </View>
           </View>
         </View>
 
         <View style={styles.statsRow}>
-          {STATS.map((s) => (
-            <View key={s.label} style={styles.statBox}>
-              <Text style={styles.statValue}>{s.value}</Text>
-              <Text style={styles.statLabel}>{s.label}</Text>
-            </View>
-          ))}
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{stats.reviews === 0 ? '—' : `${stats.rating.toFixed(1)}★`}</Text>
+            <Text style={styles.statLabel}>{stats.reviews} შეფ.</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{stats.jobs}</Text>
+            <Text style={styles.statLabel}>შესრულ. სამ.</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{experienceLabel || '—'}</Text>
+            <Text style={styles.statLabel}>გამოცდ.</Text>
+          </View>
         </View>
 
         <View style={styles.availabilityRow}>

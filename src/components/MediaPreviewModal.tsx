@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Trash2, X, type LucideIcon } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
 import type { MediaItem } from './MediaUploadGrid';
@@ -11,7 +11,7 @@ type Props = {
   onDelete?: (id: number) => void;
 };
 
-// ატვირთული ფაილის (mock) დიდი preview — Modal-ის ფონზე დაჭერით ან
+// ატვირთული ფაილის დიდი preview — Modal-ის ფონზე დაჭერით ან
 // "დახურვა"-ზე იხურება; onDelete გადაცემისას ჩანს "წაშლა"-ც.
 export function MediaPreviewModal({ item, icon: Icon, onClose, onDelete }: Props) {
   if (!item) return null;
@@ -20,7 +20,11 @@ export function MediaPreviewModal({ item, icon: Icon, onClose, onDelete }: Props
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={[styles.card, { backgroundColor: item.bg }]} onPress={() => {}}>
-          <Icon size={48} color="rgba(100,116,139,0.6)" />
+          {item.uri ? (
+            <Image source={{ uri: item.uri }} style={styles.cardImage} />
+          ) : (
+            <Icon size={48} color="rgba(100,116,139,0.6)" />
+          )}
         </Pressable>
         <View style={styles.actions}>
           {onDelete && (
@@ -59,6 +63,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
   },
   actions: {
     flexDirection: 'row',

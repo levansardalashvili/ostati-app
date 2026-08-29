@@ -1,24 +1,39 @@
-export type UploadedMedia = { id: number; bg: string };
+import { supabase } from './supabaseClient';
+
+export type UserMediaKind = 'certificate' | 'portfolio' | 'rating' | 'profile' | 'chat';
 
 export interface StorageService {
-  uploadMedia(): UploadedMedia;
-  deleteMedia(mediaId: number): void;
+  // Supabase Storage-ის რეალური ატვირთვა (#61, "Storage ეტაპი A" —
+  // job post-ის ფოტოები, `job-photos` bucket). ლოკალური ფაილის URI-დან
+  // (expo-image-picker-ის შედეგი) აბრუნებს საჯარო URL-ს.
+  uploadJobPhoto(uid: string, localUri: string): Promise<string>;
+
+  // "Storage ეტაპი B" (#62) — Provider-ის სერთიფიკატები/ნამუშევრები,
+  // RatingScreen-ის დასრულების ფოტოები, პროფილის ფოტო (#65) და ჩატის
+  // სურათები (#68) — ყველა საერთო `user-media` bucket-ში, `kind`-ის
+  // მიხედვით ცალკე "საქაღალდით" (`{kind}/{uid}/...`).
+  uploadUserMedia(uid: string, localUri: string, kind: UserMediaKind): Promise<string>;
 }
 
-const PLACEHOLDER_COLORS = ['#DBEAFE', '#D1FAE5', '#FEF3C7', '#FCE7F3', '#EDE9FE'];
-let nextId = 0;
+async function uploadToBucket(bucket: string, path: string, localUri: string): Promise<string> {
+  const response = await fetch(localUri);
+  const blob = await response.blob();
+  const { error } = await supabase.storage.from(bucket).upload(path, blob, { contentType: blob.type || 'image/jpeg' });
+  if (error) throw error;
+  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}
 
-// TODO: ჩანაცვლდება Firebase Storage-ის რეალური ატვირთვის ლოგიკით
-// (expo-image-picker-ით არჩეული ფაილის ატვირთვა, საჯარო URL-ის დაბრუნება).
-// დღეს — placeholder ფერადი მართკუთხედის დაბრუნება.
-//
-// შენიშვნა: `MediaUploadGrid`-ის `nextMediaItem` helper-ი (ProviderSetup/
-// ProviderEditProfile/RatingScreen-ის სერთიფიკატები/portfolio/ფოტოები)
-// განზრახ არ არის გადაბმული ამ სერვისზე — მისი id/ფერის ლოგიკა
-// დეტერმინისტულია (index-ზე დაფუძნებული ციკლი), ამ სერვისზე გადართვა
-// ვიზუალურ ქცევას შეცვლიდა (რენდომული ფერების თანმიმდევრობა). ეს სერვისი
-// მხოლოდ მომავალი რეალური ატვირთვის კონტრაქტს აფიქსირებს.
+function extOf(localUri: string): string {
+  return localUri.split('.').pop()?.split('?')[0] || 'jpg';
+}
+
 export const storageService: StorageService = {
-  uploadMedia: () => ({ id: ++nextId, bg: PLACEHOLDER_COLORS[nextId % PLACEHOLDER_COLORS.length] }),
-  deleteMedia: () => {},
+  async uploadJobPhoto(uid, localUri) {
+    const path = `${uid}/${Date.now()}-${Math.round(Math.random() * 1e6)}.${extOf(localUri)}`;
+    return uploadToBucket('job-photos', path, localUri);
+  },
+  async uploadUserMedia(uid, localUri, kind) {
+    const path = `${kind}/${uid}/${Date.now()}-${Math.round(Math.random() * 1e6)}.${extOf(localUri)}`;
+    return uploadToBucket('user-media', path, localUri);
+  },
 };

@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -23,15 +24,17 @@ import {
   Wallet,
   X,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
-import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
-import { CATEGORIES } from '../data/categories';
-import { chatService } from '../services/chatService';
-import { useJobStatus } from '../state/JobStatusContext';
+import { authService } from '../services/authService';
+import { chatService, type ChatParticipants } from '../services/chatService';
+import { storageService } from '../services/storageService';
+import { useCustomerProfile } from '../state/CustomerProfileContext';
+import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { ChatMsg, MsgState } from '../types/chat';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -47,15 +50,66 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ChatConversation'>;
 // ეს ცვლილება ამ ეტაპზე მხოლოდ ჩატის ლოკალურ state-შია.
 export function ChatConversationScreen({ navigation, route }: Props) {
   const { chatId, name, initials, color, role } = route.params;
-  const chatEntry = chatService.getChatById(chatId);
-  const online = chatEntry?.online ?? false;
-  const { getStatus } = useJobStatus();
-  // ჩატის job-ბანერის სტატუსი ცოცხალია (JobStatusContext.tsx) — არა
-  // CHATS_LIST-ის სტატიკური mock ველი, რომ Provider-ის "სამუშაო
-  // დავასრულე" აქაც დაუყოვნებლივ აისახოს.
-  const liveJobStatus = chatEntry?.jobId ? getStatus(chatEntry.jobId) ?? chatEntry.jobStatus : chatEntry?.jobStatus;
+  // ყველა navigation call site (#71) რეალურ Supabase UUID-ს გადასცემს
+  // chatId-ად (მეორე მხარის auth.users.id) — mock chat-ის კუნძული
+  // მთლიანად წაშლილია, ეს ეკრანი აღარ საჭიროებს mock/real branching-ს.
+  const myUid = authService.getCurrentUser()?.uid ?? null;
+  const customerId = role === 'customer' ? myUid : chatId;
+  const providerId = role === 'provider' ? myUid : chatId;
 
-  const [messages, setMessages] = useState<ChatMsg[]>(() => chatService.getMessages(chatId));
+  const { profile: customerProfile } = useCustomerProfile();
+  const { profile: providerProfile } = useProviderProfile();
+  // Conversations-ის row-ის (#68) name/initials/color ველები ყოველ
+  // გაგზავნაზე "ჩემი" მხრიდან ივსება — მეორე მხარის ინფო კი უკვე route
+  // param-შია (name/initials/color, chat-ის გახსნისას გადაცემული).
+  const participants: ChatParticipants =
+    role === 'customer'
+      ? {
+          customerName: `${customerProfile.firstName} ${customerProfile.lastName}`.trim(),
+          customerInitials: `${customerProfile.firstName.charAt(0)}${customerProfile.lastName.charAt(0)}`.toUpperCase(),
+          customerColor: colors.primary,
+          providerName: name,
+          providerInitials: initials,
+          providerColor: color,
+        }
+      : {
+          customerName: name,
+          customerInitials: initials,
+          customerColor: color,
+          providerName: `${providerProfile.firstName} ${providerProfile.lastName}`.trim(),
+          providerInitials: `${providerProfile.firstName.charAt(0)}${providerProfile.lastName.charAt(0)}`.toUpperCase(),
+          providerColor: colors.primary,
+        };
+
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+
+  useEffect(() => {
+    if (!customerId || !providerId || !myUid) return;
+    let cancelled = false;
+    chatService.listRealMessages(customerId, providerId, myUid).then((real) => {
+      if (!cancelled) setMessages(real);
+    });
+    chatService.markConversationRead(customerId, providerId, role).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId, providerId, myUid, role]);
+
+  // Realtime (#59) — მეორე მხარის ახალი შეტყობინება მაშინვე ემატება, ეკრანის
+  // ხელახლა გახსნის გარეშე.
+  useEffect(() => {
+    if (!customerId || !providerId || !myUid) return;
+    return chatService.subscribeToMessages(customerId, providerId, myUid, (msg) => {
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.id === msg.id);
+        if (idx === -1) return [...prev, msg];
+        const next = [...prev];
+        next[idx] = msg;
+        return next;
+      });
+    });
+  }, [customerId, providerId, myUid]);
+
   const [msgText, setMsgText] = useState('');
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [imgPreview, setImgPreview] = useState<string | null>(null);
@@ -63,8 +117,6 @@ export function ChatConversationScreen({ navigation, route }: Props) {
   const [offerAmount, setOfferAmount] = useState('');
   const [offerComment, setOfferComment] = useState('');
   const scrollRef = useRef<ScrollView>(null);
-
-  const jobDetailScreen = role === 'provider' ? 'ProviderJobDetail' : 'CustomerJobDetail';
 
   // ჩატის ზედა ბანერზე ფასის სტატუსი ბოლო 'offer' შეტყობინებიდან
   // გამოითვლება დინამიურად (არა სტატიკური mock ველი) — "მომლოდინე"
@@ -87,18 +139,42 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     const id = `new-${Date.now()}`;
     setMessages((prev) => [...prev, { id, type: 'text', from: 'me', text, t: 'ახლა', state: 'sending' }]);
     setMsgText('');
-    setTimeout(() => {
-      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'sent' } : m)));
-    }, 800);
+    if (!customerId || !providerId || !myUid) return;
+    chatService
+      .sendRealMessage(customerId, providerId, myUid, text, participants)
+      .then(() => {
+        setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'sent' } : m)));
+      })
+      .catch(() => {
+        setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'failed' } : m)));
+      });
   };
 
-  const sendImg = (imgColor: string) => {
-    const id = `img-${Date.now()}`;
-    setMessages((prev) => [...prev, { id, type: 'image', from: 'me', imgColor, t: 'ახლა', state: 'sending' }]);
+  const pickAndSendImage = async (source: 'camera' | 'library') => {
     setAttachSheetOpen(false);
-    setTimeout(() => {
-      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'sent' } : m)));
-    }, 1000);
+    const permission =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+    const result =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
+    if (result.canceled || !result.assets[0]) return;
+    const localUri = result.assets[0].uri;
+
+    const id = `img-${Date.now()}`;
+    setMessages((prev) => [...prev, { id, type: 'image', from: 'me', imageUrl: localUri, t: 'ახლა', state: 'sending' }]);
+
+    if (!customerId || !providerId || !myUid) return;
+    try {
+      const uploadedUrl = await storageService.uploadUserMedia(myUid, localUri, 'chat');
+      const real = await chatService.sendRealImage(customerId, providerId, myUid, uploadedUrl, participants);
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...real, state: 'sent' } : m)));
+    } catch {
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'failed' } : m)));
+    }
   };
 
   const retryMsg = (id: string) => {
@@ -112,6 +188,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     const amount = parseInt(offerAmount, 10);
     if (!amount || amount <= 0) return;
     const id = `offer-${Date.now()}`;
+    const comment = offerComment.trim() || undefined;
     setMessages((prev) => [
       ...prev,
       {
@@ -121,30 +198,33 @@ export function ChatConversationScreen({ navigation, route }: Props) {
         t: 'ახლა',
         state: 'sending',
         amount,
-        comment: offerComment.trim() || undefined,
+        comment,
         offerStatus: 'pending',
       },
     ]);
     setOfferSheetOpen(false);
     setOfferAmount('');
     setOfferComment('');
-    setTimeout(() => {
-      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'sent' } : m)));
-    }, 800);
+    if (!customerId || !providerId || !myUid) return;
+    chatService
+      .sendRealOffer(customerId, providerId, myUid, amount, comment, participants)
+      .then((real) => {
+        setMessages((prev) => prev.map((m) => (m.id === id ? { ...real, state: 'sent' } : m)));
+      })
+      .catch(() => {
+        setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'failed' } : m)));
+      });
   };
 
   const respondToOffer = (id: string, offerStatus: 'accepted' | 'declined') => {
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, offerStatus } : m)));
-    // TODO: დათანხმებული ფასის შენახვა job-ის ჩანაწერში (Firestore) — job status/price ველი ჯერ არ არსებობს.
-  };
-
-  const handleOpenJobDetail = () => {
-    if (!chatEntry?.jobId) return;
-    if (jobDetailScreen === 'ProviderJobDetail') {
-      navigation.navigate('ProviderJobDetail', { id: chatEntry.jobId });
-    } else {
-      navigation.navigate('CustomerJobDetail', { jobId: chatEntry.jobId });
-    }
+    chatService.respondToRealOffer(id, offerStatus).catch(() => {
+      // ლოკალურ state-ში პასუხი უკვე ასახულია — Supabase-ის ჩავარდნისას
+      // UI-ს არ ვბლოკავთ, დანარჩენი optimistic-update-ების იგივე პრინციპით.
+    });
+    // შენიშვნა: დათანხმებული ფასის job-ის ჩანაწერში (job_posts) შენახვა
+    // ცალკე, დარჩენილი ეტაპია — job_posts-ს ჯერ არ აქვს დათანხმებული
+    // ფასის ველი.
   };
 
   return (
@@ -153,46 +233,25 @@ export function ChatConversationScreen({ navigation, route }: Props) {
         <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
           <ArrowLeft size={18} color={colors.foreground} />
         </Pressable>
-        <Avatar initials={initials} color={color} size={38} online={online} />
+        <Avatar initials={initials} color={color} size={38} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.headerName} numberOfLines={1}>
             {name}
           </Text>
-          {online ? (
-            <Text style={styles.headerOnline}>ონლაინ</Text>
-          ) : (
-            <Text style={styles.headerOffline}>ბოლოს ნახული: გუშინ</Text>
-          )}
         </View>
         <Pressable style={styles.backButton}>
           <MoreVertical size={16} color={colors.foreground} />
         </Pressable>
       </View>
 
-      {chatEntry?.jobTitle && (
+      {offerStatusText && (
         <View style={styles.jobCard}>
-          <View style={[styles.jobIcon, { backgroundColor: CATEGORIES.find((c) => c.id === chatEntry.jobCategory)?.bg ?? colors.secondary }]}>
-            <Text style={{ fontSize: 18 }}>{CATEGORIES.find((c) => c.id === chatEntry.jobCategory)?.icon ?? '🔧'}</Text>
+          <View style={styles.offerBannerIcon}>
+            <Wallet size={16} color={colors.primary} />
           </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.jobTitle} numberOfLines={1}>
-              {chatEntry.jobTitle}
-            </Text>
-            <Text style={styles.jobMeta} numberOfLines={1}>
-              {chatEntry.jobDistrict} · {chatEntry.jobDate}
-            </Text>
-            {offerStatusText && (
-              <Text style={styles.jobOfferText} numberOfLines={1}>
-                {offerStatusText}
-              </Text>
-            )}
-          </View>
-          <View style={styles.jobActions}>
-            {liveJobStatus && <StatusPill status={liveJobStatus} />}
-            <Pressable onPress={handleOpenJobDetail}>
-              <Text style={styles.jobDetailLink}>დეტ. ნახვა</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.jobOfferText} numberOfLines={1}>
+            {offerStatusText}
+          </Text>
         </View>
       )}
 
@@ -278,12 +337,15 @@ export function ChatConversationScreen({ navigation, route }: Props) {
               return (
                 <View key={m.id} style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther, showSpacing && styles.msgSpacing]}>
                   <View>
-                    <Pressable
-                      style={[styles.imageMsg, { backgroundColor: m.imgColor ?? '#DBEAFE' }]}
-                      onPress={() => setImgPreview(m.imgColor ?? '#DBEAFE')}
-                    >
-                      <ImageIcon size={28} color="rgba(100,116,139,0.6)" />
-                    </Pressable>
+                    {m.imageUrl ? (
+                      <Pressable onPress={() => setImgPreview(m.imageUrl ?? null)}>
+                        <Image source={{ uri: m.imageUrl }} style={styles.imageMsg} />
+                      </Pressable>
+                    ) : (
+                      <View style={[styles.imageMsg, { backgroundColor: m.imgColor ?? '#DBEAFE' }]}>
+                        <ImageIcon size={28} color="rgba(100,116,139,0.6)" />
+                      </View>
+                    )}
                     <View style={[styles.msgFooter, isMe ? styles.msgFooterMe : styles.msgFooterOther]}>
                       <Text style={styles.msgTime}>{m.t}</Text>
                       <MessageStateIcon state={m.state} isMine={isMe} />
@@ -344,13 +406,13 @@ export function ChatConversationScreen({ navigation, route }: Props) {
       </KeyboardAvoidingView>
 
       <BottomSheet visible={attachSheetOpen} onClose={() => setAttachSheetOpen(false)}>
-        <Pressable style={styles.attachOption} onPress={() => sendImg('#D1FAE5')}>
+        <Pressable style={styles.attachOption} onPress={() => pickAndSendImage('camera')}>
           <View style={styles.attachOptionIcon}>
             <Camera size={20} color={colors.foreground} />
           </View>
           <Text style={styles.attachOptionText}>ფოტოს გადაღება</Text>
         </Pressable>
-        <Pressable style={styles.attachOption} onPress={() => sendImg('#FEF3C7')}>
+        <Pressable style={styles.attachOption} onPress={() => pickAndSendImage('library')}>
           <View style={styles.attachOptionIcon}>
             <ImageIcon size={20} color={colors.foreground} />
           </View>
@@ -396,7 +458,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
 
       {imgPreview && (
         <Pressable style={styles.previewOverlay} onPress={() => setImgPreview(null)}>
-          <View style={[styles.previewImage, { backgroundColor: imgPreview }]} />
+          <Image source={{ uri: imgPreview }} style={styles.previewImage} resizeMode="cover" />
           <Pressable style={styles.previewClose} onPress={() => setImgPreview(null)}>
             <X size={18} color="#FFFFFF" />
           </Pressable>
@@ -453,15 +515,6 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     fontWeight: '700',
   },
-  headerOnline: {
-    ...typography.small,
-    color: colors.success,
-    fontWeight: '700',
-  },
-  headerOffline: {
-    ...typography.small,
-    color: colors.mutedForeground,
-  },
   jobCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -472,36 +525,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
   },
-  jobIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
+  offerBannerIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.full,
+    backgroundColor: colors.secondary,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  jobTitle: {
-    ...typography.small,
-    color: colors.foreground,
-    fontWeight: '700',
-  },
-  jobMeta: {
-    ...typography.small,
-    color: colors.mutedForeground,
   },
   jobOfferText: {
     ...typography.small,
     color: colors.primary,
     fontWeight: '700',
-    marginTop: 1,
-  },
-  jobActions: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  jobDetailLink: {
-    ...typography.small,
-    color: colors.primary,
-    fontWeight: '700',
+    flexShrink: 1,
   },
   messages: {
     flex: 1,

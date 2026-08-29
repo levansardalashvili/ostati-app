@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -7,6 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   AlertCircle,
@@ -23,16 +25,22 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
+import { getCategoryIcon } from '../components/CategoryIcon';
 import { DatePickerField } from '../components/DatePickerField';
+import { formatPickedDate } from '../components/CalendarPicker';
+import { InlineBanner } from '../components/InlineBanner';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
+import { authService } from '../services/authService';
+import { jobService } from '../services/jobService';
+import { storageService } from '../services/storageService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
+import type { CustomerJob } from '../types/job';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PostJob'>;
 
 const TIMES = ['9:00–12:00', '12:00–15:00', '15:00–18:00', '18:00–21:00', 'ნებისმიერ დროს'];
-const PHOTO_BG = ['#DBEAFE', '#D1FAE5', '#FEF3C7'];
 // პროდუქტული წესი (product-spec.md) — job post-ში მაქს. 3 ფოტო,
 // არა 5, როგორც დიზაინის რეფერენსშია
 const MAX_PHOTOS = 3;
@@ -46,7 +54,11 @@ export function PostJobScreen({ navigation }: Props) {
   const [category, setCategory] = useState('');
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const [description, setDescription] = useState('');
-  const [photos, setPhotos] = useState<number[]>([]);
+  // ლოკალური ფაილის URI-ები (expo-image-picker-იდან) — რეალური thumbnail-ები,
+  // ფერადი mock კვადრატების ნაცვლად. Supabase Storage-ში იტვირთება
+  // "გამოქვეყნება"-ზე დაჭერისას (#61).
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [photoError, setPhotoError] = useState('');
   // მისამართი წინასწარ ივსება პროფილის default address-ით, მაგრამ აქ
   // ცვლილება არასდროს არ სცვლის თავად default address-ს (მხოლოდ ამ
   // კონკრეტული job post-ის მისამართია) — მომხმარებლის მოთხოვნით.
@@ -57,6 +69,8 @@ export function PostJobScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [published, setPublished] = useState(false);
   const [submitTouched, setSubmitTouched] = useState(false);
+  const [publishError, setPublishError] = useState(false);
+  const [createdJob, setCreatedJob] = useState<CustomerJob | null>(null);
 
   const categoryError = submitTouched && !category ? 'აირჩიე კატეგორია' : '';
   const descriptionError =
@@ -67,20 +81,60 @@ export function PostJobScreen({ navigation }: Props) {
         : '';
   const canSubmit = !!category && description.trim().length >= DESCRIPTION_MIN;
   const selectedCategory = CATEGORIES.find((c) => c.id === category) ?? null;
+  const SelectedCategoryIcon = getCategoryIcon(selectedCategory?.id ?? '');
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     setSubmitTouched(true);
     if (!canSubmit || loading) return;
+    setPublishError(false);
     setLoading(true);
-    // TODO: jobPosts collection-ში ჩაწერა Firestore-ში
-    setTimeout(() => {
-      setLoading(false);
+    const uid = authService.getCurrentUser()?.uid;
+    try {
+      if (!uid) throw new Error('არ ხარ ავტორიზებული.');
+      const photoUrls = await Promise.all(photos.map((uri) => storageService.uploadJobPhoto(uid, uri)));
+      const job = await jobService.createCustomerJob(uid, {
+        title: selectedCategory?.label ?? 'ახალი მოთხოვნა',
+        category,
+        description: description.trim(),
+        address: address.trim(),
+        date: selectedDate ? `${formatPickedDate(selectedDate)}${selectedTime ? ` ${selectedTime}` : ''}` : '',
+        customerName: `${profile.firstName} ${profile.lastName}`.trim(),
+        photos: photoUrls,
+      });
+      setCreatedJob(job);
       setPublished(true);
-    }, 1800);
+    } catch {
+      setPublishError(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addPhoto = () => setPhotos((ps) => [...ps, Date.now() + ps.length]);
-  const removePhoto = (id: number) => setPhotos((ps) => ps.filter((p) => p !== id));
+  const pickFromCamera = async () => {
+    setPhotoError('');
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      setPhotoError('კამერაზე წვდომა არ არის დაშვებული.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.6 });
+    if (!result.canceled && result.assets[0]) {
+      setPhotos((ps) => [...ps, result.assets[0].uri]);
+    }
+  };
+  const pickFromGallery = async () => {
+    setPhotoError('');
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      setPhotoError('გალერეაზე წვდომა არ არის დაშვებული.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
+    if (!result.canceled && result.assets[0]) {
+      setPhotos((ps) => [...ps, result.assets[0].uri]);
+    }
+  };
+  const removePhoto = (uri: string) => setPhotos((ps) => ps.filter((p) => p !== uri));
 
   // თარიღის არჩევის შემდეგ მომხმარებელი პირდაპირ დროის არჩევაზე გადადის
   const handleDateSelect = (date: Date) => {
@@ -100,10 +154,10 @@ export function PostJobScreen({ navigation }: Props) {
           <View style={styles.successActions}>
             <Button
               label="მოთხოვნის ნახვა"
-              onPress={() =>
-                // TODO: რეალურად შექმნილი job-ის id გადაეცემა, როცა Firestore-თან დაკავშირება მოხდება
-                navigation.navigate('CustomerJobDetail', { jobId: 'j2' })
-              }
+              onPress={() => {
+                if (!createdJob) return;
+                navigation.navigate('CustomerJobDetail', { jobId: createdJob.id, job: createdJob });
+              }}
             />
             <Button
               label="მთავარზე დაბრუნება"
@@ -127,7 +181,11 @@ export function PostJobScreen({ navigation }: Props) {
             style={[styles.categoryButton, categoryError && styles.inputError]}
             onPress={() => setCategorySheetOpen(true)}
           >
-            <Text style={styles.categoryButtonIcon}>{selectedCategory?.icon ?? '🛠️'}</Text>
+            <SelectedCategoryIcon
+              size={18}
+              color={selectedCategory ? selectedCategory.dot : colors.mutedForeground}
+              strokeWidth={2}
+            />
             <Text style={[styles.categoryButtonText, !selectedCategory && styles.categoryButtonPlaceholder]} numberOfLines={1}>
               {selectedCategory?.label ?? 'აირჩიე კატეგორია'}
             </Text>
@@ -159,27 +217,28 @@ export function PostJobScreen({ navigation }: Props) {
           <Text style={styles.plainLabel}>ფოტოების დამატება</Text>
           <Text style={styles.hint}>ფოტოები ოსტატს პრობლემის უკეთ შეფასებაში დაეხმარება.</Text>
           <View style={styles.photoRow}>
-            {photos.map((id, i) => (
-              <View key={id} style={[styles.photoThumb, { backgroundColor: PHOTO_BG[i % PHOTO_BG.length] }]}>
-                <Camera size={20} color="rgba(100,116,139,0.5)" />
-                <Pressable style={styles.photoRemove} onPress={() => removePhoto(id)}>
+            {photos.map((uri) => (
+              <View key={uri} style={styles.photoThumb}>
+                <Image source={{ uri }} style={styles.photoThumbImage} />
+                <Pressable style={styles.photoRemove} onPress={() => removePhoto(uri)}>
                   <X size={10} color="#FFFFFF" strokeWidth={2.5} />
                 </Pressable>
               </View>
             ))}
             {photos.length < MAX_PHOTOS && (
               <>
-                <Pressable style={styles.photoAddButton} onPress={addPhoto}>
+                <Pressable style={styles.photoAddButton} onPress={pickFromCamera}>
                   <Camera size={18} color={colors.mutedForeground} />
                   <Text style={styles.photoAddText}>გადაღება</Text>
                 </Pressable>
-                <Pressable style={styles.photoAddButton} onPress={addPhoto}>
+                <Pressable style={styles.photoAddButton} onPress={pickFromGallery}>
                   <ImageIcon size={18} color={colors.mutedForeground} />
                   <Text style={styles.photoAddText}>გალერეა</Text>
                 </Pressable>
               </>
             )}
           </View>
+          {!!photoError && <FieldError message={photoError} />}
         </View>
 
         <View style={styles.field}>
@@ -230,6 +289,9 @@ export function PostJobScreen({ navigation }: Props) {
       </ScrollView>
 
       <View style={styles.footer}>
+        {publishError && (
+          <InlineBanner type="error" msg="მოთხოვნის გამოქვეყნება ვერ მოხერხდა" action="თავიდან ცდა" onAction={handlePublish} />
+        )}
         <Button
           label={canSubmit ? 'გამოქვეყნება' : 'შეავსე სავალდებულო ველები'}
           loadingLabel="გამოქვეყნება..."
@@ -244,6 +306,7 @@ export function PostJobScreen({ navigation }: Props) {
         <ScrollView style={styles.categorySheetList} showsVerticalScrollIndicator={false}>
           {CATEGORIES.map((c) => {
             const on = category === c.id;
+            const Icon = getCategoryIcon(c.id);
             return (
               <Pressable
                 key={c.id}
@@ -253,7 +316,9 @@ export function PostJobScreen({ navigation }: Props) {
                 }}
                 style={styles.categorySheetRow}
               >
-                <Text style={styles.categoryIcon}>{c.icon}</Text>
+                <View style={styles.categoryIconWrap}>
+                  <Icon size={18} color={c.dot} strokeWidth={2} />
+                </View>
                 <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{c.label}</Text>
                 {on && <Check size={16} color={colors.primary} strokeWidth={3} />}
               </Pressable>
@@ -381,9 +446,6 @@ const styles = StyleSheet.create({
   categoryButtonDisabled: {
     opacity: 0.5,
   },
-  categoryButtonIcon: {
-    fontSize: 18,
-  },
   categoryButtonText: {
     ...typography.caption,
     color: colors.foreground,
@@ -410,10 +472,10 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     marginBottom: spacing.sm + 2,
   },
-  categoryIcon: {
-    fontSize: 18,
+  categoryIconWrap: {
     width: 24,
-    textAlign: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryLabel: {
     ...typography.caption,
@@ -448,6 +510,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  photoThumbImage: {
+    width: '100%',
+    height: '100%',
   },
   photoRemove: {
     position: 'absolute',
@@ -505,6 +572,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
+    gap: spacing.sm + 2,
   },
   successState: {
     flex: 1,

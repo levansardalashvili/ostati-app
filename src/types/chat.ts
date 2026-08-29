@@ -13,6 +13,9 @@ export type ChatMsg = {
   from: 'me' | 'other';
   text?: string;
   imgColor?: string;
+  // რეალური Supabase Storage-ის URL (#68) — თუ არსებობს, რეალურ სურათს
+  // ასახავს, `imgColor`-ის (mock placeholder) ნაცვლად.
+  imageUrl?: string;
   t?: string;
   state?: MsgState;
   label?: string;

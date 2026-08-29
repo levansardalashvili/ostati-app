@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
+import { getCategoryIcon } from '../components/CategoryIcon';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
 import type { RootStackParamList } from '../navigation/types';
@@ -18,20 +19,23 @@ export function CustomerCategoriesScreen({ navigation }: Props) {
       <BackHeader title="ყველა სერვისი" onBack={() => navigation.goBack()} />
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         <View style={styles.grid}>
-          {CATEGORIES.map((c) => (
-            <Pressable
-              key={c.id}
-              style={styles.card}
-              onPress={() => navigation.navigate('CustomerCategory', { id: c.id })}
-            >
-              <View style={[styles.iconWrap, { backgroundColor: c.bg }]}>
-                <Text style={styles.icon}>{c.icon}</Text>
-              </View>
-              <Text style={styles.label} numberOfLines={2}>
-                {c.label}
-              </Text>
-            </Pressable>
-          ))}
+          {CATEGORIES.map((c) => {
+            const Icon = getCategoryIcon(c.id);
+            return (
+              <Pressable
+                key={c.id}
+                style={styles.card}
+                onPress={() => navigation.navigate('CustomerCategory', { id: c.id })}
+              >
+                <View style={[styles.iconWrap, { backgroundColor: c.bg }]}>
+                  <Icon size={22} color={c.dot} strokeWidth={2} />
+                </View>
+                <Text style={styles.label} numberOfLines={2}>
+                  {c.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -71,9 +75,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  icon: {
-    fontSize: 22,
   },
   label: {
     ...typography.small,

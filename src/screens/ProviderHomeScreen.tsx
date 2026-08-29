@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Briefcase, ChevronRight, Clock, MapPin, User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import type { CompositeScreenProps } from '@react-navigation/native';
+import { type CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { CategoryIcon } from '../components/CategoryIcon';
@@ -13,9 +13,13 @@ import { StatusPill } from '../components/StatusPill';
 import { Switch } from '../components/Switch';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
-import { getUnreadCount } from '../data/mockNotifications';
-import { CURRENT_PROVIDER_ID, jobService } from '../services/jobService';
+import { authService } from '../services/authService';
+import { jobService } from '../services/jobService';
+import { notificationService } from '../services/notificationService';
+import { quoteService } from '../services/quoteService';
+import { userService } from '../services/userService';
 import { useJobStatus } from '../state/JobStatusContext';
+import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { FeedJob } from '../types/job';
 import type { ProviderTabParamList, RootStackParamList } from '../navigation/types';
 
@@ -24,13 +28,6 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-const MOCK_UNREAD_COUNT = getUnreadCount('provider');
-// TODO: რეალური სტატისტიკა Firestore-დან — ჯერჯერობით mock
-const MOCK_STATS = [
-  { value: '14', label: 'სამ.' },
-  { value: '2,840₾', label: 'შემოს.' },
-  { value: '4.9★', label: 'შეფ.' },
-];
 
 // Home-ზე მხოლოდ ბოლო 5 შესაბამისი მოთხოვნაა ჩანს — დანარჩენის სანახავად
 // "ყველას ნახვა" ხსნის სრულ Feed-ს (ProviderJobFeedScreen).
@@ -44,31 +41,87 @@ export function ProviderHomeScreen({ navigation }: Props) {
   const [available, setAvailable] = useState(true);
   const [interests, setInterests] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [filtered, setFiltered] = useState<FeedJob[]>([]);
+  const [assignedJobs, setAssignedJobs] = useState<FeedJob[]>([]);
+  const { profile: providerProfile } = useProviderProfile();
 
-  useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(t);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setIsLoading(true);
+      const uid = authService.getCurrentUser()?.uid;
+      Promise.all([
+        jobService.getOpenProviderFeedPosts(),
+        uid ? quoteService.listMyResponseJobIds(uid) : Promise.resolve(new Set<string>()),
+        uid ? jobService.listMyAssignedJobs(uid) : Promise.resolve([]),
+      ])
+        .then(([jobs, myResponses, assigned]) => {
+          if (cancelled) return;
+          setFiltered(jobs);
+          setInterests(myResponses);
+          setAssignedJobs(assigned);
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   // "მიმდინარე სამუშაო" — job, რომელზეც Customer-მა სწორედ ეს Provider აირჩია.
-  // ასეთი job Feed-ში აღარ ჩანს (იხ. getOpenProviderFeed). სრულად
-  // "completed"-ზე გადასვლის შემდეგ (ორმხრივი დასრულების flow,
-  // JobStatusContext.tsx) ეს ბარათი Home-ზეც აღარ ჩანს — აღარ არის
-  // "მიმდინარე".
+  // რეალურად job_posts.provider_id=me-ზეა აგებული (#69) — mock
+  // PROVIDER_FEED/CURRENT_PROVIDER_ID მექანიზმი (#30/#47) აღარ გამოიყენება.
+  // `completed`/`cancelled` სტატუსზე გადასვლის შემდეგ ეს ბარათი Home-ზეც
+  // აღარ ჩანს — აღარ არის "მიმდინარე".
   const { getStatus } = useJobStatus();
-  const currentJobCandidate = jobService.listProviderFeed().find((j) => j.assignedProviderId === CURRENT_PROVIDER_ID) ?? null;
-  const currentJobStatus = currentJobCandidate?.customerJobId ? getStatus(currentJobCandidate.customerJobId) : undefined;
+  const currentJobCandidate =
+    assignedJobs.find((j) => {
+      const liveStatus = j.customerJobId ? (getStatus(j.customerJobId) ?? j.status) : j.status;
+      return liveStatus !== 'completed' && liveStatus !== 'cancelled';
+    }) ?? null;
+  const currentJobStatus = currentJobCandidate?.customerJobId
+    ? (getStatus(currentJobCandidate.customerJobId) ?? currentJobCandidate.status)
+    : currentJobCandidate?.status;
   const currentJob = currentJobStatus === 'completed' ? null : currentJobCandidate;
   const currentJobCategory = currentJob ? CATEGORIES.find((c) => c.id === currentJob.category) : null;
 
-  const filtered = useMemo(() => jobService.getOpenProviderFeed(), []);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  useEffect(() => {
+    const uid = authService.getCurrentUser()?.uid;
+    if (!uid) return;
+    return notificationService.subscribeToUnreadCount(uid, setUnreadNotifCount);
+  }, []);
+
+  // "ამ თვის სტატისტიკა" ბარათის რეალური მონაცემები (#71) — ადრე ჰარდქოდილი
+  // "14 სამ. / 2,840₾ შემოს. / 4.9★ შეფ." იყო. შემოსავლის სტატისტიკა
+  // ამოღებულია მთლიანად — აპში ფასის აგრეგაცია საერთოდ არ არსებობს (#35),
+  // ამიტომ ნამდვილი "შემოს." რიცხვი ფიზიკურად ვერ გამოითვლება.
+  const [stats, setStats] = useState({ jobs: 0, rating: 0, reviews: 0 });
+  useEffect(() => {
+    const uid = authService.getCurrentUser()?.uid;
+    if (!uid) return;
+    let cancelled = false;
+    userService.getRealProviderById(uid).then((real) => {
+      if (!cancelled && real) setStats({ jobs: real.jobs, rating: real.rating, reviews: real.reviews });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const homeStats = [
+    { key: 'jobs', value: String(stats.jobs), label: 'სამ.' },
+    { key: 'rating', value: stats.reviews === 0 ? '—' : `${stats.rating.toFixed(1)}★`, label: 'შეფ.' },
+  ];
+
   const homeFeed = filtered.slice(0, HOME_FEED_LIMIT);
 
   const handleNotifications = () => {
     navigation.navigate('Notifications', { role: 'provider' });
   };
-  const handleJobDetail = (id: string) => {
-    navigation.navigate('ProviderJobDetail', { id });
+  const handleJobDetail = (job: FeedJob) => {
+    navigation.navigate('ProviderJobDetail', { id: job.id, job });
   };
   const handleOpenCurrentJob = () => {
     if (!currentJob) return;
@@ -78,20 +131,38 @@ export function ProviderHomeScreen({ navigation }: Props) {
     navigation.navigate('ProviderJobFeed');
   };
   const handleOpenChat = (job: FeedJob) => {
+    if (!job.customerId) return;
     navigation.navigate('ChatConversation', {
-      chatId: 'c1',
+      chatId: job.customerId,
       name: job.customer,
       initials: job.customer[0],
       color: '#64748B',
       role: 'provider',
     });
   };
-  const markInterested = (id: string) => {
+  const markInterested = (job: FeedJob) => {
     setInterests((prev) => {
       const next = new Set(prev);
-      next.add(id);
+      next.add(job.id);
       return next;
     });
+    const uid = authService.getCurrentUser()?.uid;
+    if (!uid) return;
+    quoteService
+      .expressInterest(
+        job.id,
+        {
+          id: uid,
+          name: `${providerProfile.firstName} ${providerProfile.lastName}`.trim(),
+          initials: `${providerProfile.firstName.charAt(0)}${providerProfile.lastName.charAt(0)}`,
+          color: colors.primary,
+        },
+        undefined,
+        job.customerId,
+      )
+      .catch(() => {
+        // ლოკალურ state-ში "დაინტერესებული ხარ" უკვე ასახულია — optimistic-update.
+      });
   };
 
   return (
@@ -107,7 +178,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
             <Avatar initials="გბ" color={colors.primary} size={38} />
             <Pressable style={styles.bellButton} onPress={handleNotifications}>
               <Bell size={19} color={colors.foreground} strokeWidth={1.8} />
-              {MOCK_UNREAD_COUNT > 0 && <View style={styles.bellDot} />}
+              {unreadNotifCount > 0 && <View style={styles.bellDot} />}
             </Pressable>
           </View>
         </View>
@@ -138,16 +209,16 @@ export function ProviderHomeScreen({ navigation }: Props) {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Text style={styles.statsLabel}>ამ თვის სტატისტიკა</Text>
+            <Text style={styles.statsLabel}>სტატისტიკა</Text>
             <View style={styles.statsRow}>
-              {MOCK_STATS.map((s) =>
-                s.label === 'სამ.' ? (
-                  <Pressable key={s.label} style={styles.statBox} onPress={() => navigation.navigate('MyJobsTab')}>
+              {homeStats.map((s) =>
+                s.key === 'jobs' ? (
+                  <Pressable key={s.key} style={styles.statBox} onPress={() => navigation.navigate('MyJobsTab')}>
                     <Text style={styles.statValue}>{s.value}</Text>
                     <Text style={styles.statLabel}>{s.label}</Text>
                   </Pressable>
                 ) : (
-                  <View key={s.label} style={styles.statBox}>
+                  <View key={s.key} style={styles.statBox}>
                     <Text style={styles.statValue}>{s.value}</Text>
                     <Text style={styles.statLabel}>{s.label}</Text>
                   </View>
@@ -216,8 +287,8 @@ export function ProviderHomeScreen({ navigation }: Props) {
                   key={job.id}
                   job={job}
                   sent={interests.has(job.id)}
-                  onDetail={() => handleJobDetail(job.id)}
-                  onInterested={() => markInterested(job.id)}
+                  onDetail={() => handleJobDetail(job)}
+                  onInterested={() => markInterested(job)}
                   onChat={() => handleOpenChat(job)}
                 />
               ))}

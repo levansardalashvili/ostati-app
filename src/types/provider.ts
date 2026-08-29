@@ -23,6 +23,9 @@ export type Provider = {
   skills: string[];
   certificates: MediaItem[];
   portfolio: MediaItem[];
+  // რეალური პროფილის ფოტოს URL (#65) — Supabase Storage-ში ატვირთული,
+  // `undefined` როცა ფოტო არ აქვს ატვირთული (Avatar-ი ინიციალებზე vardebა).
+  photoUrl?: string;
   // ამ ოსტატის კვ.მ-ის ფასი (თუ მისი სპეციალობა კვადრატულობით ითვლება —
   // src/data/specialties.ts-ის pricePerSqm). Customer-ის job detail-ზე
   // "დაინტერესებული ოსტატის" ბარათზე ჩნდება, თუ ცალკე შეთავაზებული ფასი არ არის.
@@ -42,7 +45,11 @@ export type ProviderProfile = {
   areas: string[];
   experience: string | null;
   about: string;
-  hasPhoto: boolean;
+  // რეალური პროფილის ფოტოს URL (#65) — Supabase Storage-ში ატვირთული.
+  // ადრე იყო `hasPhoto: boolean` (ლოკალური ტოგლი, ფოტოს გარეშე) — #65-ში
+  // ჩანაცვლდა, რადგან რეალური ატვირთვისთვის ლოკალური boolean აზრს
+  // კარგავს (URL-ის არსებობა თავად უკვე გვეუბნება "ფოტო აქვს თუ არა").
+  photoUrl?: string;
   certificates: MediaItem[];
   portfolio: MediaItem[];
   sqmPrices: Record<string, string>;

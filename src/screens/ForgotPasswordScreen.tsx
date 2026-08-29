@@ -6,7 +6,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
-import { authService } from '../services/authService';
+import { authService, getAuthErrorMessage } from '../services/authService';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ForgotPassword'>;
@@ -19,6 +19,7 @@ export function ForgotPasswordScreen({ navigation }: Props) {
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sendError, setSendError] = useState('');
 
   const emailError = touched
     ? !email
@@ -28,15 +29,26 @@ export function ForgotPasswordScreen({ navigation }: Props) {
         : ''
     : '';
 
-  const handleSend = () => {
+  const handleSend = async () => {
     setTouched(true);
+    setSendError('');
     if (!email || !isEmail(email)) return;
     setLoading(true);
-    authService.sendPasswordReset(email.trim());
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await authService.sendPasswordReset(email.trim());
       setSent(true);
-    }, 1200);
+    } catch (error) {
+      const code = (error as { code?: string } | null)?.code;
+      // "მომხმარებელი ვერ მოიძებნა" შემთხვევასაც წარმატებულ state-ს ვაჩვენებთ —
+      // უსაფრთხოების პრინციპი (არ ვამხელთ, ანგარიში არსებობს თუ არა).
+      if (code === 'auth/user-not-found') {
+        setSent(true);
+      } else {
+        setSendError(getAuthErrorMessage(error));
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -72,6 +84,12 @@ export function ForgotPasswordScreen({ navigation }: Props) {
             <Text style={styles.subtitle}>
               შეიყვანე შენი ელ. ფოსტა და გამოგიგზავნით პაროლის აღდგენის ინსტრუქციას.
             </Text>
+
+            {sendError ? (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorBannerText}>{sendError}</Text>
+              </View>
+            ) : null}
 
             <View style={styles.field}>
               <TextField
@@ -141,6 +159,16 @@ const styles = StyleSheet.create({
   },
   field: {
     marginBottom: spacing.lg,
+  },
+  errorBanner: {
+    backgroundColor: colors.dangerBackground,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  errorBannerText: {
+    ...typography.caption,
+    color: colors.destructive,
   },
   successState: {
     alignItems: 'center',

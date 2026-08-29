@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AlertTriangle, Award, CheckCircle, Clock, MapPin, MessageCircle, MoreVertical, Star, ThumbsUp } from 'lucide-react-native';
@@ -8,11 +8,34 @@ import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { colors, radius, spacing, typography } from '../theme';
+import { Skeleton } from '../components/Skeleton';
+import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
+import { notificationService } from '../services/notificationService';
+import { quoteService } from '../services/quoteService';
+import { reviewService } from '../services/reviewService';
+import { isUuid } from '../utils/isUuid';
 import { useJobStatus } from '../state/JobStatusContext';
+import { useProviderProfile } from '../state/ProviderProfileContext';
+import type { FeedJob } from '../types/job';
+import type { RatingData } from '../types/review';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderJobDetail'>;
+
+const EMPTY_JOB: FeedJob = {
+  id: '',
+  category: '',
+  title: '',
+  customer: '',
+  location: '',
+  date: '',
+  ago: '',
+  interested: 0,
+  urgent: false,
+  hasPhoto: false,
+  desc: '',
+};
 
 // B2 — Job-ის დეტალი + ინტერესის დადასტურება (Provider მხრიდან)
 // (product-spec.md; დიზაინის რეფერენსის ProviderJobDetail-ის browse/selected
@@ -20,13 +43,46 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProviderJobDetail'>;
 // machine მუშაობს (JobStatusContext.tsx) — Provider-ს პირდაპირ დასრულება არ
 // შეუძლია, მხოლოდ "სამუშაო დავასრულე", რაც Customer-ის დადასტურებას ელოდება.
 export function ProviderJobDetailScreen({ navigation, route }: Props) {
-  const { id, mode = 'browse' } = route.params;
-  const providerFeed = jobService.listProviderFeed();
-  const job = providerFeed.find((j) => j.id === id) ?? providerFeed[0];
+  const { id, mode = 'browse', job: passedJob } = route.params;
+  const [job, setJob] = useState<FeedJob>(() => passedJob ?? EMPTY_JOB);
+  const [jobLoading, setJobLoading] = useState(!passedJob);
+  useEffect(() => {
+    if (passedJob) {
+      setJob(passedJob);
+      setJobLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setJobLoading(true);
+    jobService.getFeedJobPostById(id).then((real) => {
+      if (cancelled) return;
+      if (real) setJob(real);
+      setJobLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [passedJob, id]);
+
   const [expressed, setExpressed] = useState(false);
   const [offerSheetOpen, setOfferSheetOpen] = useState(false);
   const [offerPrice, setOfferPrice] = useState('');
   const { getStatus, setStatus } = useJobStatus();
+  const { profile: providerProfile } = useProviderProfile();
+
+  // უკვე გაგზავნილი ინტერესის state-ის აღდგენა, თუ Provider ამ job-ის
+  // დეტალზე ხელახლა შემოვიდა (Supabase-ის job_responses, #56).
+  useEffect(() => {
+    const uid = authService.getCurrentUser()?.uid;
+    if (!uid || !job.id) return;
+    let cancelled = false;
+    quoteService.listMyResponseJobIds(uid).then((ids) => {
+      if (!cancelled && ids.has(job.id)) setExpressed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [job.id]);
 
   // "selected"/"completed" mode-ის რეალური ვარიანტი გაზიარებული სტატუსიდან
   // გამოითვლება, თუ job-ს Customer-ის მხარესთან ბმული აქვს (customerJobId) —
@@ -52,16 +108,38 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   const markWorkDone = () => {
     if (!job.customerJobId) return;
     setStatus(job.customerJobId, 'awaiting_customer_confirmation');
+    if (job.customerId && isUuid(job.customerId)) {
+      notificationService
+        .create(job.customerId, {
+          title: 'სამუშაო დასრულდა?',
+          body: job.title,
+          iconEmoji: '⏰',
+          iconBg: '#D97706',
+          target: { screen: 'CustomerJobDetail', jobId: job.customerJobId },
+        })
+        .catch(() => {});
+    }
   };
 
-  const receivedRating =
-    variant === 'completed'
-      ? { stars: 5, review: 'ძალიან კარგი სამუშაო, მადლობა!', chips: ['დროულად მოვიდა', 'ხარისხიანი სამუშაო'] }
-      : null;
+  const [receivedRating, setReceivedRating] = useState<RatingData | null>(null);
+  useEffect(() => {
+    if (variant !== 'completed' || !job.id) {
+      setReceivedRating(null);
+      return;
+    }
+    let cancelled = false;
+    reviewService.getReviewByJobId(job.id).then((real) => {
+      if (!cancelled) setReceivedRating(real);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [variant, job.id]);
 
   const handleChat = () => {
+    if (!job.customerId) return;
     navigation.navigate('ChatConversation', {
-      chatId: 'c1',
+      chatId: job.customerId,
       name: job.customer,
       initials: job.customer[0],
       color: '#64748B',
@@ -74,8 +152,37 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   const confirmInterest = () => {
     setExpressed(true);
     setOfferSheetOpen(false);
-    // TODO: jobResponses-ში ჩაწერა Firestore-ში (providerId, jobId, offerPrice)
+    const uid = authService.getCurrentUser()?.uid;
+    if (!uid) return;
+    quoteService
+      .expressInterest(
+        job.id,
+        {
+          id: uid,
+          name: `${providerProfile.firstName} ${providerProfile.lastName}`.trim(),
+          initials: `${providerProfile.firstName.charAt(0)}${providerProfile.lastName.charAt(0)}`,
+          color: colors.primary,
+        },
+        offerPrice || undefined,
+        job.customerId,
+      )
+      .catch(() => {
+        // ლოკალურ state-ში "დაინტერესებული ხარ" უკვე ასახულია — Supabase-ის
+        // ჩავარდნისას UI-ს არ ვბლოკავთ (CustomerEditProfileScreen-ის (#51)
+        // იგივე optimistic-update პრინციპით).
+      });
   };
+
+  if (jobLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <BackHeader title="განცხადება" onBack={() => navigation.goBack()} />
+        <View style={styles.bodyContent}>
+          <Skeleton width="100%" height={140} borderRadius={radius.lg} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -199,10 +306,6 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
             </View>
             <View>
               <Text style={styles.customerName}>{job.customer}</Text>
-              <View style={styles.customerRatingRow}>
-                <Star size={11} color="#FBBF24" fill="#FBBF24" />
-                <Text style={styles.customerRatingText}>4.7 · 8 განცხ.</Text>
-              </View>
             </View>
           </View>
         </View>
@@ -474,16 +577,6 @@ const styles = StyleSheet.create({
     ...typography.captionMedium,
     color: colors.foreground,
     fontWeight: '600',
-  },
-  customerRatingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  customerRatingText: {
-    ...typography.small,
-    color: colors.mutedForeground,
   },
   footer: {
     flexDirection: 'row',

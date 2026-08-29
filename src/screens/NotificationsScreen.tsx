@@ -1,35 +1,58 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Bell, Settings } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Skeleton } from '../components/Skeleton';
 import { colors, radius, spacing, typography } from '../theme';
-import { NOTIFICATIONS, NotificationEntry } from '../data/mockNotifications';
+import { authService } from '../services/authService';
+import { notificationService } from '../services/notificationService';
+import type { NotificationEntry } from '../types/notification';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Notifications'>;
 
-// Notifications — საერთო ეკრანი Customer/Provider-ისთვის (ზუსტად ზიპის
-// App.tsx-ის NotificationsScreen-ის მიხედვით). role route param-ით მოდის,
-// რადგან ეს root-stack ეკრანია (tab-ის გარეთ), Chat/Job Detail-ის მსგავსად.
+// Notifications — საერთო ეკრანი Customer/Provider-ისთვის, `notifications`
+// ცხრილზე (#70) აგებული.
 export function NotificationsScreen({ navigation, route }: Props) {
   const { role } = route.params;
-  const [items, setItems] = useState<NotificationEntry[]>(() => NOTIFICATIONS.filter((n) => n.role === role));
+  const [items, setItems] = useState<NotificationEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 700);
-    return () => clearTimeout(t);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setIsLoading(true);
+      const uid = authService.getCurrentUser()?.uid;
+      if (!uid) {
+        setIsLoading(false);
+        return;
+      }
+      notificationService
+        .listMine(uid)
+        .then((real) => {
+          if (!cancelled) setItems(real);
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, [role]),
+  );
 
   const unreadCount = useMemo(() => items.filter((n) => !n.read).length, [items]);
 
   const markRead = (id: string) => {
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    notificationService.markRead(id).catch(() => {});
   };
   const markAllRead = () => {
     setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+    const uid = authService.getCurrentUser()?.uid;
+    if (uid) notificationService.markAllRead(uid).catch(() => {});
   };
 
   const handleTap = (item: NotificationEntry) => {

@@ -1,15 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MessageCircle, Search } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import type { CompositeScreenProps } from '@react-navigation/native';
+import { useFocusEffect, type CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
+import { getCategoryIcon } from '../components/CategoryIcon';
 import { Skeleton } from '../components/Skeleton';
 import { colors, radius, spacing, typography } from '../theme';
-import { CATEGORIES } from '../data/categories';
+import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
+import type { ChatEntry } from '../types/chat';
 import type { CustomerTabParamList, Role, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -18,17 +20,39 @@ type Props = CompositeScreenProps<
 > & { role: Role };
 
 // D1 — ჩატების სია / Inbox (product-spec.md; დიზაინის რეფერენსის
-// ChatsList-ის მიხედვით)
+// ChatsList-ის მიხედვით). `conversations` ცხრილიდან (#68) — Bottom Tab-ის
+// ეკრანები session-ის განმავლობაში მონტირებული რჩება, ამიტომ `useFocusEffect`
+// (არა plain `useEffect`), ტაბზე დაბრუნებისას ახალი შეტყობინება/ჩატი
+// განახლდეს.
 export function ChatsListScreen({ navigation, role }: Props) {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [chats, setChats] = useState<ChatEntry[]>([]);
 
-  useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(t);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setIsLoading(true);
+      const uid = authService.getCurrentUser()?.uid;
+      if (!uid) {
+        setChats([]);
+        setIsLoading(false);
+        return;
+      }
+      chatService
+        .listMyConversations(uid, role)
+        .then((real) => {
+          if (!cancelled) setChats(real);
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, [role]),
+  );
 
-  const chats = useMemo(() => chatService.listChats(), []);
   const filtered = useMemo(
     () => chats.filter((c) => !query || c.name.toLowerCase().includes(query.toLowerCase())),
     [chats, query],
@@ -81,7 +105,7 @@ export function ChatsListScreen({ navigation, role }: Props) {
       ) : (
         <ScrollView style={styles.body}>
           {filtered.map((c) => {
-            const catEmoji = CATEGORIES.find((cat) => cat.id === c.jobCategory)?.icon ?? '🔧';
+            const JobCategoryIcon = getCategoryIcon(c.jobCategory ?? '');
             return (
               <Pressable key={c.id} style={styles.row} onPress={() => openChat(c)}>
                 <Avatar initials={c.initials} color={c.color} size={50} online={c.online} />
@@ -103,10 +127,13 @@ export function ChatsListScreen({ navigation, role }: Props) {
                     )}
                   </View>
                   {c.jobTitle && (
-                    <Text style={styles.jobLine} numberOfLines={1}>
-                      {catEmoji} {c.jobTitle}
-                      {c.jobDistrict ? ` · ${c.jobDistrict}` : ''}
-                    </Text>
+                    <View style={styles.jobLineRow}>
+                      <JobCategoryIcon size={12} color={colors.mutedForeground} strokeWidth={2} />
+                      <Text style={styles.jobLine} numberOfLines={1}>
+                        {c.jobTitle}
+                        {c.jobDistrict ? ` · ${c.jobDistrict}` : ''}
+                      </Text>
+                    </View>
                   )}
                 </View>
               </Pressable>
@@ -229,9 +256,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.primaryForeground,
   },
+  jobLineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   jobLine: {
     ...typography.small,
     color: colors.mutedForeground,
+    flexShrink: 1,
   },
   emptyState: {
     flex: 1,

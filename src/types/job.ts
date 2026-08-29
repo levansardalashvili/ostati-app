@@ -47,6 +47,14 @@ export type FeedJob = {
   // Provider-მხრიდანაა მოდელირებული, Customer-ის მხარეს შესატყვისი ჩანაწერი
   // არ არსებობს.
   customerJobId?: string;
+  // რეალური job_posts.status (#69) — შევსებულია მხოლოდ `listMyAssignedJobs`-ის
+  // შედეგზე ("ჩემი სამუშაოები"/"მიმდინარე სამუშაო" ბარათებისთვის),
+  // undefined Job Feed-ის ღია (ყოველთვის 'pending') ჩანაწერებზე.
+  status?: JobStatus;
+  // job_posts.customer_id (#70) — Provider-ის "დაინტერესებისას"/"სამუშაო
+  // დავასრულე"-ს დროს საჭიროა, რომ ვიცოდეთ Customer-ს (job-ის owner-ს)
+  // ვის შევუთხოვოთ შეტყობინება. undefined mock demo ჩანაწერებზე.
+  customerId?: string;
 };
 
 // Customer-ის მხრიდან ხილული job-ის ჩანაწერი — TODO: Firestore-ის jobPosts
@@ -55,23 +63,21 @@ export type CustomerJob = {
   id: string;
   title: string;
   category: string;
-  status: 'active' | 'pending' | 'completed' | 'cancelled';
+  // სრული JobStatus union-ია (#67) — ადრე ვიწრო '`active`|`pending`|
+  // `completed`|`cancelled`' იყო, `JobStatusContext`-ის რეალურად უფრო
+  // ფართო მდგომარეობებთან (`awaiting_customer_confirmation`/`disputed`)
+  // შეუსაბამოდ.
+  status: JobStatus;
   provider: string | null;
+  // job_posts.provider_id (#71) — Provider-ის რეალურ id-ზე დაფუძნებული
+  // ჩატის გახსნა (CustomerJobsScreen-ის "ჩატი" ღილაკი), `provider`
+  // (სახელი) ცალკეა ისტორიულად, ჩვენებისთვის საკმარისი იყო.
+  providerId?: string;
   date: string;
   address: string;
   desc: string;
-};
-
-// Provider-ის "ჩემი სამუშაოები" მარტივი მწკრივი (ProviderMyJobsScreen) —
-// ცალკე, id-ის გარეშე mock-კუნძული (არ უკავშირდება CustomerJob/FeedJob-ს).
-export type MyJobRow = { title: string; customer: string; addr: string; when: string; pay: string };
-
-// Provider-ის "შესრულებული სამუშაოები" ჩანაწერი (ProviderCompletedJobsScreen).
-export type CompletedJob = {
-  id: string;
-  category: string;
-  title: string;
-  district: string;
-  date: string;
-  rating: number | null;
+  // Supabase Storage-ის საჯარო URL-ები (#63) — `undefined` ძველ mock
+  // demo-ჩანაწერებზე (j1/j2/j3, #61-ის წინა), ცარიელი მასივი რეალურ
+  // job-ზე ფოტოს გარეშე, შევსებული მასივი — რეალურ ატვირთულ ფოტოებზე.
+  photos?: string[];
 };

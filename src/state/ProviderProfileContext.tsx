@@ -35,7 +35,7 @@ export type Completeness = {
 // მომხმარებლის მოთხოვნით.
 export function computeCompleteness(p: ProviderProfileState): Completeness {
   const items: CompletenessItem[] = [
-    { key: 'photo', label: 'პროფილის ფოტო', done: p.hasPhoto, optional: false },
+    { key: 'photo', label: 'პროფილის ფოტო', done: !!p.photoUrl, optional: false },
     { key: 'about', label: 'ჩემ შესახებ აღწერა', done: p.about.trim().length >= ABOUT_MIN_LENGTH, optional: false },
     { key: 'portfolio', label: 'ნამუშევრების ფოტო', done: p.portfolio.length > 0, optional: false },
     { key: 'certificates', label: 'სერთიფიკატი', done: p.certificates.length > 0, optional: true },

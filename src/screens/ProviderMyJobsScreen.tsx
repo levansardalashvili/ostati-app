@@ -1,13 +1,18 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Check, Clock, MapPin, User } from 'lucide-react-native';
+import { Briefcase, Clock, MapPin, User } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import type { CompositeScreenProps } from '@react-navigation/native';
+import { type CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { CategoryIcon } from '../components/CategoryIcon';
+import { Skeleton } from '../components/Skeleton';
 import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
+import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
+import { useJobStatus } from '../state/JobStatusContext';
+import type { FeedJob } from '../types/job';
 import type { ProviderTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -16,15 +21,55 @@ type Props = CompositeScreenProps<
 >;
 type Tab = 'active' | 'done';
 
-// ProviderMyJobs — ზუსტად ზიპის App.tsx-ის ProviderMyJobs-ის მიხედვით.
-// Bottom Tab-ის ("MyJobsTab") საკუთარი ეკრანია — აღარ არის root-stack-ზე
-// push-ილი (მომხმარებლის მოთხოვნით, Customer-ის "MyJobsTab"-ის იგივე
-// ლოგიკით — CustomerJobsScreen.tsx). ProviderHome-ის სტატისტიკის "სამ."
-// უჯრა და Profile-ის "ჩემი სამუშაო" მენიუც ამავე ტაბზე გადადიან push-ის
-// ნაცვლად.
-export function ProviderMyJobsScreen({}: Props) {
+const EMPTY_TEXT: Record<Tab, string> = {
+  active: 'დადასტურებული სამუშაოები არ გაქვს',
+  done: 'დასრულებული სამუშაოები არ გაქვს',
+};
+
+// ProviderMyJobs — "ჩემი სამუშაოები" ტაბი, რეალურ `job_posts`-ზე აგებული
+// (#69, `job_posts.provider_id = me`) — მანამდე ცალკე, id-ის გარეშე
+// `MyJobRow` mock-კუნძული იყო (#30-ის შენიშვნა), ჩატის/StatusPill-ის/
+// JobStatusContext-ის კავშირის გარეშე. ახლა CustomerJobsScreen-ის იგივე
+// pattern-ს იზიარებს (`useFocusEffect`, სტატუსით navigate ProviderJobDetail-ზე).
+export function ProviderMyJobsScreen({ navigation }: Props) {
   const [tab, setTab] = useState<Tab>('active');
-  const items = tab === 'active' ? jobService.listMyActiveJobs() : jobService.listMyDoneJobs();
+  const [isLoading, setIsLoading] = useState(true);
+  const [jobs, setJobs] = useState<FeedJob[]>([]);
+  const { getStatus } = useJobStatus();
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setIsLoading(true);
+      const uid = authService.getCurrentUser()?.uid;
+      if (!uid) {
+        setJobs([]);
+        setIsLoading(false);
+        return;
+      }
+      jobService
+        .listMyAssignedJobs(uid)
+        .then((real) => {
+          if (!cancelled) setJobs(real);
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
+
+  // "awaiting_customer_confirmation"/"disputed" — job ჯერ კიდევ აქტიურ
+  // მუშაობშია (არ არის დასრულებული), ამიტომ "დადასტურებული" ტაბში რჩება
+  // (ორმხრივი დასრულების flow, JobStatusContext.tsx — CustomerJobsScreen-ის
+  // იგივე პრინციპი).
+  const items = jobs.filter((j) => {
+    const status = j.customerJobId ? (getStatus(j.customerJobId) ?? j.status) : j.status;
+    if (tab === 'active') return status === 'active' || status === 'awaiting_customer_confirmation' || status === 'disputed';
+    return status === 'completed';
+  });
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -44,40 +89,70 @@ export function ProviderMyJobsScreen({}: Props) {
         ))}
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-        {items.map((j, i) => (
-          <View key={i} style={styles.card}>
-            <View style={styles.cardTop}>
-              <Text style={styles.jobTitle}>{j.title}</Text>
-              <StatusPill status={tab === 'active' ? 'active' : 'completed'} />
-            </View>
-            <View style={{ gap: spacing.xs + 2 }}>
-              <View style={styles.metaRow}>
-                <User size={13} color={colors.mutedForeground} />
-                <Text style={styles.metaText}>{j.customer}</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <MapPin size={13} color={colors.mutedForeground} />
-                <Text style={styles.metaText}>{j.addr}</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Clock size={13} color={colors.mutedForeground} />
-                <Text style={styles.metaText}>{j.when}</Text>
-              </View>
-            </View>
-            <View style={styles.cardFooter}>
-              <Text style={styles.pay}>{j.pay}</Text>
-              {tab === 'active' && (
-                <View style={styles.doneButton}>
-                  <Check size={12} color={colors.success} />
-                  <Text style={styles.doneButtonText}>დასრულება</Text>
-                </View>
-              )}
-            </View>
+      {isLoading ? (
+        <View style={styles.bodyContent}>
+          {[0, 1].map((i) => (
+            <JobRowSkeleton key={i} />
+          ))}
+        </View>
+      ) : items.length === 0 ? (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <Briefcase size={22} color={colors.mutedForeground} />
           </View>
-        ))}
-      </ScrollView>
+          <Text style={styles.emptyTitle}>{EMPTY_TEXT[tab]}</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+          {items.map((j) => {
+            const liveStatus = j.customerJobId ? (getStatus(j.customerJobId) ?? j.status) : j.status;
+            return (
+              <Pressable
+                key={j.id}
+                style={styles.card}
+                onPress={() => navigation.navigate('ProviderJobDetail', { id: j.id, job: j, mode: 'selected' })}
+              >
+                <View style={styles.cardTop}>
+                  <View style={styles.cardTopLeft}>
+                    <CategoryIcon categoryId={j.category} />
+                    <Text style={styles.jobTitle} numberOfLines={1}>
+                      {j.title}
+                    </Text>
+                  </View>
+                  {liveStatus && <StatusPill status={liveStatus} />}
+                </View>
+                <View style={{ gap: spacing.xs + 2 }}>
+                  <View style={styles.metaRow}>
+                    <User size={13} color={colors.mutedForeground} />
+                    <Text style={styles.metaText}>{j.customer}</Text>
+                  </View>
+                  <View style={styles.metaRow}>
+                    <MapPin size={13} color={colors.mutedForeground} />
+                    <Text style={styles.metaText}>{j.location}</Text>
+                  </View>
+                  <View style={styles.metaRow}>
+                    <Clock size={13} color={colors.mutedForeground} />
+                    <Text style={styles.metaText}>{j.date}</Text>
+                  </View>
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
     </SafeAreaView>
+  );
+}
+
+function JobRowSkeleton() {
+  return (
+    <View style={styles.card}>
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
+        <Skeleton width={36} height={36} borderRadius={radius.md} />
+        <Skeleton width={140} height={14} />
+      </View>
+      <Skeleton width="90%" height={12} />
+    </View>
   );
 }
 
@@ -146,11 +221,18 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.sm + 2,
   },
+  cardTopLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    flex: 1,
+    minWidth: 0,
+  },
   jobTitle: {
     ...typography.captionMedium,
     color: colors.foreground,
     fontWeight: '700',
-    flex: 1,
+    flexShrink: 1,
   },
   metaRow: {
     flexDirection: 'row',
@@ -161,34 +243,27 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
   },
-  cardFooter: {
-    flexDirection: 'row',
+  emptyState: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: colors.muted,
-    marginTop: spacing.sm + 2,
-    paddingTop: spacing.sm + 2,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xxl,
+    paddingBottom: spacing.xxl * 2,
   },
-  pay: {
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.full,
+    backgroundColor: colors.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  emptyTitle: {
     ...typography.captionMedium,
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  doneButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.successBackground,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm + 4,
-    paddingVertical: spacing.xs + 2,
-  },
-  doneButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.success,
+    color: colors.foreground,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+    textAlign: 'center',
   },
 });

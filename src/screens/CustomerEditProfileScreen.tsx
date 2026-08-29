@@ -9,6 +9,8 @@ import { Button } from '../components/Button';
 import { InlineBanner } from '../components/InlineBanner';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
+import { authService } from '../services/authService';
+import { userService } from '../services/userService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -17,8 +19,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CustomerEditProfile'>;
 // CustomerEditProfile — ზუსტად ზიპის App.tsx-ის CustomerEditProfile-ის
 // მიხედვით. პირველი შენახვა შეგნებულად ვარდება (საცდელი error-state
 // დემონსტრირებისთვის), მეორე ცდაზე წარმატებული. წარმატებულ შენახვაზე
-// მონაცემები რეალურად იწერება CustomerProfileContext-ში (მანამდე
-// უბრალოდ იკარგებოდა navigation.goBack()-ზე).
+// მონაცემები იწერება CustomerProfileContext-ში (მყისიერი UI feedback)
+// და პარალელურად Firestore-ის users/{uid}-ში (userService.updateUserRecord) —
+// რომ ცვლილება რეალურად შენარჩუნდეს, არა მხოლოდ ამ სესიაში.
 export function CustomerEditProfileScreen({ navigation }: Props) {
   const { profile, setProfile } = useCustomerProfile();
   const [firstName, setFirstName] = useState(profile.firstName);
@@ -36,15 +39,27 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
     if (!canSave || isSaving) return;
     setSaveError(false);
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    setTimeout(async () => {
       if (attemptRef.current === 0) {
+        setIsSaving(false);
         setSaveError(true);
         attemptRef.current += 1;
-      } else {
-        setProfile({ firstName: firstName.trim(), lastName: lastName.trim(), defaultAddress: address.trim() });
-        navigation.goBack();
+        return;
       }
+      const patch = { firstName: firstName.trim(), lastName: lastName.trim(), defaultAddress: address.trim() };
+      setProfile(patch);
+      const uid = authService.getCurrentUser()?.uid;
+      if (uid) {
+        try {
+          await userService.updateUserRecord(uid, patch);
+        } catch {
+          // ლოკალურ Context-ში ცვლილება უკვე ასახულია — Firestore-ის
+          // ჩავარდნისას UI-ს არ ვბლოკავთ, უბრალოდ ჩუმად რჩება
+          // შემდეგ სინქრონიზაციამდე (მომავალში: retry/queue).
+        }
+      }
+      setIsSaving(false);
+      navigation.goBack();
     }, 1000);
   };
 

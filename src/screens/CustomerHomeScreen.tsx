@@ -13,7 +13,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
-import { CategoryIcon } from '../components/CategoryIcon';
+import { CategoryIcon, getCategoryIcon } from '../components/CategoryIcon';
 import { Chip } from '../components/Chip';
 import { Skeleton } from '../components/Skeleton';
 import { StatusPill } from '../components/StatusPill';
@@ -21,10 +21,12 @@ import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
 import { TBILISI_AREAS as DISTRICTS } from '../data/districts';
-import { getUnreadCount } from '../data/mockNotifications';
+import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
+import { notificationService } from '../services/notificationService';
 import { userService } from '../services/userService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
+import type { CustomerJob } from '../types/job';
 import type { Provider } from '../types/provider';
 import { isNewProvider, providerRankScore } from '../utils/providerRank';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
@@ -33,8 +35,6 @@ type Props = CompositeScreenProps<
   BottomTabScreenProps<CustomerTabParamList, 'Home'>,
   NativeStackScreenProps<RootStackParamList>
 >;
-
-const MOCK_UNREAD_COUNT = getUnreadCount('customer');
 
 // 3 ყველაზე მოთხოვნადი სერვისი, რომლებიც პირდაპირ Home-ის ეკრანზე ჩანს
 // (დანარჩენი 12 კატეგორია "ყველა სერვისი" ღილაკის მიღმაა)
@@ -55,6 +55,16 @@ export function CustomerHomeScreen({ navigation }: Props) {
   // არასდროს ემთხვევა რეალურ რაიონის სახელს.
   const [selDistrict, setSelDistrict] = useState<string | 'mine' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    userService.listRealProviders().then((real) => {
+      if (!cancelled) setProviders(real);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Customer-ის საკუთარი რაიონი, დაცული მისამართიდან ამოღებული — DISTRICTS
   // (TBILISI_AREAS)-ის ჩამონათვალის substring-შედარებით, რადგან
@@ -78,7 +88,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
 
   const filtered = useMemo(() => {
     const effectiveDistrict = selDistrict === 'mine' ? myDistrict : selDistrict;
-    return userService.listProviders().filter((p) => {
+    return providers.filter((p) => {
       if (selCats.size > 0 && !selCats.has(p.category)) return false;
       // მთხოვნის მიხედვით — ოსტატის საცხოვრებელი მისამართის (`location`) ნაცვლად
       // მისი სამუშაო არეალით (`areas`) ვფილტრავთ.
@@ -90,7 +100,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
       }
       return true;
     }).sort((a, b) => providerRankScore(b) - providerRankScore(a));
-  }, [search, selCats, selDistrict, myDistrict]);
+  }, [providers, search, selCats, selDistrict, myDistrict]);
 
   const clearFilters = () => {
     setSelCats(new Set());
@@ -124,7 +134,30 @@ export function CustomerHomeScreen({ navigation }: Props) {
   // "მიმდინარე სამუშაო" — ჩანს მხოლოდ მაშინ, როცა Customer-მა კონკრეტულ
   // Provider-ს აირჩია (status === 'active'). დაჭერისას იხსნება არსებული
   // CustomerJobDetail ეკრანი — არა ცალკე duplicate დეტალის ეკრანი.
-  const currentJob = jobService.listCustomerJobs().find((j) => j.status === 'active') ?? null;
+  const [myJobs, setMyJobs] = useState<CustomerJob[]>([]);
+  useEffect(() => {
+    const uid = authService.getCurrentUser()?.uid;
+    if (!uid) return;
+    let cancelled = false;
+    jobService.listMyJobPosts(uid).then((real) => {
+      if (!cancelled) setMyJobs(real);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const currentJob = myJobs.find((j) => j.status === 'active') ?? null;
+
+  // ბელის წითელი წერტილი (#70) — mock ნაგულისხმებია, სანამ session
+  // ცოცხალი Realtime subscription-ით (`notificationService`) რეალურ
+  // count-ს არ დაადასტურებს (ან 0-ს) — `chatService.subscribeToUnreadCount`-ის
+  // (#68) იგივე პრინციპი.
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  useEffect(() => {
+    const uid = authService.getCurrentUser()?.uid;
+    if (!uid) return;
+    return notificationService.subscribeToUnreadCount(uid, setUnreadNotifCount);
+  }, []);
   const currentJobCategory = currentJob ? CATEGORIES.find((c) => c.id === currentJob.category) : null;
   const handleOpenCurrentJob = () => {
     if (!currentJob) return;
@@ -144,7 +177,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
           </View>
           <Pressable style={styles.bellButton} onPress={handleNotifications}>
             <Bell size={19} color={colors.foreground} strokeWidth={1.8} />
-            {MOCK_UNREAD_COUNT > 0 && <View style={styles.bellDot} />}
+            {unreadNotifCount > 0 && <View style={styles.bellDot} />}
           </Pressable>
         </View>
 
@@ -200,6 +233,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
           <View style={styles.serviceGrid}>
             {topCategories.map((c) => {
               const selected = selCats.has(c.id);
+              const ServiceIcon = getCategoryIcon(c.id);
               return (
                 <Pressable
                   key={c.id}
@@ -207,7 +241,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
                   onPress={() => toggleCat(c.id)}
                 >
                   <View style={[styles.serviceIconWrap, { backgroundColor: c.bg }]}>
-                    <Text style={styles.serviceIcon}>{c.icon}</Text>
+                    <ServiceIcon size={20} color={c.dot} strokeWidth={2} />
                   </View>
                   <Text style={styles.serviceLabel} numberOfLines={2}>
                     {c.label}
@@ -317,7 +351,7 @@ function ProviderCard({
   return (
     <View style={styles.providerCard}>
       <Pressable style={styles.providerCardBody} onPress={onOpenProfile}>
-        <Avatar initials={provider.initials} color={provider.color} size={54} online={provider.online} />
+        <Avatar initials={provider.initials} color={provider.color} size={54} online={provider.online} uri={provider.photoUrl} />
         <View style={styles.providerInfo}>
           <View style={styles.providerNameRow}>
             <Text style={styles.providerName} numberOfLines={1}>
@@ -542,9 +576,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-  },
-  serviceIcon: {
-    fontSize: 17,
   },
   serviceLabel: {
     fontSize: 12,

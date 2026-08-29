@@ -1,38 +1,47 @@
 import React, { createContext, useContext, useState } from 'react';
 import { jobService } from '../services/jobService';
 import type { JobStatus } from '../types/job';
+import { isUuid } from '../utils/isUuid';
 
 // JobStatusContext — ერთადერთი "წყარო სიმართლისთვის" job-ის სტატუსზე,
 // გაზიარებული Customer-ისა და Provider-ის ეკრანებს შორის (ორმხრივი
-// დასრულების state machine, StatusPill.tsx-ის დოკუმენტაცია). აქამდე
-// job-ის დასრულების state ორივე მხარეს ცალ-ცალკე ლოკალურ component
-// state-ში ცხოვრობდა (CustomerJobDetailScreen-ის `jobCompleted`,
-// ProviderJobDetailScreen-ის სტატიკური `mode` param) — არცერთს
-// მეორისთვის რეალურად ხილვადობა არ ჰქონდა. ეს Context წყვეტს ამას.
-//
-// Key: CUSTOMER_JOBS-ის job id (`j1`, `j2`, ...) — ეს რჩება კანონიკურ
-// id-სივრცედ, რადგან CustomerJob-ს აქვს სრული lifecycle-ის მონაცემები.
-// PROVIDER_FEED-ის ჩანაწერები, რომლებიც კონკრეტულ Customer-ის job-ს
-// შეესაბამება, ამ id-ს `customerJobId`-ის საშუალებით მიუთითებენ
-// (mockHomeData.ts, FeedJob.customerJobId) — ProviderJobDetailScreen ამ
-// ველით კითხულობს/წერს იმავე გაზიარებულ სტატუსს.
-// TODO: ჩანაცვლდება Firestore-ის jobPosts/{id}.status ველით.
+// დასრულების state machine, StatusPill.tsx-ის დოკუმენტაცია). ოპტიმისტური
+// ლოკალური overlay რეალურ `job_posts.status`-ზე — key: job_posts.id
+// (FeedJob.customerJobId === CustomerJob.id, #55-ის მიხედვით).
 type JobStatusMap = Record<string, JobStatus>;
 
 type JobStatusContextValue = {
   getStatus: (jobId: string) => JobStatus | undefined;
-  setStatus: (jobId: string, status: JobStatus) => void;
+  // `providerId`/`providerName` — მხოლოდ `pending`→`active` გადასვლას
+  // სჭირდება (#67/#69, Customer-ის მიერ Provider-ის არჩევისას
+  // job_posts.provider_id/provider_name-ის შესავსებად); დანარჩენ
+  // გადასვლებზე გამოტოვებადია.
+  setStatus: (jobId: string, status: JobStatus, providerId?: string, providerName?: string) => void;
 };
 
 const JobStatusContext = createContext<JobStatusContextValue | null>(null);
 
 export function JobStatusProvider({ children }: { children: React.ReactNode }) {
-  const [statuses, setStatuses] = useState<JobStatusMap>(() =>
-    Object.fromEntries(jobService.listCustomerJobs().map((j) => [j.id, j.status])),
-  );
+  // ცარიელი საწყისი — ეს Context ახლა მხოლოდ ოპტიმისტური ლოკალური
+  // overlay-ია რეალურ `job_posts.status`-ზე (#71); თითოეული ეკრანი თავად
+  // კითხულობს `getStatus(jobId) ?? job.status`-ს, სადაც `job.status`
+  // რეალურ Supabase-ის fetch-იდანაა.
+  const [statuses, setStatuses] = useState<JobStatusMap>({});
 
   const getStatus = (jobId: string) => statuses[jobId];
-  const setStatus = (jobId: string, status: JobStatus) => setStatuses((prev) => ({ ...prev, [jobId]: status }));
+  const setStatus = (jobId: string, status: JobStatus, providerId?: string, providerName?: string) => {
+    setStatuses((prev) => ({ ...prev, [jobId]: status }));
+    // ლოკალური Record-ი (ზემოთ) ყოველთვის სინქრონულად, optimistic-ად
+    // იცვლება — რეალურ job-ზე (#67/#69) დამატებით ფონურად წერს Supabase-ში
+    // (job_posts.status/provider_id/provider_name). mock demo job-ებზე
+    // (j1/j2/j3) ეს ნაბიჯი უბრალოდ გამოტოვდება.
+    if (isUuid(jobId)) {
+      jobService.updateJobStatus(jobId, status, providerId, providerName).catch(() => {
+        // ლოკალურ state-ში ცვლილება უკვე ასახულია — Supabase-ის
+        // ჩავარდნისას UI-ს არ ვბლოკავთ.
+      });
+    }
+  };
 
   return <JobStatusContext.Provider value={{ getStatus, setStatus }}>{children}</JobStatusContext.Provider>;
 }

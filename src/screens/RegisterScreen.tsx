@@ -17,7 +17,8 @@ import { GoogleButton } from '../components/GoogleButton';
 import { ProgressBar } from '../components/ProgressBar';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
-import { authService } from '../services/authService';
+import { authService, getAuthErrorMessage } from '../services/authService';
+import { userService } from '../services/userService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
@@ -50,6 +51,7 @@ export function RegisterScreen({ navigation, route }: Props) {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [gLoading, setGLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const touch = (field: string) => setTouched((t) => ({ ...t, [field]: true }));
 
@@ -81,13 +83,22 @@ export function RegisterScreen({ navigation, route }: Props) {
   const allValid =
     nameValid && isEmail(email) && (isProvider || address.trim()) && pass.length >= 8 && pass === confirm && agreed;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setTouched({ firstName: true, lastName: true, email: true, address: !isProvider, pass: true, confirm: true });
-    if (!allValid) return;
+    setSubmitError('');
+    if (!allValid || loading) return;
     setLoading(true);
-    authService.registerWithEmail({ email: email.trim(), password: pass, role });
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const { uid } = await authService.registerWithEmail({ email: email.trim(), password: pass, role });
+      // users/{uid} Firestore-ჩანაწერი — Login-ს დასჭირდება role-ის
+      // წასაკითხად (რომელ Home-ზე გადაიყვანოს ავტორიზაციის შემდეგ).
+      await userService.createUserRecord(uid, {
+        role,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        defaultAddress: isProvider ? '' : address.trim(),
+      });
       if (role === 'provider') {
         setProviderProfile({ firstName: firstName.trim(), lastName: lastName.trim() });
         navigation.replace('ProviderSetup');
@@ -100,16 +111,23 @@ export function RegisterScreen({ navigation, route }: Props) {
         });
         navigation.replace('CustomerSetup', { userName: `${firstName.trim()} ${lastName.trim()}` });
       }
-    }, 1200);
+    } catch (error) {
+      setSubmitError(getAuthErrorMessage(error));
+      setLoading(false);
+    }
   };
 
-  const handleGoogle = () => {
+  const handleGoogle = async () => {
+    setSubmitError('');
     setGLoading(true);
-    authService.signInWithGoogle();
-    setTimeout(() => {
-      setGLoading(false);
+    try {
+      await authService.signInWithGoogle();
       navigation.navigate('GoogleComplete', { role });
-    }, 1200);
+    } catch (error) {
+      setSubmitError(getAuthErrorMessage(error));
+    } finally {
+      setGLoading(false);
+    }
   };
 
   return (
@@ -132,6 +150,12 @@ export function RegisterScreen({ navigation, route }: Props) {
 
           <Text style={styles.title}>ანგარიშის შექმნა</Text>
           <Text style={styles.subtitle}>შეიყვანე შენი მონაცემები რეგისტრაციის გასაგრძელებლად.</Text>
+
+          {submitError ? (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorBannerText}>{submitError}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.fields}>
             <View style={styles.nameRow}>
@@ -274,6 +298,16 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.mutedForeground,
     marginBottom: spacing.lg,
+  },
+  errorBanner: {
+    backgroundColor: colors.dangerBackground,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  errorBannerText: {
+    ...typography.caption,
+    color: colors.destructive,
   },
   fields: {
     gap: spacing.md,

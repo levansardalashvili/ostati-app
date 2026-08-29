@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Briefcase, MapPin, Search, Star } from 'lucide-react-native';
@@ -9,6 +9,7 @@ import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
 import { userService } from '../services/userService';
+import type { Provider } from '../types/provider';
 import { isNewProvider } from '../utils/providerRank';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -19,9 +20,19 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CustomerCategory'>;
 // ზიპში ეს ეკრანი ყველა ოსტატს უფილტრაციოდ აჩვენებდა).
 export function CustomerCategoryScreen({ navigation, route }: Props) {
   const category = CATEGORIES.find((c) => c.id === route.params.id);
+  const [allProviders, setAllProviders] = useState<Provider[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    userService.listRealProviders().then((real) => {
+      if (!cancelled) setAllProviders(real);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const providers = useMemo(
-    () => userService.listProviders().filter((p) => p.category === route.params.id),
-    [route.params.id],
+    () => allProviders.filter((p) => p.category === route.params.id),
+    [allProviders, route.params.id],
   );
 
   return (
@@ -47,7 +58,7 @@ export function CustomerCategoryScreen({ navigation, route }: Props) {
                 onPress={() => navigation.navigate('ViewProviderProfile', { id: p.id })}
               >
                 <View style={styles.cardTop}>
-                  <Avatar initials={p.initials} color={p.color} size={52} online={p.online} />
+                  <Avatar initials={p.initials} color={p.color} size={52} online={p.online} uri={p.photoUrl} />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={styles.nameRow}>
                       <Text style={styles.name} numberOfLines={1}>

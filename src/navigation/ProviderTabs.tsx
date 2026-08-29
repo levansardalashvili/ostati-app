@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { ClipboardList, Home, MessageCircle, User } from 'lucide-react-native';
@@ -7,18 +7,25 @@ import { ProviderMyJobsScreen } from '../screens/ProviderMyJobsScreen';
 import { ChatsListScreen } from '../screens/ChatsListScreen';
 import { ProviderProfileScreen } from '../screens/ProviderProfileScreen';
 import { colors, radius, typography } from '../theme';
+import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
 import type { ProviderTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<ProviderTabParamList>();
-
-const unreadChats = chatService.listChats().filter((c) => c.unread > 0).length;
 
 // Bottom Navigation — Provider (product-spec.md-ის საწყისი "Home / ჩატები /
 // პროფილი" 3 ჩანართი გაფართოვდა "სამუშაოები" ჩანართით — ეს ყოფილი
 // root-stack "ProviderMyJobs" ("ჩემი სამუშაოები") ეკრანია, ახლა ტაბის
 // სახით, Customer-ის "MyJobsTab"-ის იგივე ლოგიკით (CustomerTabs.tsx))
 export function ProviderTabs() {
+  const [unreadChats, setUnreadChats] = useState(0);
+
+  useEffect(() => {
+    const uid = authService.getCurrentUser()?.uid;
+    if (!uid) return;
+    return chatService.subscribeToUnreadCount(uid, 'provider', setUnreadChats);
+  }, []);
+
   return (
     <Tab.Navigator
       screenOptions={{

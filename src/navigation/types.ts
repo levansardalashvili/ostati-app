@@ -1,5 +1,6 @@
 // Root stack-ის route-ების სია. ეტაპობრივად დაემატება ყველა ეკრანი
 // product-spec.md-ის "ეკრანების სრული სია" მიხედვით.
+import type { CustomerJob, FeedJob } from '../types/job';
 import type { RatingData } from '../types/review';
 import type { Role } from '../types/user';
 
@@ -19,10 +20,18 @@ export type RootStackParamList = {
   ProviderSetup: undefined;
   CustomerHome: undefined;
   ProviderHome: undefined;
-  ProviderJobDetail: { id: string; mode?: 'browse' | 'selected' | 'completed' };
+  // `job` — არასავალდებულო, უკვე წამოღებული FeedJob (real Supabase-ის
+  // job_posts-იდან, #54 "ეტაპი B"). თუ არ არის გადაცემული, ეკრანი თავად
+  // წამოიღებს (jobService.getFeedJobPostById, #71).
+  ProviderJobDetail: { id: string; mode?: 'browse' | 'selected' | 'completed'; job?: FeedJob };
   ProviderJobFeed: undefined;
   PostJob: undefined;
-  CustomerJobDetail: { jobId: string };
+  // `job` — არასავალდებულო, უკვე წამოღებული CustomerJob ობიექტი (real
+  // Supabase-ის job_posts-იდან, #53), როცა გამომძახებელს (CustomerJobsScreen,
+  // PostJobScreen) ეს უკვე ხელთ აქვს — ხელახალი fetch-ის თავიდან ასაცილებლად.
+  // თუ არ არის გადაცემული, ეკრანი თავად წამოიღებს (jobService.getJobPostById,
+  // #71) — notification deep-link-ებისთვის, სადაც მხოლოდ jobId ცნობილია.
+  CustomerJobDetail: { jobId: string; job?: CustomerJob };
   ChatConversation: { chatId: string; name: string; initials: string; color: string; role: Role };
   Notifications: { role: Role };
   NotificationSettings: { role: Role };

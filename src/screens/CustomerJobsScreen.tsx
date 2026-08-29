@@ -1,16 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FileText, MessageCircle, Plus } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import type { CompositeScreenProps } from '@react-navigation/native';
+import { type CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { Skeleton } from '../components/Skeleton';
 import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
+import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
 import { useJobStatus } from '../state/JobStatusContext';
+import type { CustomerJob } from '../types/job';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -42,28 +44,53 @@ const EMPTY_TEXT: Record<Tab, string> = {
 export function CustomerJobsScreen({ navigation }: Props) {
   const [tab, setTab] = useState<Tab>('active');
   const [isLoading, setIsLoading] = useState(true);
+  const [jobs, setJobs] = useState<CustomerJob[]>([]);
   const { getStatus } = useJobStatus();
 
-  useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 800);
-    return () => clearTimeout(t);
-  }, []);
+  // refetch ყოველ ჯერზე, როცა ეს ტაბი ფოკუსში ბრუნდება (მაგ. PostJobScreen-ზე
+  // ახალი მოთხოვნის გამოქვეყნების შემდეგ) — Bottom Tab-ის ეკრანები default-ად
+  // მთელი session-ის განმავლობაში მონტირებული რჩება, plain useEffect მხოლოდ
+  // ერთხელ, პირველ mount-ზე გაეშვებოდა.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setIsLoading(true);
+      const uid = authService.getCurrentUser()?.uid;
+      if (!uid) {
+        setJobs([]);
+        setIsLoading(false);
+        return;
+      }
+      jobService
+        .listMyJobPosts(uid)
+        .then((posts) => {
+          if (!cancelled) setJobs(posts);
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   // "awaiting_customer_confirmation"/"disputed" — job ჯერ კიდევ აქტიურ
   // მუშაობშია (არ არის დასრულებული), ამიტომ "დადასტურებული" ტაბში რჩება
   // (ორმხრივი დასრულების flow, JobStatusContext.tsx).
-  const items = jobService.listCustomerJobs().filter((j) => {
+  const items = jobs.filter((j) => {
     const status = getStatus(j.id) ?? j.status;
     if (tab === 'active') return status === 'active' || status === 'awaiting_customer_confirmation' || status === 'disputed';
     if (tab === 'pending') return status === 'pending';
     return status === 'completed';
   });
 
-  const openChat = (providerName: string) => {
+  const openChat = (job: CustomerJob) => {
+    if (!job.provider || !job.providerId) return;
     navigation.navigate('ChatConversation', {
-      chatId: 'p1',
-      name: providerName,
-      initials: providerName[0],
+      chatId: job.providerId,
+      name: job.provider,
+      initials: job.provider[0],
       color: colors.primary,
       role: 'customer',
     });
@@ -102,7 +129,11 @@ export function CustomerJobsScreen({ navigation }: Props) {
       ) : (
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
           {items.map((j) => (
-            <Pressable key={j.id} style={styles.card} onPress={() => navigation.navigate('CustomerJobDetail', { jobId: j.id })}>
+            <Pressable
+              key={j.id}
+              style={styles.card}
+              onPress={() => navigation.navigate('CustomerJobDetail', { jobId: j.id, job: j })}
+            >
               <View style={styles.cardTop}>
                 <View style={styles.cardTopLeft}>
                   <CategoryIcon categoryId={j.category} />
@@ -120,12 +151,12 @@ export function CustomerJobsScreen({ navigation }: Props) {
                 <View style={styles.footerLeft}>
                   {j.provider && <Text style={styles.providerName}>{j.provider}</Text>}
                 </View>
-                {j.provider && (
+                {j.provider && j.providerId && (
                   <Pressable
                     style={styles.chatButton}
                     onPress={(e) => {
                       e.stopPropagation();
-                      openChat(j.provider!);
+                      openChat(j);
                     }}
                   >
                     <MessageCircle size={13} color={colors.primary} />

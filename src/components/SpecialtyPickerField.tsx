@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Briefcase, Check, ChevronRight, X } from 'lucide-react-native';
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
+import { getCategoryIcon } from './CategoryIcon';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTIES } from '../data/specialties';
 
@@ -63,12 +64,15 @@ export function SpecialtyPickerField({ value, onChange }: Props) {
 
         {SPECIALTIES.map((sp) => {
           const on = isSelected(sp.id);
+          const SpecialtyIcon = getCategoryIcon(sp.id);
           return (
             <Pressable key={sp.id} style={styles.row} onPress={() => toggle(sp.id, sp.label)}>
               <View style={[styles.checkbox, on && styles.checkboxOn]}>
                 {on && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
               </View>
-              <Text style={styles.rowIcon}>{sp.icon}</Text>
+              <View style={styles.rowIconWrap}>
+                <SpecialtyIcon size={18} color={colors.mutedForeground} strokeWidth={2} />
+              </View>
               <Text style={styles.rowLabel}>{sp.label}</Text>
             </Pressable>
           );
@@ -169,6 +173,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     width: 24,
     textAlign: 'center',
+  },
+  rowIconWrap: {
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rowLabel: {
     ...typography.caption,
