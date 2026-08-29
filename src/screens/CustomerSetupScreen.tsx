@@ -30,7 +30,8 @@ export function CustomerSetupScreen({ navigation, route }: Props) {
 
   const handleDone = () => {
     setLoading(true);
-    // TODO: პროფილის ფოტოს ატვირთვა Firebase Storage-ში
+    // TODO: პროფილის ფოტოს ატვირთვა Supabase Storage-ში (Provider-ის
+    // პროფილის ფოტოს #65-ის იგივე პატერნით — Customer-ისთვის ჯერ არ აშენებულა)
     setTimeout(() => {
       setLoading(false);
       navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });

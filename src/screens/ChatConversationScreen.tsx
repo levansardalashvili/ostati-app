@@ -31,10 +31,8 @@ import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
-import { chatService, type ChatParticipants } from '../services/chatService';
+import { chatService } from '../services/chatService';
 import { storageService } from '../services/storageService';
-import { useCustomerProfile } from '../state/CustomerProfileContext';
-import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { ChatMsg, MsgState } from '../types/chat';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -45,9 +43,11 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ChatConversation'>;
 // ბარათი (product-spec.md-ის დაფიქსირებული წესი #2) — ზიპში რეფერენსი არ
 // არსებობდა, აქედან გამომდინარე დიზაინი თავიდან შემუშავდა. Provider
 // აგზავნის შეთავაზებას ცალკე ბარათის სახით (არა თავისუფალი ტექსტით),
-// Customer ეთანხმება/უარყოფს პირდაპირ ბარათიდან. დათანხმებული ფასის
-// შენახვა job-ის ჩანაწერში (Firestore) ჯერ არ არის დაკავშირებული —
-// ეს ცვლილება ამ ეტაპზე მხოლოდ ჩატის ლოკალურ state-შია.
+// Customer ეთანხმება/უარყოფს პირდაპირ ბარათიდან — ორივე მოქმედება რეალურად
+// Supabase-ის `messages` ცხრილშია (#66/#73). დათანხმებული ფასი job-ის
+// ჩანაწერში (`job_posts.agreed_price`) ჯერ მხოლოდ Provider-ის არჩევის
+// მომენტში იწერება (`select_provider()` RPC, #72) — ჩატში დათანხმებული
+// ფასის ამ ველში ავტომატურად ასახვა ცალკე, დარჩენილი ეტაპია.
 export function ChatConversationScreen({ navigation, route }: Props) {
   const { chatId, name, initials, color, role } = route.params;
   // ყველა navigation call site (#71) რეალურ Supabase UUID-ს გადასცემს
@@ -57,29 +57,9 @@ export function ChatConversationScreen({ navigation, route }: Props) {
   const customerId = role === 'customer' ? myUid : chatId;
   const providerId = role === 'provider' ? myUid : chatId;
 
-  const { profile: customerProfile } = useCustomerProfile();
-  const { profile: providerProfile } = useProviderProfile();
-  // Conversations-ის row-ის (#68) name/initials/color ველები ყოველ
-  // გაგზავნაზე "ჩემი" მხრიდან ივსება — მეორე მხარის ინფო კი უკვე route
-  // param-შია (name/initials/color, chat-ის გახსნისას გადაცემული).
-  const participants: ChatParticipants =
-    role === 'customer'
-      ? {
-          customerName: `${customerProfile.firstName} ${customerProfile.lastName}`.trim(),
-          customerInitials: `${customerProfile.firstName.charAt(0)}${customerProfile.lastName.charAt(0)}`.toUpperCase(),
-          customerColor: colors.primary,
-          providerName: name,
-          providerInitials: initials,
-          providerColor: color,
-        }
-      : {
-          customerName: name,
-          customerInitials: initials,
-          customerColor: color,
-          providerName: `${providerProfile.firstName} ${providerProfile.lastName}`.trim(),
-          providerInitials: `${providerProfile.firstName.charAt(0)}${providerProfile.lastName.charAt(0)}`.toUpperCase(),
-          providerColor: colors.primary,
-        };
+  // #73: sendReal*-ს აღარ სჭირდება participants — `messages`-ის INSERT
+  // trigger (on_message_insert_notify) მონაწილეთა სახელებს/ინიციალებს
+  // პირდაპირ `users`/`provider_profiles`-იდან კითხულობს, სერვერის მხარეს.
 
   const [messages, setMessages] = useState<ChatMsg[]>([]);
 
@@ -144,9 +124,9 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     setMsgText('');
     if (!customerId || !providerId || !myUid) return;
     chatService
-      .sendRealMessage(customerId, providerId, myUid, text, participants)
-      .then(() => {
-        setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'sent' } : m)));
+      .sendRealMessage(customerId, providerId, myUid, text)
+      .then((real) => {
+        setMessages((prev) => prev.map((m) => (m.id === id ? { ...real, state: 'sent' } : m)));
       })
       .catch(() => {
         setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'failed' } : m)));
@@ -173,18 +153,11 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     if (!customerId || !providerId || !myUid) return;
     try {
       const uploadedUrl = await storageService.uploadUserMedia(myUid, localUri, 'chat');
-      const real = await chatService.sendRealImage(customerId, providerId, myUid, uploadedUrl, participants);
+      const real = await chatService.sendRealImage(customerId, providerId, myUid, uploadedUrl);
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...real, state: 'sent' } : m)));
     } catch {
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'failed' } : m)));
     }
-  };
-
-  const retryMsg = (id: string) => {
-    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'sending' } : m)));
-    setTimeout(() => {
-      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'sent' } : m)));
-    }, 900);
   };
 
   const sendOffer = () => {
@@ -210,13 +183,55 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     setOfferComment('');
     if (!customerId || !providerId || !myUid) return;
     chatService
-      .sendRealOffer(customerId, providerId, myUid, amount, comment, participants)
+      .sendRealOffer(customerId, providerId, myUid, amount, comment)
       .then((real) => {
         setMessages((prev) => prev.map((m) => (m.id === id ? { ...real, state: 'sent' } : m)));
       })
       .catch(() => {
         setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'failed' } : m)));
       });
+  };
+
+  // Task 2 — Retry ახლა რეალურად ხელახლა უგზავნის შეტყობინებას შესაბამის
+  // chatService-ის მეთოდს (ვიზუალურ state-ს ცვლის, real send-ის გარეშე
+  // აღარ ვმუშაობთ). `retryingRef` — სინქრონული (არა useState) guard,
+  // რომ სწრაფი ორმაგი დაჭერა ერთსა და იმავე render-ში ორივემ ვერ
+  // "დაინახოს" ჯერ კიდევ 'failed' state (React-ის state batching-ის
+  // გამო `messages`-ის ცვლილება ერთ event handler-ში სინქრონულად ვერ
+  // აისახება), ვერც ორმაგი re-send მოხდეს.
+  const retryingRef = useRef<Set<string>>(new Set());
+  const retryMsg = async (id: string) => {
+    if (retryingRef.current.has(id) || !customerId || !providerId || !myUid) return;
+    const msg = messages.find((m) => m.id === id);
+    if (!msg || msg.state !== 'failed') return;
+    retryingRef.current.add(id);
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'sending' } : m)));
+    try {
+      let real: ChatMsg;
+      if (msg.type === 'text') {
+        real = await chatService.sendRealMessage(customerId, providerId, myUid, msg.text ?? '');
+      } else if (msg.type === 'offer') {
+        real = await chatService.sendRealOffer(customerId, providerId, myUid, msg.amount ?? 0, msg.comment);
+      } else if (msg.type === 'image') {
+        // თუ ატვირთვა უკვე მოხერხდა და მხოლოდ insert ჩავარდა, `imageUrl`
+        // უკვე რეალური http(s) URL-ია — ხელახლა აღარ ვტვირთავთ (image
+        // payload-ის შენარჩუნება). თუ ლოკალური file URI-ღაა, ატვირთვაც
+        // ხელახლა სჭირდება.
+        let uploadedUrl = msg.imageUrl ?? '';
+        if (uploadedUrl && !/^https?:\/\//.test(uploadedUrl)) {
+          uploadedUrl = await storageService.uploadUserMedia(myUid, uploadedUrl, 'chat');
+        }
+        real = await chatService.sendRealImage(customerId, providerId, myUid, uploadedUrl);
+      } else {
+        retryingRef.current.delete(id);
+        return;
+      }
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...real, state: 'sent' } : m)));
+    } catch {
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'failed' } : m)));
+    } finally {
+      retryingRef.current.delete(id);
+    }
   };
 
   const respondToOffer = (id: string, offerStatus: 'accepted' | 'declined') => {

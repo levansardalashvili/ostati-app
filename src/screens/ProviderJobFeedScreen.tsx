@@ -1,10 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Briefcase } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
+import { OfferPriceSheet } from '../components/OfferPriceSheet';
 import { ProviderFeedJobCard, ProviderFeedJobCardSkeleton } from '../components/ProviderFeedJobCard';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
@@ -58,29 +59,43 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
       role: 'provider',
     });
   };
-  const markInterested = (job: FeedJob) => {
-    setInterests((prev) => {
-      const next = new Set(prev);
-      next.add(job.id);
-      return next;
-    });
+  // #72: ფასი სავალდებულო, კონკრეტული რიცხვია — ProviderHomeScreen-ის
+  // იგივე OfferPriceSheet პატერნი.
+  const [offerJob, setOfferJob] = useState<FeedJob | null>(null);
+  const [offerPrice, setOfferPrice] = useState('');
+  const [sendingInterest, setSendingInterest] = useState(false);
+  const closeOfferSheet = () => {
+    setOfferJob(null);
+    setOfferPrice('');
+  };
+  const confirmInterest = async () => {
+    const priceNum = Number(offerPrice);
+    if (!offerJob || !offerPrice || priceNum <= 0 || sendingInterest) return;
     const uid = authService.getCurrentUser()?.uid;
     if (!uid) return;
-    quoteService
-      .expressInterest(
-        job.id,
+    setSendingInterest(true);
+    try {
+      await quoteService.expressInterest(
+        offerJob.id,
         {
           id: uid,
           name: `${providerProfile.firstName} ${providerProfile.lastName}`.trim(),
           initials: `${providerProfile.firstName.charAt(0)}${providerProfile.lastName.charAt(0)}`,
           color: colors.primary,
         },
-        undefined,
-        job.customerId,
-      )
-      .catch(() => {
-        // ლოკალურ state-ში "დაინტერესებული ხარ" უკვე ასახულია — optimistic-update.
+        priceNum,
+      );
+      setInterests((prev) => {
+        const next = new Set(prev);
+        next.add(offerJob.id);
+        return next;
       });
+      closeOfferSheet();
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'ინტერესის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setSendingInterest(false);
+    }
   };
 
   return (
@@ -110,13 +125,22 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
                 job={job}
                 sent={interests.has(job.id)}
                 onDetail={() => handleJobDetail(job)}
-                onInterested={() => markInterested(job)}
+                onInterested={() => setOfferJob(job)}
                 onChat={() => handleOpenChat(job)}
               />
             ))}
           </View>
         )}
       </ScrollView>
+
+      <OfferPriceSheet
+        visible={!!offerJob}
+        price={offerPrice}
+        onChangePrice={setOfferPrice}
+        onSubmit={confirmInterest}
+        onClose={closeOfferSheet}
+        submitting={sendingInterest}
+      />
     </SafeAreaView>
   );
 }

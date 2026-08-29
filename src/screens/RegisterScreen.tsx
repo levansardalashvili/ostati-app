@@ -90,7 +90,7 @@ export function RegisterScreen({ navigation, route }: Props) {
     setLoading(true);
     try {
       const { uid } = await authService.registerWithEmail({ email: email.trim(), password: pass, role });
-      // users/{uid} Firestore-ჩანაწერი — Login-ს დასჭირდება role-ის
+      // Supabase-ის `users` ცხრილის row — Login-ს დასჭირდება role-ის
       // წასაკითხად (რომელ Home-ზე გადაიყვანოს ავტორიზაციის შემდეგ).
       await userService.createUserRecord(uid, {
         role,

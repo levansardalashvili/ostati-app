@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import type { CustomerProfile, UserRecord } from '../types/user';
-import type { Provider, ProviderProfile } from '../types/provider';
+import type { Provider, ProviderProfile, VerificationStatus } from '../types/provider';
 
 // `users` ცხრილის Postgres-ის row shape (snake_case) — UserRecord (camelCase)
 // TS-ის მხარეს უცვლელი რჩება, კონვერტაცია ხდება ამ ფაილშივე, სერვისის
@@ -43,6 +43,10 @@ type ProviderProfileRow = {
   certificates: ProviderProfile['certificates'];
   portfolio: ProviderProfile['portfolio'];
   sqm_prices: Record<string, string>;
+  // Task 3 — supabase/migrations/0025. RLS-ით client-ისთვის ჩაკეტილია
+  // (owner-ს არასდროს არ შეუძლია საკუთარი თავი გაავერიფიციროს), ამიტომ
+  // ეს მნიშვნელობა ყოველთვის სანდოა, საიდანაც არ უნდა წამოვიდეს.
+  verification_status: VerificationStatus;
 };
 
 function fromProviderProfileRow(row: ProviderProfileRow): ProviderProfile {
@@ -71,10 +75,13 @@ const EXPERIENCE_YEARS: Record<string, number> = { lt1: 0, '1-2': 1, '3-5': 3, '
 type ProviderStatsRow = { provider_id: string; avg_rating: number; review_count: number; completed_jobs: number };
 
 // `provider_profiles`-ის row → საჯარო დირექტორიის `Provider` ობიექტი
-// (#60), `stats`-ის (#64) არასავალდებულო overlay-ით. `jobs`/`verified`/
-// `online`/`price`/`skills` კვლავ ნაგულისხმევებზეა; `isNewProvider`/
+// (#60), `stats`-ის (#64) არასავალდებულო overlay-ით. `jobs`/`online`/
+// `price`/`skills` კვლავ ნაგულისხმევებზეა; `isNewProvider`/
 // `weightedRating` (#42/#43) გამართულად ამუშავებენ `reviews === 0`-ს
-// "ახალი ოსტატი"-დ, crash-ის გარეშე.
+// "ახალი ოსტატი"-დ, crash-ის გარეშე. `verified`/`verificationStatus`
+// (Task 3) რეალურია — `row.verification_status`-იდან, რომელიც RLS-ით
+// client-ისთვის ჩაკეტილია (0025), ამიტომ ეს ბეჯი ყოველთვის სანდო,
+// backend-დან მომდინარე მონაცემია, არასდროს client-ის საკუთარი პრეტენზია.
 function fromProviderProfileRowToPublicProvider(row: ProviderProfileRow, stats?: ProviderStatsRow): Provider {
   const name = `${row.first_name} ${row.last_name}`.trim();
   const initials = `${row.first_name.charAt(0)}${row.last_name.charAt(0)}`.toUpperCase();
@@ -90,7 +97,8 @@ function fromProviderProfileRowToPublicProvider(row: ProviderProfileRow, stats?:
     areas: row.areas,
     price: '',
     jobs: stats?.completed_jobs ?? 0,
-    verified: false,
+    verified: row.verification_status === 'verified',
+    verificationStatus: row.verification_status,
     online: false,
     initials,
     color: '#2563EB',
@@ -166,6 +174,13 @@ export interface UserService {
   // filter-ის ნაცვლად, სადაც მხოლოდ ერთი კონკრეტული Provider-ია საჭირო
   // (ViewProviderProfileScreen-ის deep-link ან პირდაპირი id-ით გახსნა).
   getRealProviderById(id: string): Promise<Provider | null>;
+
+  // Task 2 — Provider Home-ის ხელმისაწვდომობის toggle, `provider_profiles.is_available`-ზე
+  // (მანამდე ლოკალური `useState`). ცალკე, მსუბუქი მეთოდებია (არა
+  // getProviderProfileRecord/upsertProviderProfileRecord-ის ნაწილი), რომ
+  // Home-ის toggle-ის ტოგვამ სრული პროფილის re-fetch/overwrite არ გამოიწვიოს.
+  getProviderAvailability(uid: string): Promise<boolean>;
+  setProviderAvailability(uid: string, value: boolean): Promise<void>;
 }
 
 export const userService: UserService = {
@@ -250,5 +265,19 @@ export const userService: UserService = {
     if (!data) return null;
     const stats = !statsResult.error && statsResult.data ? (statsResult.data as ProviderStatsRow) : undefined;
     return fromProviderProfileRowToPublicProvider(data as ProviderProfileRow, stats);
+  },
+
+  async getProviderAvailability(uid) {
+    const { data, error } = await supabase
+      .from('provider_profiles')
+      .select('is_available')
+      .eq('id', uid)
+      .maybeSingle();
+    if (error) throw error;
+    return (data as { is_available: boolean } | null)?.is_available ?? true;
+  },
+  async setProviderAvailability(uid, value) {
+    const { error } = await supabase.from('provider_profiles').update({ is_available: value }).eq('id', uid);
+    if (error) throw error;
   },
 };

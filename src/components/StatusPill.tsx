@@ -21,6 +21,12 @@ const STATUS_MAP: Record<JobStatus, { label: string; bg: string; text: string; d
     text: colors.warning,
     dot: colors.warning,
   },
+  confirmed_awaiting_rating: {
+    label: 'ელოდება შეფასებას',
+    bg: colors.warningBackground,
+    text: colors.warning,
+    dot: colors.warning,
+  },
   disputed: { label: 'პრობლემაა', bg: colors.dangerBackground, text: colors.destructive, dot: colors.destructive },
   completed: { label: 'დასრულებულია', bg: colors.secondary, text: colors.secondaryForeground, dot: colors.primary },
   cancelled: { label: 'გაუქმდა', bg: colors.dangerBackground, text: colors.destructive, dot: colors.destructive },

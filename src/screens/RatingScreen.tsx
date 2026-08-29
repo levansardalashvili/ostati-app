@@ -21,7 +21,9 @@ const STAR_LABELS = ['', 'ძალიან ცუდი', 'ცუდი', 'ს
 
 // RatingScreen — "ოსტატის შეფასება" (ზუსტად ზიპის App.tsx-ის RatingScreen-ის
 // მიხედვით). დათანხმებული შეფასება navigation param-ით მოწოდებული `onRate`
-// callback-ით მიეწოდება CustomerJobDetailScreen-ს (Firebase-მდე — TODO).
+// callback-ით მიეწოდება CustomerJobDetailScreen-ს, რომელიც რეალურად წერს
+// Supabase-ის `reviews` ცხრილში (reviewService.submitReview) — ამ insert-ის
+// trigger-ი job-საც `completed`-ზე გადაჰყავს (#72, supabase/migrations/0015/0023).
 // შეფასება სავალდებულოა (მომხმარებლის მოთხოვნით): უკან დაბრუნება (header
 // ისარი, gesture, Android hardware back) დაბლოკილია მანამ, სანამ
 // შეფასება არ გაიგზავნება — "მოგვიანებით" ღილაკი განზრახ არ არსებობს.

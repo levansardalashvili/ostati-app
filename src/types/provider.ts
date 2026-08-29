@@ -1,9 +1,19 @@
 import type { MediaItem } from '../components/MediaUploadGrid';
 import type { SpecialtyOption } from '../components/SpecialtyPickerField';
 
+// Provider-ის ვერიფიკაციის სტატუსი (Task 3) — `provider_profiles.verification_status`-ის
+// ზუსტი ანარეკლი (supabase/migrations/0025). Provider-ს არასდროს არ
+// შეუძლია ეს თავად შეიცვალოს (RLS-ით ჩაკეტილია, owner-ის UPDATE-ის WITH
+// CHECK-ში) — მხოლოდ სანდო backend (მომავალი admin ვერიფიკაციის flow,
+// service_role-ით) ცვლის. `verified: boolean` (ქვემოთ) ამ ველის უბრალო
+// წარმოებულია (`=== 'verified'`), საჯარო ბეჯის არსებული UI-ს
+// (5 ეკრანი, `p.verified && <VerifiedBadge/>`) რომ არ დასჭირდეს შეხება.
+export type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
+
 // საჯარო ოსტატის ჩანაწერი (directory listing entity) — Customer-ის მხრიდან
 // ჩანს ყველგან (Home, კატეგორიის სია, საჯარო პროფილი, შენახული ოსტატები).
-// TODO: ჩანაცვლდება Firestore-ის providerProfiles/{uid}-ის საჯარო ველებით.
+// რეალურად Supabase-ის `provider_profiles` ცხრილზეა აგებული (#60,
+// userService.ts-ის `listRealProviders`/`getRealProviderById`).
 export type Provider = {
   id: string;
   name: string;
@@ -16,6 +26,7 @@ export type Provider = {
   price: string;
   jobs: number;
   verified: boolean;
+  verificationStatus: VerificationStatus;
   online: boolean;
   initials: string;
   color: string;
@@ -37,7 +48,8 @@ export type Provider = {
 
 // Provider-ის საკუთარი, რედაქტირებადი პროფილის draft — ProviderProfileContext-ის
 // state-ის ფორმა (ProviderSetup/ProviderEditProfile-ის საერთო ველები).
-// TODO: ჩანაცვლდება Firestore-ის providerProfiles/{uid} დოკუმენტით.
+// რეალურად Supabase-ის იმავე `provider_profiles` ცხრილზეა აგებული (#53,
+// userService.ts-ის `getProviderProfileRecord`/`upsertProviderProfileRecord`).
 export type ProviderProfile = {
   firstName: string;
   lastName: string;

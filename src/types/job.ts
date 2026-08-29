@@ -1,30 +1,48 @@
-// ორმხრივი (two-sided) დასრულების state machine:
+// ორმხრივი (two-sided) დასრულების state machine (#72-ის მიხედვით
+// გამკვრივებული — რეალურ Postgres RPC-ებზეა აგებული, არა თავისუფალ
+// client-side UPDATE-ზე, იხ. supabase/migrations/0014_job_workflow_rpcs.sql):
 // pending (Provider ჯერ არ არჩეულა)
-//   → active (= "provider_selected" — Customer-მა Provider აირჩია)
-//   → awaiting_customer_confirmation (Provider-მა დააჭირა "სამუშაო დავასრულე" —
-//     Provider-ს პირდაპირ დასრულება არ შეუძლია, მხოლოდ ამ შუალედურ state-ში გადასვლა)
-//   → completed (მხოლოდ მას შემდეგ რაც Customer დაადასტურებს ("დადასტურება")
-//     და სავალდებულო RatingScreen-ზე ვარსკვლავს გაგზავნის — status "completed"
-//     ხდება ვარსკვლავის გაგზავნის მომენტში, არა უფრო ადრე)
-//   ან → disputed (Customer-მა "პრობლემა მაქვს" აირჩია — job არასდროს ხდება
-//     completed ამ short-circuit-ით, პრობლემის flow განაგრძობს ცალკე)
-// "cancelled" ამ ციკლის მიღმაა (გამონაკლისი/terminal state).
-//
-// სახელები განზრახ არჩეულია მომავალი ბარათით გადახდის უსაფრთხოდ დამატებისთვის —
-// მაგ. 'payment_pending'/'paid' შეიძლება ჩაისვას 'awaiting_customer_confirmation'-სა
-// და 'completed'-ს შორის (ან 'completed'-ის შემდეგ) სტრუქტურის შეცვლის გარეშე,
-// რადგან job-ის სტატუსი უკვე string-keyed union-ია, არა boolean flag-ების ნაკრები.
+//   → active (select_provider() RPC — Customer-მა Provider აირჩია;
+//     ატომურად ინიშნება provider_id + agreed_price, ამ ბოლოს პირდაპირ
+//     Provider-ის job_responses.offered_price-დან, RPC-ის შიგნით)
+//   → awaiting_customer_confirmation (provider_request_completion() RPC —
+//     Provider-ს პირდაპირ დასრულება არ შეუძლია, მხოლოდ ამ შუალედურ
+//     state-ში გადასვლა)
+//   → confirmed_awaiting_rating (customer_confirm_completion() RPC —
+//     Customer ეთანხმება, მაგრამ job ჯერ არ არის "completed")
+//   → completed (მხოლოდ reviews-ის INSERT trigger-ის (0015) გვერდითი
+//     ეფექტით, მას შემდეგ რაც სავალდებულო RatingScreen ვარსკვლავს
+//     გააგზავნის — არცერთი RPC პირდაპირ არ აყენებს "completed"-ს)
+//   ან → disputed (customer_report_problem() RPC, მიზეზის ტექსტით —
+//     job არასდროს ხდება completed ამ short-circuit-ით)
+// "cancelled" ამ ციკლის მიღმაა (გამონაკლისი/terminal state, კვლავ
+// მხოლოდ ლოკალური UI-ს დონეზე, არასდროს Supabase-ში ჩაწერილი — #47-ის
+// ცნობილი შეზღუდვა).
 //
 // შენიშვნა: StatusPill.tsx ამ ტიპს რეექსპორტავს (`export type { JobStatus }`),
 // რომ არსებული `import { StatusPill, type JobStatus } from '../components/StatusPill'`
 // import-ები ხელუხლებელი დარჩეს.
-export type JobStatus = 'active' | 'pending' | 'awaiting_customer_confirmation' | 'disputed' | 'completed' | 'cancelled';
+export type JobStatus =
+  | 'active'
+  | 'pending'
+  | 'awaiting_customer_confirmation'
+  | 'confirmed_awaiting_rating'
+  | 'disputed'
+  | 'completed'
+  | 'cancelled';
 
-// Provider-ის მხრიდან ხილული job-ის ჩანაწერი (Job Feed) — TODO: Firestore-ის
-// jobPosts collection-ის Provider-ისთვის ხილვადი queries.
+// Provider-ის მხრიდან ხილული job-ის ჩანაწერი (Job Feed) — რეალურად
+// Supabase-ის `job_posts` ცხრილზეა აგებული (#55 "ეტაპი B", jobService.ts-ის
+// `getOpenProviderFeedPosts`/`listMyAssignedJobs`).
 export type FeedJob = {
   id: string;
   category: string;
+  // job_posts-ს აღარ აქვს `title` სვეტი (#72 — ლეგასი, user-entered
+  // title წაშლილია canonical მოდელიდან, იხ.
+  // supabase/migrations/0011_job_posts_workflow_columns.sql). ეს ველი
+  // UI-ს გამო რჩება (ეკრანების ცვლილება არ დასჭირდა), მაგრამ
+  // jobService.ts-ში კატეგორიიდან გამოითვლება (`deriveJobTitle`), არა
+  // ბაზიდან წაკითხული.
   title: string;
   customer: string;
   location: string;
@@ -55,12 +73,19 @@ export type FeedJob = {
   // დავასრულე"-ს დროს საჭიროა, რომ ვიცოდეთ Customer-ს (job-ის owner-ს)
   // ვის შევუთხოვოთ შეტყობინება. undefined mock demo ჩანაწერებზე.
   customerId?: string;
+  // job_posts.agreed_price (#72) — select_provider() RPC-ის მიერ
+  // ატომურად კოპირებული არჩეული Provider-ის job_responses.offered_price-დან.
+  // undefined/null სანამ Provider ჯერ არ არჩეულა.
+  agreedPrice?: number | null;
 };
 
-// Customer-ის მხრიდან ხილული job-ის ჩანაწერი — TODO: Firestore-ის jobPosts
-// collection-ის Customer-ისთვის ხილვადი queries.
+// Customer-ის მხრიდან ხილული job-ის ჩანაწერი — რეალურად Supabase-ის
+// `job_posts` ცხრილზეა აგებული (#54 "ეტაპი A", jobService.ts-ის
+// `createCustomerJob`/`listMyJobPosts`/`getJobPostById`).
 export type CustomerJob = {
   id: string;
+  // job_posts-ს აღარ აქვს `title` სვეტი (#72) — იხ. FeedJob.title-ის
+  // იგივე შენიშვნა ზემოთ.
   title: string;
   category: string;
   // სრული JobStatus union-ია (#67) — ადრე ვიწრო '`active`|`pending`|
@@ -80,4 +105,9 @@ export type CustomerJob = {
   // demo-ჩანაწერებზე (j1/j2/j3, #61-ის წინა), ცარიელი მასივი რეალურ
   // job-ზე ფოტოს გარეშე, შევსებული მასივი — რეალურ ატვირთულ ფოტოებზე.
   photos?: string[];
+  // job_posts.agreed_price (#72) — იხ. FeedJob-ის იგივე ველი ზემოთ.
+  agreedPrice?: number | null;
+  // job_posts.dispute_reason (#72) — customer_report_problem() RPC-ის
+  // მიერ შენახული თავისუფალი ტექსტი, მხოლოდ 'disputed' სტატუსზე.
+  disputeReason?: string | null;
 };

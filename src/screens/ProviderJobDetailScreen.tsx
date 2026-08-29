@@ -1,20 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AlertTriangle, Award, CheckCircle, Clock, MapPin, MessageCircle, MoreVertical, Star, ThumbsUp } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
-import { BottomSheet } from '../components/BottomSheet';
-import { Button } from '../components/Button';
 import { CategoryIcon } from '../components/CategoryIcon';
+import { OfferPriceSheet } from '../components/OfferPriceSheet';
 import { colors, radius, spacing, typography } from '../theme';
 import { Skeleton } from '../components/Skeleton';
 import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
-import { notificationService } from '../services/notificationService';
 import { quoteService } from '../services/quoteService';
 import { reviewService } from '../services/reviewService';
-import { isUuid } from '../utils/isUuid';
 import { useJobStatus } from '../state/JobStatusContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { FeedJob } from '../types/job';
@@ -112,19 +109,20 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
                 ? 'active'
                 : 'browse';
 
-  const markWorkDone = () => {
-    if (!job.customerJobId) return;
-    setStatus(job.customerJobId, 'awaiting_customer_confirmation');
-    if (job.customerId && isUuid(job.customerId)) {
-      notificationService
-        .create(job.customerId, {
-          title: 'სამუშაო დასრულდა?',
-          body: job.title,
-          iconEmoji: '⏰',
-          iconBg: '#D97706',
-          target: { screen: 'CustomerJobDetail', jobId: job.customerJobId },
-        })
-        .catch(() => {});
+  const [markingWorkDone, setMarkingWorkDone] = useState(false);
+  const markWorkDone = async () => {
+    if (!job.customerJobId || markingWorkDone) return;
+    setMarkingWorkDone(true);
+    try {
+      // #73: Customer-ის "სამუშაო დასრულდა?" შეტყობინება ახლა თავად RPC-ის
+      // (provider_request_completion) მხრიდან იგზავნება, სერვერის მხარეს —
+      // იხ. supabase/migrations/0022.
+      await jobService.providerRequestCompletion(job.customerJobId);
+      setStatus(job.customerJobId, 'awaiting_customer_confirmation');
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'სამუშაოს დასრულების მონიშვნა ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setMarkingWorkDone(false);
     }
   };
 
@@ -159,13 +157,17 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   const handleMore = () => {
     // TODO: მენიუს მოქმედებები (მაგ. "გაუზიარე", "შეატყობინე") მოგვიანებით
   };
-  const confirmInterest = () => {
-    setExpressed(true);
-    setOfferSheetOpen(false);
+  // #72: ფასი სავალდებულო, კონკრეტული რიცხვია — "დაინტ. ვარ" აღარ
+  // იგზავნება ფასის გარეშე.
+  const [sendingInterest, setSendingInterest] = useState(false);
+  const confirmInterest = async () => {
+    const priceNum = Number(offerPrice);
+    if (!offerPrice || priceNum <= 0 || sendingInterest) return;
     const uid = authService.getCurrentUser()?.uid;
     if (!uid) return;
-    quoteService
-      .expressInterest(
+    setSendingInterest(true);
+    try {
+      await quoteService.expressInterest(
         job.id,
         {
           id: uid,
@@ -173,14 +175,15 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
           initials: `${providerProfile.firstName.charAt(0)}${providerProfile.lastName.charAt(0)}`,
           color: colors.primary,
         },
-        offerPrice || undefined,
-        job.customerId,
-      )
-      .catch(() => {
-        // ლოკალურ state-ში "დაინტერესებული ხარ" უკვე ასახულია — Supabase-ის
-        // ჩავარდნისას UI-ს არ ვბლოკავთ (CustomerEditProfileScreen-ის (#51)
-        // იგივე optimistic-update პრინციპით).
-      });
+        priceNum,
+      );
+      setExpressed(true);
+      setOfferSheetOpen(false);
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'ინტერესის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setSendingInterest(false);
+    }
   };
 
   // ერთი მუდმივი JSX ხე jobLoading→loaded გადასვლისას (Fabric-ის "child
@@ -354,9 +357,15 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               მაშინ ჩანს, როცა ამ job-ს Customer-ის მხარესთან რეალური ბმული
               აქვს (customerJobId) — წინააღმდეგ შემთხვევაში დასაჭერი არაფერია. */}
           {job.customerJobId && (
-            <Pressable style={styles.completeWorkButton} onPress={markWorkDone}>
+            <Pressable
+              style={[styles.completeWorkButton, markingWorkDone && styles.completeWorkButtonDisabled]}
+              onPress={markWorkDone}
+              disabled={markingWorkDone}
+            >
               <CheckCircle size={17} color={colors.primaryForeground} />
-              <Text style={styles.completeWorkButtonText}>სამუშაო დავასრულე</Text>
+              <Text style={styles.completeWorkButtonText}>
+                {markingWorkDone ? 'იგზავნება...' : 'სამუშაო დავასრულე'}
+              </Text>
             </Pressable>
           )}
         </View>
@@ -394,27 +403,14 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       </>
       )}
 
-      <BottomSheet visible={offerSheetOpen} onClose={() => setOfferSheetOpen(false)}>
-        <Text style={styles.sheetTitle}>დაინტერესების გაგზავნა</Text>
-        <Text style={styles.sheetSubtitle}>შეგიძლია მიუთითო შეთავაზებული ფასი (არასავალდებულო).</Text>
-        <Text style={styles.offerLabel}>შეთავაზებული ფასი</Text>
-        <View style={styles.offerInputWrap}>
-          <TextInput
-            value={offerPrice}
-            onChangeText={(v) => setOfferPrice(v.replace(/[^0-9]/g, ''))}
-            placeholder="ჩაწერეთ თანხა"
-            placeholderTextColor={colors.mutedForeground}
-            keyboardType="numeric"
-            style={styles.offerInput}
-            autoFocus
-          />
-          <Text style={styles.offerSuffix}>₾</Text>
-        </View>
-        <Button label="დაინტერესების გაგზავნა" onPress={confirmInterest} />
-        <Pressable style={styles.sheetCancelLink} onPress={() => setOfferSheetOpen(false)}>
-          <Text style={styles.sheetCancelLinkText}>გაუქმება</Text>
-        </Pressable>
-      </BottomSheet>
+      <OfferPriceSheet
+        visible={offerSheetOpen}
+        price={offerPrice}
+        onChangePrice={setOfferPrice}
+        onSubmit={confirmInterest}
+        onClose={() => setOfferSheetOpen(false)}
+        submitting={sendingInterest}
+      />
     </SafeAreaView>
   );
 }
@@ -642,6 +638,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
     borderRadius: radius.md,
     minHeight: 52,
+  },
+  completeWorkButtonDisabled: {
+    opacity: 0.6,
   },
   completeWorkButtonText: {
     ...typography.bodyMedium,

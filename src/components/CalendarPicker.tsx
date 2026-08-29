@@ -21,7 +21,7 @@ function isSameDay(a: Date, b: Date): boolean {
 }
 
 // "დღეს"/"ხვალ" ან "D თვე" ფორმატში — job-ის თარიღების არსებული
-// ჩვენების კონვენციასთან თანხვედრით (მაგ. mockHomeData.ts-ის "20 დეკ.").
+// ჩვენების კონვენციასთან თანხვედრით (მაგ. "20 დეკ.").
 export function formatPickedDate(date: Date): string {
   const today = startOfDay(new Date());
   const target = startOfDay(date);

@@ -1,5 +1,4 @@
 import { supabase } from './supabaseClient';
-import { notificationService } from './notificationService';
 import type { JobQuote } from '../types/quote';
 
 // `job_responses` ცხრილის Postgres row shape — Provider-ის საჯარო
@@ -14,7 +13,10 @@ type JobResponseRow = {
   provider_name: string;
   provider_initials: string;
   provider_color: string;
-  offered_price: string | null;
+  // #72: numeric, არა text — Provider ყოველთვის კონკრეტულ რიცხვს
+  // წარადგენს. `null` მხოლოდ migration-მდელ ისტორიულ response-ებზეა
+  // შესაძლებელი (იხ. supabase/migrations/0012_job_responses_price_numeric.sql).
+  offered_price: number | null;
 };
 
 // რეალური response-იდან აგებული Provider — მხოლოდ დენორმალიზებული
@@ -36,6 +38,7 @@ function fromJobResponseRow(row: JobResponseRow): JobQuote {
       price: '',
       jobs: 0,
       verified: false,
+      verificationStatus: 'unverified',
       online: false,
       initials: row.provider_initials,
       color: row.provider_color,
@@ -53,10 +56,14 @@ export type InterestedProvider = { id: string; name: string; initials: string; c
 
 export interface QuoteService {
   // Supabase-ის `job_responses` ცხრილი (#56) — Provider-ის "დაინტერესება"-ს
-  // რეალური ჩაწერა/წაკითხვა. `customerId` (#70) — თუ მოცემულია (რეალურ,
-  // job_posts-იდან წამოღებულ job-ზე), Customer-ს ამატებს "ახალი ოსტატი
-  // დაინტერესდა" შეტყობინებას.
-  expressInterest(jobId: string, provider: InterestedProvider, offeredPrice?: string, customerId?: string): Promise<void>;
+  // რეალური ჩაწერა/წაკითხვა. "ახალი ოსტატი დაინტერესდა" შეტყობინება Customer-ს
+  // ახლა `on_job_response_insert_notify` trigger-ით ეგზავნება ავტომატურად
+  // (#73, supabase/migrations/0021), ამ insert-ის გვერდითი ეფექტის სახით —
+  // კლიენტს აღარ სჭირდება customerId-ის ცალკე გადაცემა შეტყობინებისთვის.
+  // `offeredPrice` სავალდებულო, კონკრეტული რიცხვია (#72) — აღარ არის
+  // არასავალდებულო თავისუფალი ტექსტი; "ფასი სამუშაოს ნახვის შემდეგ" აღარ
+  // არსებობს, როგორც შესაძლებლობა.
+  expressInterest(jobId: string, provider: InterestedProvider, offeredPrice: number): Promise<void>;
   // Provider-ის საკუთარი პასუხების job-id-ების სია — Feed/დეტალის ეკრანებზე
   // "უკვე დაინტერესებული ხარ" state-ის აღსადგენად.
   listMyResponseJobIds(providerId: string): Promise<Set<string>>;
@@ -68,29 +75,16 @@ export interface QuoteService {
 // (ChatMsg-ის type:'offer') ცალკე რჩება — ის კონკრეტული საუბრის ნაწილია
 // და chatService-ის დომენშია, არა აქ.
 export const quoteService: QuoteService = {
-  async expressInterest(jobId, provider, offeredPrice, customerId) {
+  async expressInterest(jobId, provider, offeredPrice) {
     const { error } = await supabase.from('job_responses').insert({
       job_id: jobId,
       provider_id: provider.id,
       provider_name: provider.name,
       provider_initials: provider.initials,
       provider_color: provider.color,
-      offered_price: offeredPrice ?? null,
+      offered_price: offeredPrice,
     });
     if (error) throw error;
-    if (customerId) {
-      notificationService
-        .create(customerId, {
-          title: 'ახალი ოსტატი დაინტერესდა',
-          body: `${provider.name} დაინტერესდა შენი მოთხოვნით`,
-          iconEmoji: '🔧',
-          iconBg: '#2563EB',
-          target: { screen: 'CustomerJobDetail', jobId },
-        })
-        .catch(() => {
-          // შეტყობინების ჩავარდნა მთავარ მოქმედებას (დაინტერესებას) არ ბლოკავს.
-        });
-    }
   },
   async listMyResponseJobIds(providerId) {
     const { data, error } = await supabase.from('job_responses').select('job_id').eq('provider_id', providerId);

@@ -1,19 +1,6 @@
 import { supabase } from './supabaseClient';
-import { notificationService } from './notificationService';
 import type { ChatEntry, ChatMsg, OfferStatus } from '../types/chat';
 import type { Role } from '../types/user';
-
-// მონაწილის საჩვენებელი ინფო (სახელი/ინიციალები/ფერი) — sendReal*-ის
-// ყოველ გამოძახებაზე გადაეცემა, რომ `conversations`-ის (#68) row-ი
-// (touchConversation) ყოველთვის განახლდეს უახლესი მონაცემით.
-export type ChatParticipants = {
-  customerName: string;
-  customerInitials: string;
-  customerColor: string;
-  providerName: string;
-  providerInitials: string;
-  providerColor: string;
-};
 
 export interface ChatService {
   // Supabase-ის `messages` ცხრილი (#57/#59/#66/#68) — ტექსტი, Realtime,
@@ -21,29 +8,23 @@ export interface ChatService {
   // ცხრილის (#68) გარეშეა მოდელირებული — უბრალოდ (customer_id, provider_id)
   // წყვილი, რომ ყველა არსებული "ჩატი" ღილაკის navigation call site
   // უცვლელი დარჩეს (chatId კვლავ "მეორე მხარის id"-ია).
+  //
+  // #73 — sendReal*-ს აღარ სჭირდება ChatParticipants პარამეტრი: `messages`-ის
+  // insert-ის შემდეგ ყველაფერს (conversations-ის ატომური upsert +
+  // მიმღების შეტყობინება) `on_message_insert_notify` trigger აკეთებს
+  // ერთსა და იმავე ტრანზაქციაში (supabase/migrations/0020) — ის
+  // მონაწილეთა სახელებს/ინიციალებს პირდაპირ `users`/`provider_profiles`-იდან
+  // კითხულობს (SECURITY DEFINER), კლიენტის მტკიცებას აღარ ენდობა.
   listRealMessages(customerId: string, providerId: string, myUid: string): Promise<ChatMsg[]>;
-  sendRealMessage(
-    customerId: string,
-    providerId: string,
-    senderId: string,
-    text: string,
-    participants: ChatParticipants,
-  ): Promise<ChatMsg>;
+  sendRealMessage(customerId: string, providerId: string, senderId: string, text: string): Promise<ChatMsg>;
   sendRealOffer(
     customerId: string,
     providerId: string,
     senderId: string,
     amount: number,
     comment: string | undefined,
-    participants: ChatParticipants,
   ): Promise<ChatMsg>;
-  sendRealImage(
-    customerId: string,
-    providerId: string,
-    senderId: string,
-    imageUrl: string,
-    participants: ChatParticipants,
-  ): Promise<ChatMsg>;
+  sendRealImage(customerId: string, providerId: string, senderId: string, imageUrl: string): Promise<ChatMsg>;
   respondToRealOffer(messageId: string, status: Extract<OfferStatus, 'accepted' | 'declined'>): Promise<void>;
   subscribeToMessages(
     customerId: string,
@@ -55,8 +36,9 @@ export interface ChatService {
   // `conversations` ცხრილი (#68) — ჩატების სიის (ChatsListScreen) რეალური
   // მონაცემი. ცალკე ცხრილია (არა `messages`-იდან on-the-fly აგრეგირებული),
   // რადგან "ბოლო შეტყობინება + წაუკითხავის რაოდენობა თითო საუბარზე"
-  // PostgREST-ის უბრალო query-ით არ გამოითვლება — ინახება/ნახლდება
-  // sendReal*-ის მხრიდან, გვერდითი ეფექტის სახით (`touchConversation`).
+  // PostgREST-ის უბრალო query-ით არ გამოითვლება — ინახება/ნახლდება ატომურად,
+  // `messages`-ის INSERT trigger-ის მხრიდან (#73, `on_message_insert_notify`,
+  // supabase/migrations/0020) — აღარ არის ცალკე კლიენტის read-modify-write.
   listMyConversations(myUid: string, myRole: Role): Promise<ChatEntry[]>;
   markConversationRead(customerId: string, providerId: string, myRole: Role): Promise<void>;
 
@@ -129,82 +111,6 @@ function fromMessageRow(row: MessageRow, myUid: string): ChatMsg {
   return { id: row.id, type: 'text', from, text: row.text, t, state: 'read' };
 }
 
-// `messages`-ის ყოველი გაგზავნის შემდეგ `conversations`-ის row-ს ქმნის ან
-// ანახლებს — ბოლო შეტყობინება/დრო/მიმღების წაუკითხავის counter+1. Read-
-// modify-write (2 round trip) — მისაღები pragmatism, ამ აპის scale-ზე.
-async function touchConversation(
-  customerId: string,
-  providerId: string,
-  senderId: string,
-  lastMessage: string,
-  p: ChatParticipants,
-): Promise<void> {
-  const { data: existing } = await supabase
-    .from('conversations')
-    .select('customer_unread, provider_unread')
-    .eq('customer_id', customerId)
-    .eq('provider_id', providerId)
-    .maybeSingle();
-  const isFromCustomer = senderId === customerId;
-  const base = {
-    customer_id: customerId,
-    provider_id: providerId,
-    customer_name: p.customerName,
-    customer_initials: p.customerInitials,
-    customer_color: p.customerColor,
-    provider_name: p.providerName,
-    provider_initials: p.providerInitials,
-    provider_color: p.providerColor,
-    last_message: lastMessage,
-    last_message_at: new Date().toISOString(),
-  };
-  if (existing) {
-    await supabase
-      .from('conversations')
-      .update({
-        ...base,
-        customer_unread: isFromCustomer ? existing.customer_unread : existing.customer_unread + 1,
-        provider_unread: isFromCustomer ? existing.provider_unread + 1 : existing.provider_unread,
-      })
-      .eq('customer_id', customerId)
-      .eq('provider_id', providerId);
-  } else {
-    await supabase.from('conversations').insert({
-      ...base,
-      customer_unread: isFromCustomer ? 0 : 1,
-      provider_unread: isFromCustomer ? 1 : 0,
-    });
-  }
-}
-
-// ახალი შეტყობინების შეტყობინება (#70) — მიმღები ყოველთვის "მეორე მხარეა"
-// (არა sender), `ChatConversation`-ის target-ის `chatId` მიმღების
-// პერსპექტივიდან sender-ის id-ია (route param-ის იგივე კონვენცია, რასაც
-// ყველა "ჩატი" ღილაკი იყენებს).
-async function notifySender(
-  customerId: string,
-  providerId: string,
-  senderId: string,
-  body: string,
-  p: ChatParticipants,
-): Promise<void> {
-  const isFromCustomer = senderId === customerId;
-  const recipientId = isFromCustomer ? providerId : customerId;
-  await notificationService.create(recipientId, {
-    title: 'ახალი შეტყობინება',
-    body,
-    iconEmoji: '💬',
-    iconBg: '#2563EB',
-    target: {
-      screen: 'ChatConversation',
-      chatId: senderId,
-      name: isFromCustomer ? p.customerName : p.providerName,
-      initials: isFromCustomer ? p.customerInitials : p.providerInitials,
-      color: isFromCustomer ? p.customerColor : p.providerColor,
-    },
-  });
-}
-
 export const chatService: ChatService = {
   async listRealMessages(customerId, providerId, myUid) {
     const { data, error } = await supabase
@@ -216,18 +122,16 @@ export const chatService: ChatService = {
     if (error) throw error;
     return (data as MessageRow[]).map((row) => fromMessageRow(row, myUid));
   },
-  async sendRealMessage(customerId, providerId, senderId, text, participants) {
+  async sendRealMessage(customerId, providerId, senderId, text) {
     const { data, error } = await supabase
       .from('messages')
       .insert({ customer_id: customerId, provider_id: providerId, sender_id: senderId, type: 'text', text })
       .select()
       .single();
     if (error) throw error;
-    await touchConversation(customerId, providerId, senderId, text, participants);
-    notifySender(customerId, providerId, senderId, text, participants).catch(() => {});
     return fromMessageRow(data as MessageRow, senderId);
   },
-  async sendRealOffer(customerId, providerId, senderId, amount, comment, participants) {
+  async sendRealOffer(customerId, providerId, senderId, amount, comment) {
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -243,12 +147,9 @@ export const chatService: ChatService = {
       .select()
       .single();
     if (error) throw error;
-    const summary = `შეთავაზებული ფასი: ${amount} ₾`;
-    await touchConversation(customerId, providerId, senderId, summary, participants);
-    notifySender(customerId, providerId, senderId, summary, participants).catch(() => {});
     return fromMessageRow(data as MessageRow, senderId);
   },
-  async sendRealImage(customerId, providerId, senderId, imageUrl, participants) {
+  async sendRealImage(customerId, providerId, senderId, imageUrl) {
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -262,8 +163,6 @@ export const chatService: ChatService = {
       .select()
       .single();
     if (error) throw error;
-    await touchConversation(customerId, providerId, senderId, '📷 ფოტო', participants);
-    notifySender(customerId, providerId, senderId, '📷 ფოტო', participants).catch(() => {});
     return fromMessageRow(data as MessageRow, senderId);
   },
   async respondToRealOffer(messageId, status) {
@@ -271,8 +170,11 @@ export const chatService: ChatService = {
     if (error) throw error;
   },
   subscribeToMessages(customerId, providerId, myUid, onMessage) {
+    // შემთხვევითი suffix (notificationService.subscribeToUnreadCount-ის
+    // იგივე მიზეზით) — topic-ის collision-ის თავიდან ასაცილებლად, თუ ეს
+    // ეკრანი ორჯერ აღმოჩნდება mounted (მაგ. navigation-ის race).
     const channel = supabase
-      .channel(`messages-${customerId}-${providerId}`)
+      .channel(`messages-${customerId}-${providerId}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'messages', filter: `customer_id=eq.${customerId}` },
@@ -330,7 +232,7 @@ export const chatService: ChatService = {
     };
     fetchCount();
     const channel = supabase
-      .channel(`conversations-unread-${myUid}`)
+      .channel(`conversations-unread-${myUid}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `${column}=eq.${myUid}` }, fetchCount)
       .subscribe();
     return () => {

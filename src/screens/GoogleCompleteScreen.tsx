@@ -21,7 +21,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'GoogleComplete'>;
 // იგივე წესით (Provider-ს საცხოვრებელი მისამართი საერთოდ არ სჭირდება,
 // სამუშაო არეალს მოგვიანებით ProviderSetup-ზე ირჩევს). Google-ის რეალური
 // ავტორიზაცია უკვე მოხდა წინა ეკრანზე (RegisterScreen-ის Google ღილაკი) —
-// აქ უბრალოდ ვკითხულობთ უკვე შესულ Firebase მომხმარებელს
+// აქ უბრალოდ ვკითხულობთ უკვე შესულ Supabase Auth მომხმარებელს
 // (authService.getCurrentUser()) და ვასრულებთ პროფილს.
 export function GoogleCompleteScreen({ navigation, route }: Props) {
   const { role } = route.params;

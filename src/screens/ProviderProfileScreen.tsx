@@ -49,20 +49,31 @@ export function ProviderProfileScreen({ navigation }: Props) {
   // რეალური rating/reviews/jobs (#71) — ადრე ჰარდქოდილი "4.9★/127 შეფ./312
   // სამ." იყო, ანგარიშის რეალურ მდგომარეობასთან დაუკავშირებელი.
   const uid = authService.getCurrentUser()?.uid ?? null;
-  const [stats, setStats] = useState({ rating: 0, reviews: 0, jobs: 0 });
+  // `null` სანამ არ ჩაიტვირთება (არა `{rating:0,...}` საწყისიდანვე) — თუ
+  // 0-ზე დაწყებულს გვექნებოდა, `isNewProvider`-ის ternary ქვემოთ ჯერ ერთ
+  // ფრაგმენტს (⭐-ის გარეშე) დახატავდა, მერე fetch-ის დასრულებისთანავე
+  // მთლიანად სხვა ფრაგმენტზე (⭐+რიცხვები) გადავიდოდა — ეს ტიპის ცვლილება
+  // ერთსა და იმავე position-ზე Fabric-ის ცნობილი Android crash-ია
+  // ("addViewAt... child already has a parent", #71-ის loading-guard-ების
+  // იგივე ოჯახის ბაგი). `null`-ის დროს საერთოდ არაფერი არ ვრენდერავთ იმ
+  // ადგილას — ცარიელიდან შევსებულზე გადასვლა კი უსაფრთხოა.
+  const [stats, setStats] = useState<{ rating: number; reviews: number; jobs: number } | null>(null);
   useEffect(() => {
     if (!uid) return;
     let cancelled = false;
     userService
       .getRealProviderById(uid)
       .then((real) => {
-        if (!cancelled && real) setStats({ rating: real.rating, reviews: real.reviews, jobs: real.jobs });
+        if (!cancelled) setStats({ rating: real?.rating ?? 0, reviews: real?.reviews ?? 0, jobs: real?.jobs ?? 0 });
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setStats({ rating: 0, reviews: 0, jobs: 0 });
+      });
     return () => {
       cancelled = true;
     };
   }, [uid]);
+  const displayStats = stats ?? { rating: 0, reviews: 0, jobs: 0 };
 
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   useEffect(() => {
@@ -74,8 +85,8 @@ export function ProviderProfileScreen({ navigation }: Props) {
     { icon: Pencil, label: 'პროფილის რედაქტირება', bg: '#EFF6FF', color: '#2563EB', badge: 0 },
     { icon: MapPin, label: 'სამუშაო არეალი', bg: '#ECFDF5', color: '#059669', badge: 0 },
     { icon: ClipboardList, label: 'ჩემი სამუშაო', bg: '#FFF7ED', color: '#EA580C', badge: 0 },
-    { icon: Briefcase, label: 'შესრულებული სამუშაოები', bg: '#F5F3FF', color: '#7C3AED', badge: stats.jobs },
-    { icon: Star, label: 'შეფასებები', bg: '#FFFBEB', color: '#D97706', badge: stats.reviews },
+    { icon: Briefcase, label: 'შესრულებული სამუშაოები', bg: '#F5F3FF', color: '#7C3AED', badge: displayStats.jobs },
+    { icon: Star, label: 'შეფასებები', bg: '#FFFBEB', color: '#D97706', badge: displayStats.reviews },
     { icon: Bell, label: 'შეტყობინებები', bg: colors.muted, color: colors.mutedForeground, badge: unreadNotifCount },
     { icon: HelpCircle, label: 'დახმარება', bg: '#ECFEFF', color: '#0891B2', badge: 0 },
     { icon: Settings, label: 'ანგარიშის პარამეტრები', bg: colors.muted, color: colors.mutedForeground, badge: 0 },
@@ -128,28 +139,29 @@ export function ProviderProfileScreen({ navigation }: Props) {
             {!!specialtyLabel && <Text style={styles.specialty}>{specialtyLabel}</Text>}
             {!!experienceLabel && <Text style={styles.experience}>{experienceLabel} გამოცდილება</Text>}
             <View style={styles.ratingRow}>
-              {isNewProvider({ reviews: stats.reviews }) ? (
-                <Text style={styles.ratingMeta}>ახალი ოსტატი</Text>
-              ) : (
-                <>
-                  <Star size={12} color="#FBBF24" fill="#FBBF24" />
-                  <Text style={styles.ratingValue}>{stats.rating.toFixed(1)}</Text>
-                  <Text style={styles.ratingMeta}>
-                    · {stats.reviews} შეფ. · {stats.jobs} სამ.
-                  </Text>
-                </>
-              )}
+              {stats &&
+                (isNewProvider({ reviews: stats.reviews }) ? (
+                  <Text style={styles.ratingMeta}>ახალი ოსტატი</Text>
+                ) : (
+                  <>
+                    <Star size={12} color="#FBBF24" fill="#FBBF24" />
+                    <Text style={styles.ratingValue}>{stats.rating.toFixed(1)}</Text>
+                    <Text style={styles.ratingMeta}>
+                      · {stats.reviews} შეფ. · {stats.jobs} სამ.
+                    </Text>
+                  </>
+                ))}
             </View>
           </View>
         </View>
 
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>{stats.reviews === 0 ? '—' : `${stats.rating.toFixed(1)}★`}</Text>
-            <Text style={styles.statLabel}>{stats.reviews} შეფ.</Text>
+            <Text style={styles.statValue}>{displayStats.reviews === 0 ? '—' : `${displayStats.rating.toFixed(1)}★`}</Text>
+            <Text style={styles.statLabel}>{displayStats.reviews} შეფ.</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>{stats.jobs}</Text>
+            <Text style={styles.statValue}>{displayStats.jobs}</Text>
             <Text style={styles.statLabel}>შესრულ. სამ.</Text>
           </View>
           <View style={styles.statBox}>

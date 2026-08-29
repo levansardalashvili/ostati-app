@@ -21,6 +21,12 @@ export interface AuthService {
   signOut(): Promise<void>;
   getCurrentUser(): AppUser | null;
   subscribeToAuthState(callback: (user: AppUser | null) => void): () => void;
+  // Cold-start session restore (Task 1) — resolves once Supabase-ის
+  // persisted session (AsyncStorage) რეალურად წაკითხულია, ისე რომ
+  // RootNavigator-მა Welcome-ის საწყისი render (flash) ამის დასრულებამდე
+  // არ გამოაჩინოს. ერთხელ გამოითვლება (module-level promise), ყოველი
+  // გამომძახებელი ერთსა და იმავე შედეგს იღებს.
+  waitForSession(): Promise<AppUser | null>;
 }
 
 // Web OAuth Client ID — იგივე, რაც Firebase-ის დროს გამოვიყენეთ Google
@@ -64,9 +70,16 @@ let cachedUser: SupabaseUser | null = null;
 supabase.auth.onAuthStateChange((_event, session) => {
   cachedUser = session?.user ?? null;
 });
-supabase.auth.getSession().then(({ data }) => {
-  cachedUser = data.session?.user ?? null;
-});
+// იგივე საწყისი getSession() call, უბრალოდ ახლა `sessionReadyPromise`-ადაც
+// ინახება (waitForSession-ისთვის) — RootNavigator-ს სჭირდება ეს Promise,
+// რომ იცოდეს ზუსტად როდის დასრულდა AsyncStorage-იდან სესიის აღდგენა.
+const sessionReadyPromise: Promise<AppUser | null> = supabase.auth
+  .getSession()
+  .then(({ data }) => {
+    cachedUser = data.session?.user ?? null;
+    return cachedUser ? toAppUser(cachedUser) : null;
+  })
+  .catch(() => null);
 
 // Supabase-ის შეცდომის ტექსტები ქართულ, მომხმარებლისთვის გასაგებ
 // ტექსტად — ეკრანების არსებული error-banner-ების მიერ გამოსაყენებელი.
@@ -138,5 +151,8 @@ export const authService: AuthService = {
       callback(session?.user ? toAppUser(session.user) : null);
     });
     return () => data.subscription.unsubscribe();
+  },
+  waitForSession() {
+    return sessionReadyPromise;
   },
 };

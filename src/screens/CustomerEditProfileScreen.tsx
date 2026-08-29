@@ -20,7 +20,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CustomerEditProfile'>;
 // მიხედვით. პირველი შენახვა შეგნებულად ვარდება (საცდელი error-state
 // დემონსტრირებისთვის), მეორე ცდაზე წარმატებული. წარმატებულ შენახვაზე
 // მონაცემები იწერება CustomerProfileContext-ში (მყისიერი UI feedback)
-// და პარალელურად Firestore-ის users/{uid}-ში (userService.updateUserRecord) —
+// და პარალელურად Supabase-ის `users` ცხრილში (userService.updateUserRecord) —
 // რომ ცვლილება რეალურად შენარჩუნდეს, არა მხოლოდ ამ სესიაში.
 export function CustomerEditProfileScreen({ navigation }: Props) {
   const { profile, setProfile } = useCustomerProfile();
@@ -53,7 +53,7 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
         try {
           await userService.updateUserRecord(uid, patch);
         } catch {
-          // ლოკალურ Context-ში ცვლილება უკვე ასახულია — Firestore-ის
+          // ლოკალურ Context-ში ცვლილება უკვე ასახულია — Supabase-ის
           // ჩავარდნისას UI-ს არ ვბლოკავთ, უბრალოდ ჩუმად რჩება
           // შემდეგ სინქრონიზაციამდე (მომავალში: retry/queue).
         }

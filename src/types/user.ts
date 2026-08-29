@@ -12,13 +12,14 @@ export type CustomerProfile = {
   defaultAddress: string;
 };
 
-// Firestore-ის users/{uid} დოკუმენტის ფორმა — ანგარიშის საბაზისო
-// identity + role, საერთო ორივე როლისთვის. Register/GoogleComplete
-// წერს ამას რეგისტრაციისას, Login კითხულობს (რომ იცოდეს, სად გადაიყვანოს
-// მომხმარებელი — CustomerHome თუ ProviderHome). Provider-ისთვის
-// `defaultAddress` ცარიელია (Provider-ს საცხოვრებელი მისამართი არ სჭირდება,
-// #46) — მისი დანარჩენი, უფრო დეტალური პროფილი (specialty/areas/about...)
-// მომავალში providerProfiles/{uid} collection-ში იქნება, ჯერ არ არსებობს.
+// Supabase-ის `users` ცხრილის row-ის ფორმა — ანგარიშის საბაზისო
+// identity + role, საერთო ორივე როლისთვის (#51/#52). Register/GoogleComplete
+// წერს ამას რეგისტრაციისას, Login/RootNavigator-ის session-restore
+// კითხულობს (რომ იცოდეს, სად გადაიყვანოს მომხმარებელი — CustomerHome თუ
+// ProviderHome). Provider-ისთვის `defaultAddress` ცარიელია (Provider-ს
+// საცხოვრებელი მისამართი არ სჭირდება, #46) — მისი დანარჩენი, უფრო
+// დეტალური პროფილი (specialty/areas/about...) ცალკე `provider_profiles`
+// ცხრილშია (#53, `src/types/provider.ts`-ის `ProviderProfile`).
 export type UserRecord = {
   role: Role;
   firstName: string;

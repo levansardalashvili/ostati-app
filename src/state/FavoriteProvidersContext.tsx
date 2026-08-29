@@ -3,8 +3,10 @@ import React, { createContext, useContext, useState } from 'react';
 // FavoriteProvidersContext — Customer-ის შენახული (favorite) ოსტატების
 // id-ების სია. Customer ❤️-ს აჭერს ოსტატის საჯარო პროფილზე
 // (ViewProviderProfileScreen), CustomerProfileScreen-ის "შენახული ოსტატები"
-// კითხულობს (SavedProvidersScreen). TODO: ჩანაცვლდება Firestore-ის
-// users/{uid}/favoriteProviders sub-collection-ით.
+// კითხულობს (SavedProvidersScreen). სუფთა ლოკალური React state — Supabase-ს
+// არასდროს არ დაკავშირებია (განზრახ, დოკუმენტირებული, `supabase/README.md`-ის
+// "Deliberately not included" — favorites/saved_providers ცხრილი არ არსებობს).
+// TODO: მომავალში საკუთარი `favorites` ცხრილით (owner-only RLS), თუ საჭირო გახდება.
 type FavoriteProvidersContextValue = {
   favoriteIds: Set<string>;
   isFavorite: (providerId: string) => boolean;

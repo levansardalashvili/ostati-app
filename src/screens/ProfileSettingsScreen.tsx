@@ -32,7 +32,7 @@ export function ProfileSettingsScreen({ navigation }: Props) {
 
   const handleSave = () => {
     if (!canSave) return;
-    // TODO: Firebase Auth-ის updatePassword გამოძახება
+    // TODO: Supabase Auth-ის supabase.auth.updateUser({ password }) გამოძახება
     closeSheet();
   };
 

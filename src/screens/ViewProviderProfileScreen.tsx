@@ -33,6 +33,7 @@ const EMPTY_PROVIDER: Provider = {
   price: '',
   jobs: 0,
   verified: false,
+  verificationStatus: 'unverified',
   online: false,
   initials: '',
   color: colors.primary,
@@ -211,7 +212,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
               {p.sqmPrice && <Text style={styles.priceText}>ფასი კვ.მ-ზე: {p.sqmPrice} ₾ / მ²</Text>}
             </View>
           ) : (
-            <Text style={styles.priceTextMuted}>ფასი სამუშაოს ნახვის შემდეგ განისაზღვრება</Text>
+            <Text style={styles.priceTextMuted}>საბაზისო ფასი მითითებული არ არის</Text>
           )}
         </View>
 

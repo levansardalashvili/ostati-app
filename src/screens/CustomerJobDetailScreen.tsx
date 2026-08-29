@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Briefcase,
@@ -26,7 +26,6 @@ import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
 import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
-import { notificationService } from '../services/notificationService';
 import { quoteService } from '../services/quoteService';
 import { reviewService } from '../services/reviewService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
@@ -119,15 +118,14 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   );
   const [sortBy, setSortBy] = useState<'price' | 'rating' | 'experience' | null>(null);
 
-  const priceValue = (entry: (typeof interestedList)[number]) => {
-    const raw = entry.offeredPrice ?? entry.provider.sqmPrice;
-    return raw ? Number(raw) : Number.POSITIVE_INFINITY;
-  };
-  const priceLabel = (entry: (typeof interestedList)[number]) => {
-    if (entry.offeredPrice) return `შეთავაზებული ფასი: ${entry.offeredPrice} ₾`;
-    if (entry.provider.sqmPrice) return `${entry.provider.sqmPrice} ₾ / მ²`;
-    return 'ფასი სამუშაოს ნახვის შემდეგ განისაზღვრება';
-  };
+  // #72: Provider ყოველთვის კონკრეტულ რიცხვს წარადგენს — "ფასი სამუშაოს
+  // ნახვის შემდეგ განისაზღვრება"/inspection-ფასის ცნება აღარ არსებობს.
+  // `offeredPrice === undefined` მხოლოდ migration-მდელ ისტორიულ
+  // response-ებზეა შესაძლებელი (0012-ის backfill-შენიშვნა).
+  const priceValue = (entry: (typeof interestedList)[number]) =>
+    entry.offeredPrice ?? Number.POSITIVE_INFINITY;
+  const priceLabel = (entry: (typeof interestedList)[number]) =>
+    entry.offeredPrice !== undefined ? `შეთავაზებული ფასი: ${entry.offeredPrice} ₾` : 'ფასი არ არის მითითებული';
   const sortedInterestedList = useMemo(() => {
     if (!sortBy) return interestedList;
     const copy = [...interestedList];
@@ -194,33 +192,56 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const handleOpenProfile = (provider: Provider) => {
     navigation.navigate('ViewProviderProfile', { id: provider.id });
   };
-  const confirmSelection = () => {
-    if (!confirmProvider) return;
-    setSelectedProvider(confirmProvider);
-    setStatus(job.id, 'active', confirmProvider.id, confirmProvider.name); // provider_selected
-    if (isUuid(confirmProvider.id)) {
-      notificationService
-        .create(confirmProvider.id, {
-          title: 'შენ აგირჩიეს სამუშაოსთვის',
-          body: job.title,
-          iconEmoji: '🏆',
-          iconBg: '#059669',
-          target: { screen: 'ProviderJobDetail', id: job.id, mode: 'selected' },
-        })
-        .catch(() => {});
+  // #72: კრიტიკული გადასვლები (Provider-ის არჩევა/დასრულების
+  // დადასტურება/პრობლემის შეტყობინება) აღარ არის "ჯერ ლოკალურად, მერე
+  // ფონურად Supabase-ში" — ჯერ RPC-ს ვიძახებთ და ველოდებით (`await`),
+  // მხოლოდ წარმატებაზე ვცვლით ლოკალურ state-ს/ვნავიგირებთ. RPC-ის
+  // ჩავარდნისას (მაგ. Provider-მა უკვე გამოითხოვა თანხმობა, ან job-ის
+  // სტატუსი შუალედში შეიცვალა) მომხმარებელს პირდაპირ ვატყობინებთ, ლოკალურ
+  // state-ს არასწორად აღარ "ვაჩვენებთ" წარმატებულად.
+  const [selecting, setSelecting] = useState(false);
+  const confirmSelection = async () => {
+    if (!confirmProvider || selecting) return;
+    setSelecting(true);
+    try {
+      await jobService.selectProvider(job.id, confirmProvider.id);
+      setSelectedProvider(confirmProvider);
+      setStatus(job.id, 'active');
+      setJob((prev) => ({ ...prev, status: 'active', provider: confirmProvider.name, providerId: confirmProvider.id }));
+      setConfirmProvider(null);
+      // #73: "შენ აგირჩიეს სამუშაოსთვის" ახლა select_provider RPC-ის მხრიდან
+      // იგზავნება, სერვერის მხარეს — იხ. supabase/migrations/0022.
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'ოსტატის არჩევა ვერ დასრულდა — სცადე თავიდან.');
+    } finally {
+      setSelecting(false);
     }
-    setConfirmProvider(null);
   };
   const confirmCancel = () => {
     setCancelled(true);
     setCancelSheetOpen(false);
   };
   // Customer-ის "დადასტურება" — Provider-ის დასრულების მოთხოვნას ეთანხმება
-  // და პირდაპირ სავალდებულო შეფასებაზე გადადის. Job "completed" ხდება
-  // მხოლოდ მას შემდეგ, რაც ვარსკვლავიანი შეფასება რეალურად გაიგზავნება
-  // (openRating-ის onRate callback-ში) — არა ამ ღილაკზე დაჭერისთანავე.
-  const confirmCompletion = () => {
-    openRating();
+  // (customer_confirm_completion() RPC, awaiting_customer_confirmation →
+  // confirmed_awaiting_rating) და მხოლოდ წარმატებაზე გადადის სავალდებულო
+  // შეფასებაზე. Job "completed" ხდება მხოლოდ მას შემდეგ, რაც
+  // ვარსკვლავიანი შეფასება რეალურად გაიგზავნება და reviews-ის INSERT
+  // trigger-ი (Supabase-ის მხარეს) status-ს "completed"-ზე გადაიყვანს —
+  // არც ეს ღილაკი და არც RatingScreen-ის onRate აღარ აყენებენ
+  // "completed"-ს პირდაპირ, კლიენტიდან.
+  const [confirming, setConfirming] = useState(false);
+  const confirmCompletion = async () => {
+    if (confirming) return;
+    setConfirming(true);
+    try {
+      await jobService.customerConfirmCompletion(job.id);
+      setStatus(job.id, 'confirmed_awaiting_rating');
+      openRating();
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'დასრულების დადასტურება ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setConfirming(false);
+    }
   };
   const openRating = () => {
     navigation.navigate('RatingScreen', {
@@ -228,52 +249,51 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       providerName: selectedProvider?.name ?? 'გიორგი ბერიძე',
       providerInitials: selectedProvider?.initials ?? 'გბ',
       providerColor: selectedProvider?.color ?? colors.primary,
-      onRate: (data) => {
-        setRatingData(data);
-        setStatus(job.id, 'completed');
+      onRate: async (data) => {
         const uid = authService.getCurrentUser()?.uid;
-        if (uid && selectedProvider && isUuid(selectedProvider.id) && isUuid(job.id)) {
-          reviewService
-            .submitReview(
-              job.id,
-              uid,
-              selectedProvider.id,
-              `${customerProfile.firstName} ${customerProfile.lastName}`.trim(),
-              data,
-            )
-            .catch(() => {
-              // ლოკალურ state-ში ("შენი შეფასება" სექცია) უკვე ასახულია —
-              // Supabase-ის ჩავარდნისას UI-ს არ ვბლოკავთ.
-            });
-        }
-        if (selectedProvider && isUuid(selectedProvider.id)) {
-          notificationService
-            .create(selectedProvider.id, {
-              title: 'სამუშაო დასრულებულად დადასტურდა',
-              body: job.title,
-              iconEmoji: '✅',
-              iconBg: '#059669',
-              target: { screen: 'ProviderJobDetail', id: job.id, mode: 'completed' },
-            })
-            .catch(() => {});
+        if (!uid || !selectedProvider || !isUuid(selectedProvider.id) || !isUuid(job.id)) return;
+        try {
+          // reviews-ის INSERT-ს job_posts.status-ს "completed"-ზე გადაჰყავს
+          // (0015_review_completion_trigger.sql) — ეს ერთადერთი გზაა
+          // completed-მდე მისასვლელად, ამიტომ ლოკალურ state-საც მხოლოდ
+          // ამ insert-ის წარმატების შემდეგ ვცვლით.
+          await reviewService.submitReview(
+            job.id,
+            uid,
+            selectedProvider.id,
+            `${customerProfile.firstName} ${customerProfile.lastName}`.trim(),
+            data,
+          );
+          setRatingData(data);
+          setStatus(job.id, 'completed');
+          // #73: "სამუშაო დასრულებულად დადასტურდა" ახლა reviews-ის INSERT
+          // trigger-ის (handle_review_completion) მხრიდან იგზავნება, იმავე
+          // transaction-ში, სადაც status "completed"-ზე გადადის — იხ.
+          // supabase/migrations/0023.
+        } catch {
+          // RatingScreen უკვე "submitted" ეკრანზეა გადასული (optimistic,
+          // RatingScreen.tsx-ის საკუთარი ქცევა) — job-ის დეტალის ეკრანზე
+          // დაბრუნებისას ratingData/effectiveStatus კვლავ "ელოდება
+          // შეფასებას"-ს აჩვენებს, არასწორად "დასრულებულს" არ ვცვლით.
         }
       },
     });
   };
-  const submitProblem = () => {
-    if (!problemOption || (problemOption === 'სხვა' && !problemOther.trim())) return;
-    setProblemSheetOpen(false);
-    setStatus(job.id, 'disputed');
-    if (selectedProvider && isUuid(selectedProvider.id)) {
-      notificationService
-        .create(selectedProvider.id, {
-          title: 'მომხმარებელმა პრობლემა აღნიშნა',
-          body: job.title,
-          iconEmoji: '⚠️',
-          iconBg: '#DC2626',
-          target: { screen: 'ProviderJobDetail', id: job.id, mode: 'selected' },
-        })
-        .catch(() => {});
+  const [reportingProblem, setReportingProblem] = useState(false);
+  const submitProblem = async () => {
+    if (!problemOption || (problemOption === 'სხვა' && !problemOther.trim()) || reportingProblem) return;
+    const reason = problemOption === 'სხვა' ? problemOther.trim() : problemOption;
+    setReportingProblem(true);
+    try {
+      await jobService.customerReportProblem(job.id, reason);
+      setProblemSheetOpen(false);
+      setStatus(job.id, 'disputed');
+      // #73: "მომხმარებელმა პრობლემა აღნიშნა" ახლა customer_report_problem
+      // RPC-ის მხრიდან იგზავნება, სერვერის მხარეს — იხ. supabase/migrations/0022.
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'პრობლემის შეტყობინება ვერ გაიგზავნა — სცადე თავიდან.');
+    } finally {
+      setReportingProblem(false);
     }
   };
 
@@ -387,13 +407,25 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
               </View>
             )}
             <View style={styles.completionActionsRow}>
-              <Pressable style={styles.problemButton} onPress={() => setProblemSheetOpen(true)}>
+              <Pressable style={styles.problemButton} onPress={() => setProblemSheetOpen(true)} disabled={confirming}>
                 <Text style={styles.problemButtonText}>პრობლემა მაქვს</Text>
               </Pressable>
-              <Pressable style={styles.completeButton} onPress={confirmCompletion}>
-                <Text style={styles.completeButtonText}>დადასტურება</Text>
+              <Pressable style={[styles.completeButton, confirming && styles.completeButtonDisabled]} onPress={confirmCompletion} disabled={confirming}>
+                <Text style={styles.completeButtonText}>{confirming ? 'დადასტურდება...' : 'დადასტურება'}</Text>
               </Pressable>
             </View>
+          </View>
+        )}
+
+        {effectiveStatus === 'confirmed_awaiting_rating' && (
+          <View style={styles.section}>
+            <Text style={styles.problemSubmittedText}>
+              დასრულება დადასტურებულია — მხოლოდ ოსტატის შეფასებაა დარჩენილი.
+            </Text>
+            <Pressable style={styles.rateButton} onPress={openRating}>
+              <Star size={15} color={colors.primaryForeground} fill={colors.primaryForeground} />
+              <Text style={styles.rateButtonText}>ოსტატის შეფასება</Text>
+            </Pressable>
           </View>
         )}
 
@@ -539,7 +571,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
                         </View>
                       </View>
                       <View style={styles.priceRow}>
-                        <Text style={[styles.priceRowText, !entry.offeredPrice && !prov.sqmPrice && styles.priceRowTextMuted]}>
+                        <Text style={[styles.priceRowText, entry.offeredPrice === undefined && styles.priceRowTextMuted]}>
                           {priceLabel(entry)}
                         </Text>
                       </View>
@@ -607,7 +639,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
                 </View>
               </View>
             </View>
-            <Button label="დადასტურება" onPress={confirmSelection} />
+            <Button label="დადასტურება" loadingLabel="ინიშნება..." onPress={confirmSelection} loading={selecting} />
             <Pressable style={styles.sheetCancelLink} onPress={() => setConfirmProvider(null)}>
               <Text style={styles.sheetCancelLinkText}>გაუქმება</Text>
             </Pressable>
@@ -659,8 +691,10 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
         )}
         <Button
           label="გაგზავნა"
+          loadingLabel="იგზავნება..."
           onPress={submitProblem}
           disabled={!problemOption || (problemOption === 'სხვა' && !problemOther.trim())}
+          loading={reportingProblem}
           style={{ marginTop: spacing.sm }}
         />
       </BottomSheet>
@@ -1136,6 +1170,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
     borderRadius: radius.md,
     paddingVertical: spacing.sm + 2,
+  },
+  completeButtonDisabled: {
+    opacity: 0.6,
   },
   completeButtonText: {
     ...typography.small,

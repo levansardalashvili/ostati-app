@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Briefcase, ChevronRight, Clock, MapPin, User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,6 +8,7 @@ import { type CompositeScreenProps, useFocusEffect } from '@react-navigation/nat
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { CategoryIcon } from '../components/CategoryIcon';
+import { OfferPriceSheet } from '../components/OfferPriceSheet';
 import { ProviderFeedJobCard, ProviderFeedJobCardSkeleton } from '../components/ProviderFeedJobCard';
 import { StatusPill } from '../components/StatusPill';
 import { Switch } from '../components/Switch';
@@ -38,7 +39,38 @@ const HOME_FEED_LIMIT = 5;
 export function ProviderHomeScreen({ navigation }: Props) {
   // `available` მხოლოდ push-შეტყობინებებზე მოქმედებს — Job Feed (`filtered`)
   // მისგან დამოუკიდებელია და OFF-ის დროსაც ჩანს (მომხმარებლის მოთხოვნით).
+  // Task 2 — რეალურად Supabase-ზე (`provider_profiles.is_available`),
+  // აღდგება app restart-ის შემდეგაც.
   const [available, setAvailable] = useState(true);
+  const [availabilitySaving, setAvailabilitySaving] = useState(false);
+  useEffect(() => {
+    const uid = authService.getCurrentUser()?.uid;
+    if (!uid) return;
+    let cancelled = false;
+    userService
+      .getProviderAvailability(uid)
+      .then((value) => {
+        if (!cancelled) setAvailable(value);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const toggleAvailability = async (next: boolean) => {
+    const uid = authService.getCurrentUser()?.uid;
+    if (!uid || availabilitySaving) return;
+    setAvailable(next);
+    setAvailabilitySaving(true);
+    try {
+      await userService.setProviderAvailability(uid, next);
+    } catch {
+      setAvailable(!next);
+      Alert.alert('ვერ მოხერხდა', 'ხელმისაწვდომობის განახლება ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setAvailabilitySaving(false);
+    }
+  };
   const [interests, setInterests] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [filtered, setFiltered] = useState<FeedJob[]>([]);
@@ -143,29 +175,45 @@ export function ProviderHomeScreen({ navigation }: Props) {
       role: 'provider',
     });
   };
-  const markInterested = (job: FeedJob) => {
-    setInterests((prev) => {
-      const next = new Set(prev);
-      next.add(job.id);
-      return next;
-    });
+  // #72: ფასი სავალდებულო, კონკრეტული რიცხვია — Job Feed-ის ბარათის
+  // "დაინტ. ვარ" ერთი-შეხებით ღილაკს ვეღარ შეუძლია პირდაპირ, ფასის
+  // გარეშე ინტერესის გაგზავნა, ამიტომ ჯერ ფასის prompt-ს ხსნის
+  // (OfferPriceSheet, ProviderJobDetailScreen-ის იგივე კომპონენტი).
+  const [offerJob, setOfferJob] = useState<FeedJob | null>(null);
+  const [offerPrice, setOfferPrice] = useState('');
+  const [sendingInterest, setSendingInterest] = useState(false);
+  const closeOfferSheet = () => {
+    setOfferJob(null);
+    setOfferPrice('');
+  };
+  const confirmInterest = async () => {
+    const priceNum = Number(offerPrice);
+    if (!offerJob || !offerPrice || priceNum <= 0 || sendingInterest) return;
     const uid = authService.getCurrentUser()?.uid;
     if (!uid) return;
-    quoteService
-      .expressInterest(
-        job.id,
+    setSendingInterest(true);
+    try {
+      await quoteService.expressInterest(
+        offerJob.id,
         {
           id: uid,
           name: `${providerProfile.firstName} ${providerProfile.lastName}`.trim(),
           initials: `${providerProfile.firstName.charAt(0)}${providerProfile.lastName.charAt(0)}`,
           color: colors.primary,
         },
-        undefined,
-        job.customerId,
-      )
-      .catch(() => {
-        // ლოკალურ state-ში "დაინტერესებული ხარ" უკვე ასახულია — optimistic-update.
+        priceNum,
+      );
+      setInterests((prev) => {
+        const next = new Set(prev);
+        next.add(offerJob.id);
+        return next;
       });
+      closeOfferSheet();
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'ინტერესის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setSendingInterest(false);
+    }
   };
 
   return (
@@ -203,7 +251,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
                 </Text>
               </View>
             </View>
-            <Switch value={available} onValueChange={setAvailable} />
+            <Switch value={available} onValueChange={toggleAvailability} />
           </View>
 
           <LinearGradient
@@ -291,7 +339,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
                   job={job}
                   sent={interests.has(job.id)}
                   onDetail={() => handleJobDetail(job)}
-                  onInterested={() => markInterested(job)}
+                  onInterested={() => setOfferJob(job)}
                   onChat={() => handleOpenChat(job)}
                 />
               ))}
@@ -303,6 +351,15 @@ export function ProviderHomeScreen({ navigation }: Props) {
           )}
         </View>
       </ScrollView>
+
+      <OfferPriceSheet
+        visible={!!offerJob}
+        price={offerPrice}
+        onChangePrice={setOfferPrice}
+        onSubmit={confirmInterest}
+        onClose={closeOfferSheet}
+        submitting={sendingInterest}
+      />
     </SafeAreaView>
   );
 }

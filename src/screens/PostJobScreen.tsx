@@ -93,7 +93,6 @@ export function PostJobScreen({ navigation }: Props) {
       if (!uid) throw new Error('არ ხარ ავტორიზებული.');
       const photoUrls = await Promise.all(photos.map((uri) => storageService.uploadJobPhoto(uid, uri)));
       const job = await jobService.createCustomerJob(uid, {
-        title: selectedCategory?.label ?? 'ახალი მოთხოვნა',
         category,
         description: description.trim(),
         address: address.trim(),
