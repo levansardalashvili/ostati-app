@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -488,7 +487,7 @@ if (
 
       {imgPreview && (
         <Pressable style={styles.previewOverlay} onPress={() => setImgPreview(null)}>
-          <Image source={{ uri: imgPreview }} style={styles.previewImage} resizeMode="cover" />
+          <SecureStorageImage reference={imgPreview} style={styles.previewImage} resizeMode="cover"/>
           <Pressable style={styles.previewClose} onPress={() => setImgPreview(null)}>
             <X size={18} color="#FFFFFF" />
           </Pressable>

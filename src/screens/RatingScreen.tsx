@@ -107,8 +107,9 @@ return {
           }),
         );
       } catch {
-        // ატვირთვა ჩავარდა — შეფასებას მაინც ვაგზავნით ფოტოების გარეშე
-        // ვერ დაბლოკვის მაგივრად ლოკალურ (ატვირთვამდელ) URI-ებით.
+  // ფოტო ვერ აიტვირთა — შეფასება მაინც გაიგზავნება,
+  // მაგრამ ლოკალური file:// URI database-ში არ ჩაიწერება.
+  uploadedPhotos = [];
       }
     }
     onRate?.({ stars, review, chips, photos: uploadedPhotos.length > 0 ? uploadedPhotos : undefined });
