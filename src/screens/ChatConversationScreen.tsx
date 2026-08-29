@@ -72,7 +72,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
         if (!cancelled) setMessages(real);
       })
       .catch(() => {});
-    chatService.markConversationRead(customerId, providerId, role).catch(() => {});
+    chatService.markConversationRead(customerId, providerId).catch(() => {});
     return () => {
       cancelled = true;
     };

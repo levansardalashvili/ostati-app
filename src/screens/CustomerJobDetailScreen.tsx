@@ -111,7 +111,8 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelSheetOpen, setCancelSheetOpen] = useState(false);
-  const [cancelled, setCancelled] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
   const [confirmProvider, setConfirmProvider] = useState<Provider | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(
     () => interestedList.find((entry) => entry.provider.name === job.provider)?.provider ?? null,
@@ -167,7 +168,11 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   }, [job.id]);
 
   const sharedStatus = getStatus(job.id) ?? job.status;
-  const effectiveStatus: JobStatus = cancelled ? 'cancelled' : sharedStatus;
+  // #79: "cancelled" ცალკე ლოკალურ boolean-ად აღარ ინახება — cancelJob()
+  // RPC-ის წარმატებაზე `setStatus(job.id,'cancelled')`-ს ვიძახებთ, იმავე
+  // გაზიარებულ JobStatusContext-ში, რასაც confirmSelection/confirmCompletion/
+  // submitProblem-იც იყენებენ — `sharedStatus` თავად უკვე ასახავს.
+  const effectiveStatus: JobStatus = sharedStatus;
   const showCompletionConfirmCard = effectiveStatus === 'awaiting_customer_confirmation';
 
   const progressSteps = [
@@ -217,9 +222,25 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       setSelecting(false);
     }
   };
-  const confirmCancel = () => {
-    setCancelled(true);
-    setCancelSheetOpen(false);
+  // #82: "active" job-ს (Provider უკვე მინიჭებული) გაუქმებისას მიზეზი
+  // ახლა UI-დანაც შეგროვდება (#79-ის RPC-ს ეს ველი ისედაც შეეძლო მიეღო,
+  // მხოლოდ sheet-ს არ ჰქონდა ველი) — "pending" job-ზე (Provider ჯერ არ
+  // მინიჭებულა) კვლავ არ მოითხოვება, ზუსტად #79-ის "pending job may be
+  // cancelled" / "active job may be cancelled with a reason" წესის მიხედვით.
+  const cancelRequiresReason = effectiveStatus === 'active';
+  const confirmCancel = async () => {
+    if (cancelling || (cancelRequiresReason && !cancelReason.trim())) return;
+    setCancelling(true);
+    try {
+      await jobService.cancelJob(job.id, cancelReason.trim() || undefined);
+      setStatus(job.id, 'cancelled');
+      setCancelSheetOpen(false);
+      setCancelReason('');
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'მოთხოვნის გაუქმება ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setCancelling(false);
+    }
   };
   // Customer-ის "დადასტურება" — Provider-ის დასრულების მოთხოვნას ეთანხმება
   // (customer_confirm_completion() RPC, awaiting_customer_confirmation →
@@ -647,14 +668,44 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
         )}
       </BottomSheet>
 
-      <BottomSheet visible={cancelSheetOpen} onClose={() => setCancelSheetOpen(false)}>
+      <BottomSheet
+        visible={cancelSheetOpen}
+        onClose={() => {
+          setCancelSheetOpen(false);
+          setCancelReason('');
+        }}
+      >
         <View style={styles.cancelIcon}>
           <X size={22} color={colors.destructive} />
         </View>
         <Text style={styles.sheetTitle}>მოთხოვნის გაუქმება</Text>
         <Text style={styles.sheetSubtitle}>ნამდვილად გსურთ ამ სამუშაო მოთხოვნის გაუქმება?</Text>
-        <Button label="გაუქმება" variant="destructive" onPress={confirmCancel} />
-        <Pressable style={styles.sheetCancelLink} onPress={() => setCancelSheetOpen(false)}>
+        {cancelRequiresReason && (
+          <TextInput
+            value={cancelReason}
+            onChangeText={setCancelReason}
+            placeholder="მიუთითე გაუქმების მიზეზი..."
+            placeholderTextColor={colors.mutedForeground}
+            multiline
+            numberOfLines={3}
+            style={styles.problemTextarea}
+          />
+        )}
+        <Button
+          label="გაუქმება"
+          loadingLabel="უქმდება..."
+          variant="destructive"
+          onPress={confirmCancel}
+          disabled={cancelRequiresReason && !cancelReason.trim()}
+          loading={cancelling}
+        />
+        <Pressable
+          style={styles.sheetCancelLink}
+          onPress={() => {
+            setCancelSheetOpen(false);
+            setCancelReason('');
+          }}
+        >
           <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
         </Pressable>
       </BottomSheet>

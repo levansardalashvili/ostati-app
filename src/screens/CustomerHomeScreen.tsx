@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, ChevronRight, LayoutGrid, MapPin, MessageCircle, Search, Star, X } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import type { CompositeScreenProps } from '@react-navigation/native';
+import { useFocusEffect, type CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { CategoryIcon, getCategoryIcon } from '../components/CategoryIcon';
@@ -138,20 +138,28 @@ export function CustomerHomeScreen({ navigation }: Props) {
   // Provider-ს აირჩია (status === 'active'). დაჭერისას იხსნება არსებული
   // CustomerJobDetail ეკრანი — არა ცალკე duplicate დეტალის ეკრანი.
   const [myJobs, setMyJobs] = useState<CustomerJob[]>([]);
-  useEffect(() => {
-    const uid = authService.getCurrentUser()?.uid;
-    if (!uid) return;
-    let cancelled = false;
-    jobService
-      .listMyJobPosts(uid)
-      .then((real) => {
-        if (!cancelled) setMyJobs(real);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // #83: `useFocusEffect`-ზეა (არა mount-ზე ერთხელ) — Home არასდროს
+  // unmount-დება (Bottom Tab), ამიტომ plain `useEffect`-ს ვერასდროს
+  // "შეეტყობოდა" job-ის გაუქმებაზე, თუ Customer-მა ის CustomerJobDetail-იდან
+  // გააუქმა და უკან Home-ზე დაბრუნდა — "მიმდინარე სამუშაო" ბარათი
+  // "active"-ად "გაყინული" დარჩებოდა permanently, მთელი session-ის
+  // განმავლობაში, თუნდაც job რეალურად უკვე "cancelled"-ია.
+  useFocusEffect(
+    useCallback(() => {
+      const uid = authService.getCurrentUser()?.uid;
+      if (!uid) return;
+      let cancelled = false;
+      jobService
+        .listMyJobPosts(uid)
+        .then((real) => {
+          if (!cancelled) setMyJobs(real);
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
   const currentJob = myJobs.find((j) => j.status === 'active') ?? null;
 
   // ბელის წითელი წერტილი (#70) — mock ნაგულისხმებია, სანამ session

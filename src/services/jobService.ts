@@ -137,6 +137,13 @@ export interface JobService {
   providerRequestCompletion(jobId: string): Promise<void>;
   customerConfirmCompletion(jobId: string): Promise<void>;
   customerReportProblem(jobId: string, reason: string): Promise<void>;
+
+  // Job cancellation — supabase/migrations/0032_job_cancellation.sql,
+  // იგივე "RPC-only writes" პრინციპით, რაც ზემოთ ოთხი RPC-ისთვის.
+  // `reason` არასავალდებულოა (ცხრილში `cancellation_reason` nullable-ია) —
+  // დღეს UI-ს ცალკე ტექსტური ველი გაუქმების მიზეზისთვის არ აქვს
+  // (განზრახ, "UI-ს არ ვცვლით" შეზღუდვის ფარგლებში).
+  cancelJob(jobId: string, reason?: string): Promise<void>;
 }
 
 export const jobService: JobService = {
@@ -207,6 +214,10 @@ export const jobService: JobService = {
   },
   async customerReportProblem(jobId, reason) {
     const { error } = await supabase.rpc('customer_report_problem', { p_job_id: jobId, p_reason: reason });
+    if (error) throw error;
+  },
+  async cancelJob(jobId, reason) {
+    const { error } = await supabase.rpc('cancel_job', { p_job_id: jobId, p_reason: reason ?? null });
     if (error) throw error;
   },
 };

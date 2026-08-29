@@ -245,9 +245,13 @@ export const userService: UserService = {
     if (error) throw error;
   },
   async listRealProviders() {
+    // Security audit — `provider_stats` VIEW ჩანაცვლდა `get_provider_stats()`
+    // RPC-ით (Supabase-ის "Security Definer View" lint-გაფრთხილების
+    // გასწორება, supabase/migrations/0030) — ვიწროდ განსაზღვრული ფუნქცია,
+    // იგივე 4 agregირებული სვეტი, არა ღია VIEW.
     const [{ data, error }, statsResult] = await Promise.all([
       supabase.from('provider_profiles').select('*'),
-      supabase.from('provider_stats').select('*'),
+      supabase.rpc('get_provider_stats'),
     ]);
     if (error) throw error;
     const statsMap = new Map<string, ProviderStatsRow>();
@@ -259,11 +263,11 @@ export const userService: UserService = {
   async getRealProviderById(id) {
     const [{ data, error }, statsResult] = await Promise.all([
       supabase.from('provider_profiles').select('*').eq('id', id).maybeSingle(),
-      supabase.from('provider_stats').select('*').eq('provider_id', id).maybeSingle(),
+      supabase.rpc('get_provider_stats', { p_provider_id: id }),
     ]);
     if (error) throw error;
     if (!data) return null;
-    const stats = !statsResult.error && statsResult.data ? (statsResult.data as ProviderStatsRow) : undefined;
+    const stats = !statsResult.error ? (statsResult.data as ProviderStatsRow[] | null)?.[0] : undefined;
     return fromProviderProfileRowToPublicProvider(data as ProviderProfileRow, stats);
   },
 

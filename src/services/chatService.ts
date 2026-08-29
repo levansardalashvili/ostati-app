@@ -40,7 +40,9 @@ export interface ChatService {
   // `messages`-ის INSERT trigger-ის მხრიდან (#73, `on_message_insert_notify`,
   // supabase/migrations/0020) — აღარ არის ცალკე კლიენტის read-modify-write.
   listMyConversations(myUid: string, myRole: Role): Promise<ChatEntry[]>;
-  markConversationRead(customerId: string, providerId: string, myRole: Role): Promise<void>;
+  // Task 4 (security audit) — `mark_conversation_read` RPC-ს იძახებს,
+  // საკუთარი unread counter-ის auth.uid()-იდან თავად დგინდება სერვერზე.
+  markConversationRead(customerId: string, providerId: string): Promise<void>;
 
   // Tab-bar-ის წაუკითხავი-ჩატის წითელი წერტილისთვის (CustomerTabs/
   // ProviderTabs) — ნებისმიერი `conversations`-ის row-ის ცვლილებაზე (ახალი
@@ -211,9 +213,17 @@ export const chatService: ChatService = {
       online: false,
     }));
   },
-  async markConversationRead(customerId, providerId, myRole) {
-    const patch = myRole === 'customer' ? { customer_unread: 0 } : { provider_unread: 0 };
-    await supabase.from('conversations').update(patch).eq('customer_id', customerId).eq('provider_id', providerId);
+  async markConversationRead(customerId, providerId) {
+    // მოცილებულია direct client `.update()` — `conversations`-ს აღარ აქვს
+    // client-ისთვის INSERT/UPDATE grant (security audit, supabase/migrations/
+    // 0029) — RPC თავად ადგენს, `auth.uid()`-იდან გამომდინარე, საკუთარი
+    // unread counter-ის (customer_unread თუ provider_unread) გადატვირთვას,
+    // `myRole` პარამეტრი აღარ სჭირდება.
+    const { error } = await supabase.rpc('mark_conversation_read', {
+      p_customer_id: customerId,
+      p_provider_id: providerId,
+    });
+    if (error) throw error;
   },
 
   subscribeToUnreadCount(myUid, myRole, onChange) {

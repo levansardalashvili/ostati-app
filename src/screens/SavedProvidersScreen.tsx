@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Heart, MapPin, MessageCircle, Star } from 'lucide-react-native';
+import { AlertCircle, Heart, MapPin, MessageCircle, Star } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
+import { Skeleton } from '../components/Skeleton';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
@@ -25,14 +26,25 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SavedProviders'>;
 export function SavedProvidersScreen({ navigation }: Props) {
   const { favoriteIds, toggleFavorite } = useFavoriteProviders();
   const [allProviders, setAllProviders] = useState<Provider[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   useEffect(() => {
     let cancelled = false;
+    setIsLoading(true);
+    setLoadError(false);
     userService
       .listRealProviders()
       .then((real) => {
         if (!cancelled) setAllProviders(real);
       })
-      .catch(() => {});
+      .catch(() => {
+        // "შენახული ოსტატები არ გაქვს"-ის ნაცვლად (რაც არასწორად
+        // ჩანდა ქსელის შეცდომისასაც) — ცალკე error-state.
+        if (!cancelled) setLoadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -54,7 +66,29 @@ export function SavedProvidersScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader title="შენახული ოსტატები" onBack={() => navigation.goBack()} />
 
-      {saved.length === 0 ? (
+      {isLoading ? (
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={styles.card}>
+              <View style={styles.cardBody}>
+                <Skeleton width={54} height={54} borderRadius={radius.full} />
+                <View style={{ flex: 1, gap: spacing.xs }}>
+                  <Skeleton width="70%" height={16} />
+                  <Skeleton width="50%" height={12} />
+                </View>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      ) : loadError ? (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <AlertCircle size={22} color={colors.mutedForeground} />
+          </View>
+          <Text style={styles.emptyTitle}>ვერ ჩაიტვირთა</Text>
+          <Text style={styles.emptySubtitle}>ინტერნეტთან კავშირი შეამოწმე და სცადე თავიდან.</Text>
+        </View>
+      ) : saved.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
             <Heart size={22} color={colors.mutedForeground} />

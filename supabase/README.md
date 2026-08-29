@@ -54,6 +54,15 @@ before applying them. None of the files drop tables.
 | `0023_review_completion_notify.sql` | `handle_review_completion` (0015) gains a notification insert |
 | `0024_storage_ownership_policies.sql` | `storage.objects` policies: uploads/updates/deletes restricted to the uploader's own uid path segment, for `job-photos` and `user-media` |
 | `0025_provider_verification_status.sql` | `provider_profiles`: `verified boolean` → `verification_status text` (unverified/pending/verified/rejected), client-locked |
+| `0026_fix_recursive_rls_policies.sql` | removes same-table self-select subqueries from `users`/`provider_profiles`/`job_posts` UPDATE policies (column-level GRANT/REVOKE + RPC-only writes instead) |
+| `0027_reviews_hardening.sql` | `BEFORE INSERT` trigger derives `reviews.customer_id`/`provider_id` server-side from the job; RLS re-checks job status too |
+| `0028_messages_hardening.sql` | INSERT requires a real Customer/Provider relationship (role-asymmetric); UPDATE column-locked to `offer_status`, sender can't respond to their own offer |
+| `0029_conversations_lockdown.sql` | removes client INSERT/UPDATE entirely; new `mark_conversation_read()` RPC |
+| `0030_provider_stats_function.sql` | `provider_stats` VIEW → `get_provider_stats()` function (fixes the "Security Definer View" lint warning) |
+| `0031_favorite_providers.sql` | `favorite_providers` (new table) |
+| `0032_job_cancellation.sql` | `job_posts`: +`cancelled_at`/`cancelled_by`/`cancellation_reason`; RPC `cancel_job` |
+| `0033_job_cancellation_notify.sql` | `cancel_job` (0032) gains a notification insert for the assigned Provider |
+| `0034_job_reports.sql` | `job_reports` (new table); RPC `create_job_report` |
 
 ## Job workflow hardening (0011–0015)
 
@@ -173,13 +182,97 @@ private (a separate bucket or path prefix + `createSignedUrl()` instead
 of `getPublicUrl()`, with a SELECT policy scoped to participants) is a
 real follow-up, deliberately out of scope for this pass.
 
-## Deliberately not included
+## Job Reports / no-show reporting (0034)
 
-- **`favorites`/`saved_providers`** — the app's "შენახული ოსტატები"
-  feature (`src/state/FavoriteProvidersContext.tsx`) is still pure local
-  React state; it has never been wired to Supabase, so there is nothing
-  in the live database to reconstruct. Adding a table for it now would
-  be inventing schema the app doesn't use yet.
+`job_reports` — brand-new table, no UI reads or writes it yet (report
+submission and moderation UI are both explicitly out of scope for this
+task; only the backend exists). Reasons are a fixed enum
+(`provider_no_show`/`customer_no_show`/`work_not_completed`/
+`inappropriate_behavior`/`incorrect_information`/`other`), status a
+fixed enum (`open`/`reviewing`/`resolved`/`dismissed`, defaulting to
+`open`).
+
+Writes are RPC-only (`create_job_report(p_job_id, p_reason,
+p_details)`) — direct client INSERT/UPDATE/DELETE is revoked at the
+grant level entirely, matching `job_posts`' (0026) and `reviews`' (0027)
+established pattern. The RPC validates the caller is the job's own
+customer or its assigned Provider (job_responses-only "interested"
+Providers don't count — you can't report a no-show for a job you were
+never assigned to), requires the reason be one of the fixed values, and
+derives `reported_user_id` server-side as "the other participant"
+(nullable — a Customer reporting a still-unassigned `pending` job has no
+specific Provider to attach it to). `reporter_id` is always
+`auth.uid()`, never client-supplied.
+
+RLS has exactly one policy: reporter can SELECT their own reports
+(`reporter_id = auth.uid()`). No policy grants the reported user, or
+anyone else, read access, and no UPDATE policy exists at all — moderation
+status can only ever change via a future `service_role`-authenticated
+tool (bypasses RLS by Postgres/Supabase design), which does not exist
+yet ("do not build Admin Panel").
+
+## Job cancellation (0032–0033)
+
+`job_posts.status` already accepted `'cancelled'` (0011's check
+constraint), and `CustomerJobDetailScreen` already had a full "გაუქმება"
+menu item + confirmation sheet — but `confirmCancel()` only ever set a
+local `useState` boolean; nothing was ever persisted, and since 0026
+revoked all direct client UPDATE on `job_posts`, a direct
+`.update({status:'cancelled'})` would fail outright even if attempted.
+Additive columns `cancelled_at`/`cancelled_by`/`cancellation_reason`
+(all nullable) plus a new `cancel_job(p_job_id, p_reason default null)`
+RPC — same SECURITY DEFINER pattern as the other four job-workflow RPCs
+(0014): validates the caller is the job's own customer (never the
+assigned Provider — there is no Provider-initiated cancellation path in
+the UI, and none was added), validates the job is currently `pending` or
+`active` (rejects `completed`/already-`cancelled`/anything past `active`
+in the two-sided completion flow), then atomically stamps all four
+columns. `cancellation_reason` is optional/nullable — the existing
+cancel-confirmation sheet has no text-input field for a reason today
+(out of scope to add one here — "do not redesign UI"), so the client
+currently always passes `null`; the RPC itself has no issue accepting a
+real reason whenever a future screen collects one.
+`jobService.cancelJob()` calls the RPC; `CustomerJobDetailScreen`'s
+`confirmCancel` is now async (loading state on the button, `Alert` on
+failure) and updates the shared `JobStatusContext` on success instead of
+its own local boolean, matching every other status transition in that
+screen.
+
+**0033** adds the in-app notification for it, folded into the same RPC
+(`CREATE OR REPLACE`, same pattern as 0022/0023) rather than any
+client-side insert — `notifications`' client INSERT policy stays
+removed (0018). Only fires when the cancelled job had an assigned
+Provider (`v_job.provider_id is not null`, i.e. the job was `active`,
+not merely `pending`) — a Provider who only expressed interest via
+`job_responses` is not "the assigned Provider" and is not notified.
+Recipient and job details are read from the already-validated,
+already-updated row inside the function, never from a client parameter.
+Provider-initiated cancellation does not exist anywhere in this app (no
+RPC, no UI), so there is nothing yet for the symmetric "notify the
+Customer" case to hook into.
+
+## Favorite Providers (0031)
+
+`favorite_providers` — Customer's saved/favorite Providers (❤️ on
+`ViewProviderProfileScreen`, `SavedProvidersScreen`). Previously pure
+local React state (`FavoriteProvidersContext`) — lost on every app
+restart, never synced across devices. Now a real table: composite
+primary key `(user_id, provider_id)` (doubles as the "no duplicate save"
+constraint), owner-only RLS on SELECT/DELETE, and an INSERT policy that
+requires the caller to actually be a Customer (checked against their own
+`users` row, which their own RLS permits reading) and `provider_id` to
+reference a real Provider (checked against `provider_profiles`, which is
+publicly readable — checking a non-owned row against `users` instead
+would have been silently blocked by `users`' own owner-only SELECT
+policy and made every insert fail, which is why two different tables are
+used for the two checks). Only `provider_id` is stored — no snapshot of
+the Provider's data — `SavedProvidersScreen` already fetches full
+Provider objects separately and filters by these ids client-side.
+`src/services/favoriteProviderService.ts` is the new service;
+`FavoriteProvidersContext` now loads/persists through it, keyed off
+`authService.subscribeToAuthState` (covers cold-start restore, login,
+and logout in one code path — favorites clear immediately on logout
+rather than leaking into the next session).
 
 ## Provider verification status (0025)
 
@@ -213,14 +306,53 @@ allows, only how the client obtains connection info. The app throws a
 clear startup error if `.env` is missing, instead of silently connecting
 to `undefined`.
 
-## Known gaps, read before relying on this as "fully secure"
+## Security audit — recursive RLS, reviews/messages/conversations hardening, provider_stats (0026–0030)
 
-- **`0010_provider_stats_view.sql`** — the view runs without
-  `security_invoker`, which Supabase's linter flags as "Security
-  Definer View". It needs the elevated read today because its
-  `completed_jobs` aggregate spans `job_posts` rows across every
-  Customer. A proper fix is a narrowly-scoped SECURITY DEFINER function
-  instead of a view — out of scope here.
+- **`0026`** — three UPDATE policies (`users`, `provider_profiles`,
+  `job_posts`) had a same-table correlated subquery in their WITH CHECK
+  (e.g. `role = (select role from users where id = auth.uid())`) — the
+  documented Postgres/Supabase "recursive RLS" footgun: the policy
+  re-triggers RLS evaluation against the very table it's protecting.
+  Fixed per-table with a different safe pattern each time: `users`/
+  `provider_profiles` now use column-level `REVOKE`/`GRANT` (the
+  protected column simply can't appear in a client UPDATE's SET list —
+  checked before RLS even runs, no subquery); `job_posts` had **no**
+  legitimate direct-client UPDATE path left at all once the 0014 RPCs
+  existed (verified: no screen calls `.from('job_posts').update(...)`),
+  so its UPDATE grant is revoked entirely and the RLS policy is now a
+  flat `using (false)` — RPC-only writes.
+- **`0027`** — `reviews` INSERT didn't check the job's status, and
+  never validated `provider_id` against the job's actual assigned
+  provider at all — a Customer could attribute a review to an arbitrary
+  Provider. A `BEFORE INSERT` trigger now derives both `customer_id`
+  (`auth.uid()`) and `provider_id` (from `job_posts.provider_id`)
+  server-side, discarding whatever the client sent, plus re-validates
+  ownership/status — RLS keeps a second, independent check.
+- **`0028`** — `messages` INSERT accepted any `(customer_id,
+  provider_id)` pair with zero relationship required; UPDATE let either
+  participant rewrite the entire row. Fixed with a role-asymmetric
+  relationship check on INSERT (Customer → any Provider stays
+  unrestricted — it's a real, working "message from the public
+  directory" feature; Provider → Customer now requires a real job
+  relationship) and a column-locked (`offer_status` only), sender-excluded
+  UPDATE policy on top.
+- **`0029`** — `conversations` had open client INSERT/UPDATE (either
+  participant could rewrite the other's unread counter or fabricate
+  history). Both revoked entirely; the existing message trigger (0020)
+  remains the only writer, and a new `mark_conversation_read(customer_id,
+  provider_id)` RPC replaces the client's one legitimate write (resetting
+  only the caller's own unread counter). `chatService.markConversationRead`
+  updated to call it.
+- **`0030`** — resolves `0010`'s "Security Definer View" lint warning:
+  `provider_stats` (a raw, directly-queryable view bypassing RLS) is
+  replaced by `get_provider_stats(p_provider_id uuid default null)`, a
+  narrowly-scoped SECURITY DEFINER function returning the same 4
+  aggregate columns. Supabase's linter only flags views, not functions —
+  this is the same pattern already used for every other cross-user
+  aggregate/transition in this project. `userService.ts` updated to call
+  `.rpc('get_provider_stats', ...)` instead of `.from('provider_stats')`.
 
 (`0009_notifications.sql`'s open INSERT policy — previously listed here
-as a known gap — is resolved as of 0018; see the section above.)
+as a known gap — is resolved as of 0018; see the section above. As of
+0030, there are no further known RLS/security gaps documented in this
+migration set.)

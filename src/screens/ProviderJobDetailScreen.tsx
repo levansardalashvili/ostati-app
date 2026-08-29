@@ -93,21 +93,30 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   // route-ის სტატიკური `mode` param მხოლოდ fallback-ია (ან საწყისი
   // navigation-ის მინიშნებაა). Provider-ს "დასრულებული" mode-ის პირდაპირ
   // დაყენება არასდროს არ შეუძლია — მხოლოდ სტატუსის ცვლილებით.
-  const linkedStatus = job.customerJobId ? getStatus(job.customerJobId) : undefined;
-  const variant: 'browse' | 'active' | 'awaiting_confirmation' | 'disputed' | 'completed' =
-    linkedStatus === 'awaiting_customer_confirmation'
-      ? 'awaiting_confirmation'
-      : linkedStatus === 'disputed'
-        ? 'disputed'
-        : linkedStatus === 'completed'
-          ? 'completed'
-          : linkedStatus === 'active'
-            ? 'active'
-            : mode === 'completed'
-              ? 'completed'
-              : mode === 'selected'
-                ? 'active'
-                : 'browse';
+  // #82: `getStatus(...)` მხოლოდ ლოკალური, ამ მოწყობილობის JobStatusContext
+  // ქეშია — Provider-ის საკუთარ device-ს არასდროს არ "შეუტყვია" job-ის
+  // გაუქმებაზე ლოკალურად (მხოლოდ Customer-ის device-ზე გამოიძახა
+  // setStatus(...,'cancelled')), ამიტომ `?? job.status` fallback აუცილებელია —
+  // `job.status` კი ყოველთვის ახლახან წამოღებული, რეალური მნიშვნელობაა
+  // (`getFeedJobPostById`/`listMyAssignedJobs`-იდან), რომ Provider-მა
+  // "cancelled" job-ს ჯერ კიდევ "active"-ად ვერასდროს დაინახოს.
+  const linkedStatus = (job.customerJobId ? getStatus(job.customerJobId) : undefined) ?? job.status;
+  const variant: 'browse' | 'active' | 'awaiting_confirmation' | 'disputed' | 'completed' | 'cancelled' =
+    linkedStatus === 'cancelled'
+      ? 'cancelled'
+      : linkedStatus === 'awaiting_customer_confirmation'
+        ? 'awaiting_confirmation'
+        : linkedStatus === 'disputed'
+          ? 'disputed'
+          : linkedStatus === 'completed'
+            ? 'completed'
+            : linkedStatus === 'active'
+              ? 'active'
+              : mode === 'completed'
+                ? 'completed'
+                : mode === 'selected'
+                  ? 'active'
+                  : 'browse';
 
   const [markingWorkDone, setMarkingWorkDone] = useState(false);
   const markWorkDone = async () => {
@@ -241,6 +250,16 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               <Text style={styles.disputedBannerTitle}>მომხმარებელმა პრობლემა აღნიშნა</Text>
             </View>
             <Text style={styles.disputedBannerText}>დაუკავშირდი მომხმარებელს ჩატში პრობლემის გასარკვევად.</Text>
+          </View>
+        )}
+
+        {variant === 'cancelled' && (
+          <View style={styles.disputedBanner}>
+            <View style={styles.bannerHeaderRow}>
+              <AlertTriangle size={16} color={colors.destructive} />
+              <Text style={styles.disputedBannerTitle}>მოთხოვნა გაუქმებულია</Text>
+            </View>
+            <Text style={styles.disputedBannerText}>მომხმარებელმა ეს მოთხოვნა გააუქმა.</Text>
           </View>
         )}
 
@@ -398,6 +417,13 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
             <Award size={17} color={colors.primary} />
             <Text style={styles.reviewsButtonText}>ჩემი შეფასებები</Text>
           </Pressable>
+        </View>
+      )}
+      {variant === 'cancelled' && (
+        <View style={styles.footer}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.disputedFooterText}>მომხმარებელმა მოთხოვნა გააუქმა.</Text>
+          </View>
         </View>
       )}
       </>
