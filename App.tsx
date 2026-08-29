@@ -5,6 +5,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { navigationRef } from './src/navigation/navigationRef';
+import { PushNotificationsBootstrap } from './src/components/PushNotificationsBootstrap';
 import { CustomerProfileProvider } from './src/state/CustomerProfileContext';
 import { FavoriteProvidersProvider } from './src/state/FavoriteProvidersContext';
 import { JobStatusProvider } from './src/state/JobStatusContext';
@@ -18,8 +20,9 @@ export default function App() {
           <FavoriteProvidersProvider>
             <ProviderProfileProvider>
               <JobStatusProvider>
-                <NavigationContainer>
+                <NavigationContainer ref={navigationRef}>
                   <RootNavigator />
+                  <PushNotificationsBootstrap />
                   <StatusBar style="dark" />
                 </NavigationContainer>
               </JobStatusProvider>

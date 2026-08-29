@@ -222,11 +222,16 @@ export function ProviderHomeScreen({ navigation }: Props) {
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
             <Text style={styles.name} numberOfLines={1}>
-              გამარჯობა, გიორგი
+              გამარჯობა, {providerProfile.firstName || 'ოსტატო'}
             </Text>
           </View>
           <View style={styles.headerActions}>
-            <Avatar initials="გბ" color={colors.primary} size={38} />
+            <Avatar
+              initials={`${providerProfile.firstName.charAt(0)}${providerProfile.lastName.charAt(0)}`}
+              color={colors.primary}
+              size={38}
+              uri={providerProfile.photoUrl}
+            />
             <Pressable style={styles.bellButton} onPress={handleNotifications}>
               <Bell size={19} color={colors.foreground} strokeWidth={1.8} />
               {unreadNotifCount > 0 && <View style={styles.bellDot} />}

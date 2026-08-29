@@ -65,4 +65,16 @@ export type ProviderProfile = {
   certificates: MediaItem[];
   portfolio: MediaItem[];
   sqmPrices: Record<string, string>;
+  // Provider verification request flow (supabase/migrations/0035) — RLS-locked,
+  // same as `Provider.verificationStatus` above: a Provider can read these,
+  // but never write them directly (upsertProviderProfileRecord never sends
+  // them to Supabase, regardless of what a caller passes in). Optional
+  // here (unlike the required `Provider.verificationStatus` on the public
+  // directory type) because ProviderSetupScreen builds a fresh upsert
+  // payload before any row — and therefore any server-known verification
+  // state — exists; `undefined` there simply means "not yet known",
+  // resolved to the real value on the next fetch via `fromProviderProfileRow`.
+  verificationStatus?: VerificationStatus;
+  verificationRequestedAt?: string | null;
+  verificationRejectionReason?: string | null;
 };

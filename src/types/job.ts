@@ -77,6 +77,14 @@ export type FeedJob = {
   // ატომურად კოპირებული არჩეული Provider-ის job_responses.offered_price-დან.
   // undefined/null სანამ Provider ჯერ არ არჩეულა.
   agreedPrice?: number | null;
+  // job_posts.cancellation_actor (supabase/migrations/0036) — ვინ
+  // გააუქმა (`cancel_job`/`provider_cancel_job` RPC-ებში სერვერზეა
+  // derived, არასდროს client-ის claim). `undefined`/`null` — job
+  // არასდროს გაუქმებულა, ან ძველი, migration-მდელი ჩანაწერია.
+  // `ProviderJobDetailScreen`-ის 'cancelled' variant-ის ტექსტს იყენებს,
+  // რომ არასწორად "მომხმარებელმა გააუქმა" არ დაწეროს, როცა სინამდვილეში
+  // Provider-მა თავად გააუქმა საკუთარი job.
+  cancellationActor?: 'customer' | 'provider' | 'admin' | null;
 };
 
 // Customer-ის მხრიდან ხილული job-ის ჩანაწერი — რეალურად Supabase-ის

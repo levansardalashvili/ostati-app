@@ -5,6 +5,7 @@ import {
   Briefcase,
   Check,
   Clock,
+  Flag,
   MapPin,
   MessageCircle,
   MoreVertical,
@@ -19,6 +20,7 @@ import { BackHeader } from '../components/BackHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { CategoryIcon } from '../components/CategoryIcon';
+import { ReportJobSheet } from '../components/ReportJobSheet';
 import { Skeleton } from '../components/Skeleton';
 import { StatusPill, type JobStatus } from '../components/StatusPill';
 import { VerifiedBadge } from '../components/VerifiedBadge';
@@ -113,6 +115,10 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const [cancelSheetOpen, setCancelSheetOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  // #84 — ზოგადი moderation-რეპორტი (job_reports/create_job_report),
+  // completion-dispute-ის ("პრობლემა მაქვს") მთლიანად ცალკე, დამოუკიდებელი
+  // მოქმედება — იხ. src/components/ReportJobSheet.tsx-ის თავსართის შენიშვნა.
+  const [reportSheetOpen, setReportSheetOpen] = useState(false);
   const [confirmProvider, setConfirmProvider] = useState<Provider | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(
     () => interestedList.find((entry) => entry.provider.name === job.provider)?.provider ?? null,
@@ -631,6 +637,16 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
           style={styles.menuRow}
           onPress={() => {
             setMenuOpen(false);
+            setReportSheetOpen(true);
+          }}
+        >
+          <Flag size={15} color={colors.mutedForeground} />
+          <Text style={styles.menuRowText}>პრობლემის შეტყობინება</Text>
+        </Pressable>
+        <Pressable
+          style={styles.menuRow}
+          onPress={() => {
+            setMenuOpen(false);
             setCancelSheetOpen(true);
           }}
         >
@@ -638,6 +654,13 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
           <Text style={[styles.menuRowText, { color: colors.destructive }]}>გაუქმება</Text>
         </Pressable>
       </BottomSheet>
+
+      <ReportJobSheet
+        visible={reportSheetOpen}
+        jobId={job.id}
+        role="customer"
+        onClose={() => setReportSheetOpen(false)}
+      />
 
       <BottomSheet visible={!!confirmProvider} onClose={() => setConfirmProvider(null)}>
         {confirmProvider && (

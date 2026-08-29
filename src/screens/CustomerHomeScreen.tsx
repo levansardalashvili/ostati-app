@@ -58,12 +58,23 @@ export function CustomerHomeScreen({ navigation }: Props) {
   const [providers, setProviders] = useState<Provider[]>([]);
   useEffect(() => {
     let cancelled = false;
+    setIsLoading(true);
     userService
       .listRealProviders()
       .then((real) => {
         if (!cancelled) setProviders(real);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        // #85: ადრე `isLoading` ცალკე, ფიქსირებული 950ms `setTimeout`-ით
+        // იმართებოდა, სრულიად დაუკავშირებელი ამ რეალურ fetch-თან —
+        // ნელი ქსელისას (950ms-ზე ხანგრძლივი fetch) ეს ნიშნავდა, რომ
+        // skeleton ნაადრევად ქრებოდა და "ოსტატები ვერ მოიძებნა" ცარიელი
+        // state ერთი წამით ცდომილად გამოკრთებოდა, სანამ `providers`
+        // რეალურად ჩაიტვირთებოდა. ახლა `isLoading` პირდაპირ ამ fetch-ის
+        // დასრულებაზეა დამოკიდებული.
+        if (!cancelled) setIsLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -76,11 +87,6 @@ export function CustomerHomeScreen({ navigation }: Props) {
     () => DISTRICTS.find((d) => profile.defaultAddress.includes(d)) ?? null,
     [profile.defaultAddress],
   );
-
-  useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 950);
-    return () => clearTimeout(t);
-  }, []);
 
   const toggleCat = (id: string) =>
     setSelCats((prev) => {

@@ -22,6 +22,7 @@ import { Avatar } from '../components/Avatar';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { ProfileMenuRow } from '../components/ProfileMenuRow';
+import { VerificationRequestCard } from '../components/VerificationRequestCard';
 import { colors, radius, spacing, typography } from '../theme';
 import { EXPERIENCE_OPTIONS } from '../data/experience';
 import { authService } from '../services/authService';
@@ -39,7 +40,7 @@ type Props = CompositeScreenProps<
 // E1 — Provider-ის პროფილის ეკრანი (product-spec.md; დიზაინის რეფერენსის
 // ProviderProfile-ის მიხედვით)
 export function ProviderProfileScreen({ navigation }: Props) {
-  const { profile } = useProviderProfile();
+  const { profile, setProfile } = useProviderProfile();
   const [logoutSheetOpen, setLogoutSheetOpen] = useState(false);
   const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`;
   const specialtyLabel = profile.specialty[0]?.label ?? '';
@@ -198,6 +199,12 @@ export function ProviderProfileScreen({ navigation }: Props) {
             </View>
           </Pressable>
         )}
+
+        <VerificationRequestCard
+          profile={profile}
+          onUpdated={setProfile}
+          onEditProfile={() => navigation.navigate('ProviderEditProfile')}
+        />
 
         <Pressable style={styles.previewButton} onPress={() => handleMenuPress('preview')}>
           <View style={styles.previewLeft}>

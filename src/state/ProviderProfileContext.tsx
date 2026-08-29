@@ -44,6 +44,32 @@ export function computeCompleteness(p: ProviderProfileState): Completeness {
   return { percent, missing: items.filter((i) => !i.done) };
 }
 
+// Provider verification request eligibility gate (supabase/migrations/0035
+// — request_provider_verification()). This is a UI-only guard ("show a
+// useful message and guide them to complete profile" per the task) — it
+// has no security role, since the RPC itself never trusts anything the
+// client sends. specialty/areas are already mandatory at ProviderSetupScreen
+// (#13, no skip), so in practice a Provider profile that exists at all
+// already satisfies those two — the check still covers them defensively
+// rather than assuming it. Deliberately does NOT require `about`/portfolio/
+// certificates — those are part of the separate, broader `computeCompleteness`
+// score above but were never named by the task's minimum-data list, and
+// certificates in particular are explicitly optional everywhere else in
+// this app (#44).
+export type VerificationEligibility = {
+  eligible: boolean;
+  missingLabels: string[];
+};
+
+export function getVerificationEligibility(p: ProviderProfileState): VerificationEligibility {
+  const missingLabels: string[] = [];
+  if (!p.firstName.trim() || !p.lastName.trim()) missingLabels.push('სახელი და გვარი');
+  if (p.specialty.length === 0) missingLabels.push('სპეციალობა');
+  if (p.areas.length === 0) missingLabels.push('სამუშაო არეალი');
+  if (!p.photoUrl) missingLabels.push('პროფილის ფოტო');
+  return { eligible: missingLabels.length === 0, missingLabels };
+}
+
 type ProviderProfileContextValue = {
   profile: ProviderProfileState;
   setProfile: (patch: Partial<ProviderProfileState>) => void;

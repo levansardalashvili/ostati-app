@@ -17,8 +17,16 @@ type UserRow = {
 function fromRow(row: UserRow): UserRecord {
   return {
     role: row.role,
-    firstName: row.first_name,
-    lastName: row.last_name,
+    // #86: `first_name`/`last_name` TS-ში `string`-ადაა ტიპირებული (0002-ის
+    // `not null default ''`-ის მიხედვით), მაგრამ თუ ცოცხალ ბაზაში ეს
+    // constraint რაიმე მიზეზით არ ემთხვევა ფაილს (ხელით გაშვებული SQL,
+    // ძველი row schema-ცვლილებამდე) — Supabase SQL NULL-ს პირდაპირ JS
+    // `null`-ად აბრუნებს, რაც `.charAt(0)`-ის მსგავს ადგილებში crash-ს
+    // იწვევს (ProviderProfileScreen-ზე დაფიქსირებული). სერვისის
+    // საზღვარზე ვიცავთ, ისევე როგორც `photo_url ?? undefined` უკვე
+    // იცავდა ქვემოთ.
+    firstName: row.first_name ?? '',
+    lastName: row.last_name ?? '',
     email: row.email,
     defaultAddress: row.default_address,
   };
@@ -47,12 +55,18 @@ type ProviderProfileRow = {
   // (owner-ს არასდროს არ შეუძლია საკუთარი თავი გაავერიფიციროს), ამიტომ
   // ეს მნიშვნელობა ყოველთვის სანდოა, საიდანაც არ უნდა წამოვიდეს.
   verification_status: VerificationStatus;
+  // Verification request metadata (supabase/migrations/0035) — ორივე
+  // client-ისთვის წერადობით ჩაკეტილია, ისევე როგორც verification_status
+  // (0026-ის column-level grant allowlist-ში არც ერთი მათგანი არ შედის).
+  verification_requested_at: string | null;
+  verification_rejection_reason: string | null;
 };
 
 function fromProviderProfileRow(row: ProviderProfileRow): ProviderProfile {
   return {
-    firstName: row.first_name,
-    lastName: row.last_name,
+    // #86: იგივე defensive coalesce, რაც fromRow-შია — იხ. იქაური შენიშვნა.
+    firstName: row.first_name ?? '',
+    lastName: row.last_name ?? '',
     specialty: row.specialty,
     areas: row.areas,
     experience: row.experience,
@@ -61,6 +75,9 @@ function fromProviderProfileRow(row: ProviderProfileRow): ProviderProfile {
     certificates: row.certificates,
     portfolio: row.portfolio,
     sqmPrices: row.sqm_prices,
+    verificationStatus: row.verification_status,
+    verificationRequestedAt: row.verification_requested_at,
+    verificationRejectionReason: row.verification_rejection_reason,
   };
 }
 
@@ -83,8 +100,14 @@ type ProviderStatsRow = { provider_id: string; avg_rating: number; review_count:
 // client-ისთვის ჩაკეტილია (0025), ამიტომ ეს ბეჯი ყოველთვის სანდო,
 // backend-დან მომდინარე მონაცემია, არასდროს client-ის საკუთარი პრეტენზია.
 function fromProviderProfileRowToPublicProvider(row: ProviderProfileRow, stats?: ProviderStatsRow): Provider {
-  const name = `${row.first_name} ${row.last_name}`.trim();
-  const initials = `${row.first_name.charAt(0)}${row.last_name.charAt(0)}`.toUpperCase();
+  // #86: `?? ''` — იგივე defensive coalesce, რაც fromRow/fromProviderProfileRow-ში;
+  // ეს ფუნქცია ცალკეა (არა `fromProviderProfileRow`-ზე აგებული) და პირდაპირ
+  // `row.first_name`-ს იყენებდა `.charAt(0)`-ისთვის, საჯარო დირექტორიის
+  // (Customer Home/Category/SavedProviders/ViewProviderProfile) crash-ის რისკით.
+  const firstName = row.first_name ?? '';
+  const lastName = row.last_name ?? '';
+  const name = `${firstName} ${lastName}`.trim();
+  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   const sqmValues = Object.values(row.sqm_prices);
   return {
     id: row.id,
@@ -133,6 +156,9 @@ const DEFAULT_PROVIDER_PROFILE: ProviderProfile = {
     { id: 3, bg: '#FCE7F3' },
   ],
   sqmPrices: {},
+  verificationStatus: 'unverified',
+  verificationRequestedAt: null,
+  verificationRejectionReason: null,
 };
 
 // მარტივი module-level "in-memory db" — ერთადერთი ლოკალური მომხმარებელია
@@ -181,6 +207,14 @@ export interface UserService {
   // Home-ის toggle-ის ტოგვამ სრული პროფილის re-fetch/overwrite არ გამოიწვიოს.
   getProviderAvailability(uid: string): Promise<boolean>;
   setProviderAvailability(uid: string, value: boolean): Promise<void>;
+
+  // Provider verification request (supabase/migrations/0035) — RPC-ს
+  // იძახებს (`request_provider_verification`, პარამეტრების გარეშე —
+  // caller-ი/target status ორივე სერვერზეა derived, `reportService.submitJobReport`-ის/
+  // `jobService.cancelJob`-ის იგივე პატერნით). client-ს არასდროს არ
+  // შეუძლია `verification_status`-ის პირდაპირი `.update()`/`.upsert()` —
+  // ეს ერთადერთი გზაა unverified/rejected → pending-ის შესაცვლელად.
+  requestProviderVerification(): Promise<void>;
 }
 
 export const userService: UserService = {
@@ -282,6 +316,11 @@ export const userService: UserService = {
   },
   async setProviderAvailability(uid, value) {
     const { error } = await supabase.from('provider_profiles').update({ is_available: value }).eq('id', uid);
+    if (error) throw error;
+  },
+
+  async requestProviderVerification() {
+    const { error } = await supabase.rpc('request_provider_verification');
     if (error) throw error;
   },
 };

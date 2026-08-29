@@ -33,6 +33,13 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#2563EB"
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "ios": {

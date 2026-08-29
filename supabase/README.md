@@ -63,6 +63,13 @@ before applying them. None of the files drop tables.
 | `0032_job_cancellation.sql` | `job_posts`: +`cancelled_at`/`cancelled_by`/`cancellation_reason`; RPC `cancel_job` |
 | `0033_job_cancellation_notify.sql` | `cancel_job` (0032) gains a notification insert for the assigned Provider |
 | `0034_job_reports.sql` | `job_reports` (new table); RPC `create_job_report` |
+| `0035_provider_verification_request.sql` | `provider_profiles`: +`verification_requested_at`/`verification_rejection_reason`; RPC `request_provider_verification` (unverified/rejected → pending only) |
+| `0036_provider_job_cancellation.sql` | `job_posts`: +`cancellation_actor`/`cancellation_reason_code`; RPC `provider_cancel_job` (active → cancelled only, fixed reason codes); `cancel_job` now also stamps `cancellation_actor='customer'` |
+| `0037_push_tokens.sql` | `push_tokens` (new table, RPC-only writes); RPCs `register_push_token`/`deactivate_push_token` |
+| `0038_notifications_push_types.sql` | `notifications`: +`type` (+ best-effort backfill); all 8 existing notification-writing functions now also set `type` |
+| `0039_new_job_provider_notify.sql` | new `specialty_to_category()` helper + `handle_new_job_notify` trigger on `job_posts` (type=`new_jobs_in_area`, specialty+area+availability matched) |
+
+See `supabase/functions/send-push-notifications/README.md` for the Edge Function that actually sends pushes (deploy + Database Webhook setup — both manual, cannot be done from a migration).
 
 ## Job workflow hardening (0011–0015)
 

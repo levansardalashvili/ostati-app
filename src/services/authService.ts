@@ -1,6 +1,7 @@
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
+import { pushTokenService } from './pushTokenService';
 import type { Role } from '../types/user';
 
 export type EmailCredentials = { email: string; password: string };
@@ -131,6 +132,12 @@ export const authService: AuthService = {
     if (error) throw error;
   },
   async signOut() {
+    // Push token-ის deactivation ხდება სესიის დახურვამდე — RPC-ს (0037)
+    // `auth.uid()` სჭირდება, რომელიც `supabase.auth.signOut()`-ის შემდეგ
+    // აღარ არსებობს. ჩავარდნაზეც (ქსელი/RPC error) logout მაინც
+    // გრძელდება — token-ის cleanup best-effort-ია, არასდროს არ ბლოკავს
+    // გასვლას.
+    await pushTokenService.deactivateCurrentToken().catch(() => {});
     await supabase.auth.signOut();
     cachedUser = null;
     // GoogleSignin-ის საკუთარი session-იც უნდა გასუფთავდეს, თორემ შემდეგი

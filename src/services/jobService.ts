@@ -31,6 +31,11 @@ type JobPostRow = {
   provider_name: string | null;
   agreed_price: number | null;
   dispute_reason: string | null;
+  // supabase/migrations/0036 — ვინ გააუქმა (`cancel_job`/`provider_cancel_job`-ში
+  // სერვერზეა derived). `FeedJob`-ში მხოლოდ (Provider-ის 'cancelled'
+  // variant-ის ტექსტისთვის) — `CustomerJob`-ს ჯერ არ სჭირდება, generic
+  // StatusPill-ი უკვე საკმარისია Customer-ის მხარეს.
+  cancellation_actor: 'customer' | 'provider' | 'admin' | null;
 };
 
 // `title` აღარ ინახება ბაზაში — ყოველთვის კატეგორიის label-იდანაა
@@ -88,6 +93,7 @@ function fromJobPostRowToFeedJob(row: JobPostRow): FeedJob {
     status: row.status,
     customerId: row.customer_id,
     agreedPrice: row.agreed_price,
+    cancellationActor: row.cancellation_actor,
   };
 }
 
@@ -144,6 +150,13 @@ export interface JobService {
   // დღეს UI-ს ცალკე ტექსტური ველი გაუქმების მიზეზისთვის არ აქვს
   // (განზრახ, "UI-ს არ ვცვლით" შეზღუდვის ფარგლებში).
   cancelJob(jobId: string, reason?: string): Promise<void>;
+
+  // Provider-initiated job cancellation — supabase/migrations/0036,
+  // ცალკე RPC (`provider_cancel_job`) `cancelJob`-ის (Customer-ის RPC)
+  // გვერდით — active → cancelled ერთადერთი დაშვებული გადასვლა,
+  // `reasonCode` სავალდებულოა (fixed enum), `details` მხოლოდ
+  // `reasonCode === 'other'`-ზეა სავალდებულო (RPC-ივე ამოწმებს სერვერზე).
+  providerCancelJob(jobId: string, reasonCode: string, details?: string): Promise<void>;
 }
 
 export const jobService: JobService = {
@@ -218,6 +231,14 @@ export const jobService: JobService = {
   },
   async cancelJob(jobId, reason) {
     const { error } = await supabase.rpc('cancel_job', { p_job_id: jobId, p_reason: reason ?? null });
+    if (error) throw error;
+  },
+  async providerCancelJob(jobId, reasonCode, details) {
+    const { error } = await supabase.rpc('provider_cancel_job', {
+      p_job_id: jobId,
+      p_reason_code: reasonCode,
+      p_details: details ?? null,
+    });
     if (error) throw error;
   },
 };

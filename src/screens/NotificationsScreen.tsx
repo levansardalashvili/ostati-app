@@ -9,6 +9,7 @@ import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import type { NotificationEntry } from '../types/notification';
+import { navigateToNotificationTarget } from '../utils/notificationNavigation';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Notifications'>;
@@ -57,27 +58,7 @@ export function NotificationsScreen({ navigation, route }: Props) {
 
   const handleTap = (item: NotificationEntry) => {
     markRead(item.id);
-    if (!item.target) return;
-    switch (item.target.screen) {
-      case 'CustomerJobDetail':
-        navigation.navigate('CustomerJobDetail', { jobId: item.target.jobId });
-        break;
-      case 'ProviderJobDetail':
-        navigation.navigate('ProviderJobDetail', { id: item.target.id, mode: item.target.mode });
-        break;
-      case 'ChatConversation':
-        navigation.navigate('ChatConversation', {
-          chatId: item.target.chatId,
-          name: item.target.name,
-          initials: item.target.initials,
-          color: item.target.color,
-          role,
-        });
-        break;
-      case 'ProviderReviews':
-        navigation.navigate('ProviderReviews');
-        break;
-    }
+    navigateToNotificationTarget(navigation.navigate, item.target, role);
   };
 
   return (

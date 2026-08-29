@@ -1,11 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AlertTriangle, Award, CheckCircle, Clock, MapPin, MessageCircle, MoreVertical, Star, ThumbsUp } from 'lucide-react-native';
+import {
+  AlertTriangle,
+  Award,
+  CheckCircle,
+  Clock,
+  Flag,
+  MapPin,
+  MessageCircle,
+  MoreVertical,
+  Star,
+  ThumbsUp,
+  X,
+} from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
+import { BottomSheet } from '../components/BottomSheet';
+import { Button } from '../components/Button';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { OfferPriceSheet } from '../components/OfferPriceSheet';
+import { ReportJobSheet } from '../components/ReportJobSheet';
 import { colors, radius, spacing, typography } from '../theme';
 import { Skeleton } from '../components/Skeleton';
 import { authService } from '../services/authService';
@@ -33,6 +48,19 @@ const EMPTY_JOB: FeedJob = {
   hasPhoto: false,
   desc: '',
 };
+
+// Provider-ის job-გაუქმების ფიქსირებული მიზეზები (task-ის მოთხოვნა,
+// supabase/migrations/0036-ის `job_posts_cancellation_reason_code_check`-ის
+// ზუსტი ანარეკლი) — structured code + ცალკე ქართული ლეიბლი, არა
+// მხოლოდ ტექსტი (მომავალი moderation-ისთვის).
+const PROVIDER_CANCEL_REASONS: { code: string; label: string }[] = [
+  { code: 'provider_unavailable', label: 'აღარ ვარ ხელმისაწვდომი' },
+  { code: 'schedule_conflict', label: 'დროის კონფლიქტი' },
+  { code: 'cannot_complete_job', label: 'სამუშაოს შესრულებას ვერ შევძლებ' },
+  { code: 'customer_unreachable', label: 'მომხმარებელს ვერ ვუკავშირდები' },
+  { code: 'incorrect_job_information', label: 'სამუშაოს ინფორმაცია არასწორია' },
+  { code: 'other', label: 'სხვა' },
+];
 
 // B2 — Job-ის დეტალი + ინტერესის დადასტურება (Provider მხრიდან)
 // (product-spec.md; დიზაინის რეფერენსის ProviderJobDetail-ის browse/selected
@@ -163,8 +191,49 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       role: 'provider',
     });
   };
+  // #84-ის დროს "..." ღილაკს მხოლოდ ერთი მოქმედება (ზოგადი
+  // moderation-რეპორტი) ჰქონდა, ამიტომ პირდაპირ ხსნიდა ReportJobSheet-ს.
+  // ახლა job-ის გაუქმებაც ემატება (Task — Provider-initiated cancellation)
+  // — ორი მოქმედება ერთ ღილაკზე უკვე მართლაც menu-ს საჭიროებს, ზუსტად
+  // CustomerJobDetailScreen-ის იგივე "..." menu-ს პატერნით.
+  // completion-dispute flow ("პრობლემა მაქვს", markWorkDone-ის მეზობელი)
+  // ამ menu-ს არაფერში ეხება, სრულიად ცალკეა.
+  const [reportSheetOpen, setReportSheetOpen] = useState(false);
+  const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const handleMore = () => {
-    // TODO: მენიუს მოქმედებები (მაგ. "გაუზიარე", "შეატყობინე") მოგვიანებით
+    setActionMenuOpen(true);
+  };
+
+  // Provider-initiated job cancellation — supabase/migrations/0036-ის
+  // `provider_cancel_job` RPC. მხოლოდ `variant === 'active'`-ზეა
+  // ხელმისაწვდომი (task: "Do not show the action for jobs where
+  // Provider is only interested but not selected") — menu-ს JSX-შივეა
+  // დაცული, ცალკე დამატებითი შემოწმება აქ არ სჭირდება.
+  const [cancelSheetOpen, setCancelSheetOpen] = useState(false);
+  const [cancelReasonCode, setCancelReasonCode] = useState<string | null>(null);
+  const [cancelDetails, setCancelDetails] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+  const canSubmitCancel = !!cancelReasonCode && (cancelReasonCode !== 'other' || cancelDetails.trim().length > 0);
+  const closeCancelSheet = () => {
+    if (cancelling) return;
+    setCancelSheetOpen(false);
+    setCancelReasonCode(null);
+    setCancelDetails('');
+  };
+  const confirmCancel = async () => {
+    if (!job.customerJobId || !canSubmitCancel || cancelling) return;
+    setCancelling(true);
+    try {
+      await jobService.providerCancelJob(job.customerJobId, cancelReasonCode!, cancelDetails.trim() || undefined);
+      setStatus(job.customerJobId, 'cancelled');
+      setCancelSheetOpen(false);
+      setCancelReasonCode(null);
+      setCancelDetails('');
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'სამუშაოს გაუქმება ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setCancelling(false);
+    }
   };
   // #72: ფასი სავალდებულო, კონკრეტული რიცხვია — "დაინტ. ვარ" აღარ
   // იგზავნება ფასის გარეშე.
@@ -259,7 +328,12 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               <AlertTriangle size={16} color={colors.destructive} />
               <Text style={styles.disputedBannerTitle}>მოთხოვნა გაუქმებულია</Text>
             </View>
-            <Text style={styles.disputedBannerText}>მომხმარებელმა ეს მოთხოვნა გააუქმა.</Text>
+            {/* supabase/migrations/0036: `cancellationActor` სერვერზეა
+                derived (RPC-ის შიგნით), არასდროს client-ის claim — ტექსტი
+                სწორად განასხვავებს, თავად Provider-მა გააუქმა თუ Customer-მა. */}
+            <Text style={styles.disputedBannerText}>
+              {job.cancellationActor === 'provider' ? 'შენ გააუქმე ეს სამუშაო.' : 'მომხმარებელმა ეს მოთხოვნა გააუქმა.'}
+            </Text>
           </View>
         )}
 
@@ -422,7 +496,9 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       {variant === 'cancelled' && (
         <View style={styles.footer}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.disputedFooterText}>მომხმარებელმა მოთხოვნა გააუქმა.</Text>
+            <Text style={styles.disputedFooterText}>
+              {job.cancellationActor === 'provider' ? 'შენ გააუქმე ეს სამუშაო.' : 'მომხმარებელმა მოთხოვნა გააუქმა.'}
+            </Text>
           </View>
         </View>
       )}
@@ -437,6 +513,74 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         onClose={() => setOfferSheetOpen(false)}
         submitting={sendingInterest}
       />
+
+      <ReportJobSheet
+        visible={reportSheetOpen}
+        jobId={job.id}
+        role="provider"
+        onClose={() => setReportSheetOpen(false)}
+      />
+
+      <BottomSheet visible={actionMenuOpen} onClose={() => setActionMenuOpen(false)}>
+        <Pressable
+          style={styles.menuRow}
+          onPress={() => {
+            setActionMenuOpen(false);
+            setReportSheetOpen(true);
+          }}
+        >
+          <Flag size={15} color={colors.mutedForeground} />
+          <Text style={styles.menuRowText}>პრობლემის შეტყობინება</Text>
+        </Pressable>
+        {variant === 'active' && (
+          <Pressable
+            style={styles.menuRow}
+            onPress={() => {
+              setActionMenuOpen(false);
+              setCancelSheetOpen(true);
+            }}
+          >
+            <X size={15} color={colors.destructive} />
+            <Text style={[styles.menuRowText, { color: colors.destructive }]}>სამუშაოს გაუქმება</Text>
+          </Pressable>
+        )}
+      </BottomSheet>
+
+      <BottomSheet visible={cancelSheetOpen} onClose={closeCancelSheet}>
+        <View style={styles.cancelIcon}>
+          <X size={22} color={colors.destructive} />
+        </View>
+        <Text style={styles.sheetTitle}>სამუშაოს გაუქმება</Text>
+        <Text style={styles.sheetSubtitle}>მომხმარებელს ეცნობება გაუქმების შესახებ. აირჩიე მიზეზი.</Text>
+        {PROVIDER_CANCEL_REASONS.map((opt) => {
+          const on = cancelReasonCode === opt.code;
+          return (
+            <Pressable
+              key={opt.code}
+              style={[styles.problemOption, on && styles.problemOptionOn]}
+              onPress={() => setCancelReasonCode(opt.code)}
+            >
+              <View style={[styles.radioOuter, on && styles.radioOuterOn]}>{on && <View style={styles.radioInner} />}</View>
+              <Text style={[styles.problemOptionText, on && styles.problemOptionTextOn]}>{opt.label}</Text>
+            </Pressable>
+          );
+        })}
+        {cancelReasonCode === 'other' && (
+          <TextInput
+            value={cancelDetails}
+            onChangeText={setCancelDetails}
+            placeholder="აღწერე მიზეზი..."
+            placeholderTextColor={colors.mutedForeground}
+            multiline
+            numberOfLines={3}
+            style={styles.problemTextarea}
+          />
+        )}
+        <Button label="სამუშაოს გაუქმება" loadingLabel="უქმდება..." variant="destructive" onPress={confirmCancel} disabled={!canSubmitCancel} loading={cancelling} />
+        <Pressable style={styles.sheetCancelLink} onPress={closeCancelSheet}>
+          <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
+        </Pressable>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -794,5 +938,77 @@ const styles = StyleSheet.create({
   sheetCancelLinkText: {
     ...typography.captionMedium,
     color: colors.mutedForeground,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  menuRowText: {
+    ...typography.captionMedium,
+    color: colors.foreground,
+  },
+  cancelIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.full,
+    backgroundColor: colors.dangerBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: spacing.sm + 2,
+  },
+  problemOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 6,
+    marginBottom: spacing.sm,
+  },
+  problemOptionOn: {
+    borderColor: colors.primary,
+    backgroundColor: colors.secondary,
+  },
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioOuterOn: {
+    borderColor: colors.primary,
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+  },
+  problemOptionText: {
+    ...typography.caption,
+    color: colors.foreground,
+    fontWeight: '500',
+  },
+  problemOptionTextOn: {
+    color: colors.secondaryForeground,
+  },
+  problemTextarea: {
+    ...typography.caption,
+    color: colors.foreground,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.sm + 6,
+    minHeight: 72,
+    textAlignVertical: 'top',
+    marginBottom: spacing.sm,
   },
 });
