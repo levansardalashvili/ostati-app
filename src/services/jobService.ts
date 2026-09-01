@@ -205,6 +205,15 @@ export interface JobService {
   // ზუსტად ამ job-ს/ამ caller-ს.
   setJobPhotos(jobId: string, photos: string[]): Promise<void>;
 
+  // Final pre-beta audit, item 1 — CONFIRMED bug fix. Syncs current form
+  // values into an already-created draft before publish, so a Customer
+  // who edits category/description/address/date/time between a failed
+  // publish attempt and a retry never has those edits silently dropped
+  // (owner-only, draft-only — supabase/migrations/0062). Same shape as
+  // `NewJobPostInput` minus `customerName` (never was accepted here) —
+  // reuses it directly rather than a near-duplicate type.
+  updateJobDraft(jobId: string, input: NewJobPostInput): Promise<CustomerJob>;
+
   // Third hardening pass, priority 2 — draft -> pending. ერთადერთი გზაა,
   // რომლითაც job Provider-ის feed-ში ხილული ხდება (supabase/migrations/0053).
   finalizeJobPublish(jobId: string): Promise<CustomerJob>;
@@ -222,6 +231,19 @@ export const jobService: JobService = {
     // and preferred_date<->time_slot consistency — PostJobScreen's own
     // validation is UX-only, not the security boundary.
     const { data, error } = await supabase.rpc('create_job', {
+      p_category: input.category,
+      p_description: input.description,
+      p_address: input.address,
+      p_date: input.date,
+      p_preferred_date: input.preferredDate ?? null,
+      p_time_slot: input.timeSlot ?? null,
+    });
+    if (error) throw error;
+    return fromJobPostRow(data as JobPostRow);
+  },
+  async updateJobDraft(jobId, input) {
+    const { data, error } = await supabase.rpc('update_job_draft', {
+      p_job_id: jobId,
       p_category: input.category,
       p_description: input.description,
       p_address: input.address,

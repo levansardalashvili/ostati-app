@@ -155,16 +155,17 @@ export function PostJobScreen({ navigation }: Props) {
       // that actually makes the job visible to Providers. From the
       // user's side, "გამოქვეყნება" is still one action; a failed
       // mid-flow retry silently continues from wherever it left off.
+      const currentInput = {
+        category,
+        description: description.trim(),
+        address: address.trim(),
+        date: selectedDate ? `${formatPickedDate(selectedDate)}${selectedTimeLabel ? ` ${selectedTimeLabel}` : ''}` : '',
+        preferredDate: selectedDate ? toIsoDateString(selectedDate) : null,
+        timeSlot: selectedTime || null,
+      };
       let job = draftJob;
       if (!job) {
-        job = await jobService.createCustomerJob(uid, {
-          category,
-          description: description.trim(),
-          address: address.trim(),
-          date: selectedDate ? `${formatPickedDate(selectedDate)}${selectedTimeLabel ? ` ${selectedTimeLabel}` : ''}` : '',
-          preferredDate: selectedDate ? toIsoDateString(selectedDate) : null,
-          timeSlot: selectedTime || null,
-        });
+        job = await jobService.createCustomerJob(uid, currentInput);
         setDraftJob(job);
       } else {
         // Resuming after a previous attempt failed client-side — but
@@ -181,6 +182,14 @@ export function PostJobScreen({ navigation }: Props) {
           setLoading(false);
           return;
         }
+        // Final pre-beta audit, item 1 — the Customer may have edited the
+        // form (category/description/address/date/time) since the draft
+        // was first created (a failed attempt, then changes, then retry).
+        // Sync those current values into the draft server-side before
+        // continuing, so the published job always matches what the form
+        // shows right now — never a stale snapshot from the first attempt.
+        job = await jobService.updateJobDraft(job.id, currentInput);
+        setDraftJob(job);
       }
       if (photos.length > 0) {
         const photoRefs = await Promise.all(photos.map((uri) => storageService.uploadPrivateJobPhoto(job.id, uid, uri)));
