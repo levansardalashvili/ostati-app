@@ -119,16 +119,30 @@ async function fetchJobPostRow(id: string): Promise<JobPostRow | null> {
   return (data as JobPostRow | null) ?? null;
 }
 
+// Second hardening pass, item 3 — Provider-ის feed-კითხვები (`job_posts`
+// ნაცვლად `job_posts_feed`-ს იყენებენ, supabase/migrations/0047) — view-ის
+// `address`-ის სვეტი caller-ის auth.uid()-ის მიხედვით masked-ია (მხოლოდ
+// job-ის საკუთარი customer_id/provider_id ხედავს ზუსტ მისამართს, სხვა
+// ნებისმიერი Provider — მხოლოდ `area_label`-ს). Row shape იდენტურია
+// `JobPostRow`-ის — view-ს დამატებით აქვს `address_is_exact` (აქ არ
+// გამოიყენება).
+async function fetchFeedJobPostRow(id: string): Promise<JobPostRow | null> {
+  const { data, error } = await supabase.from('job_posts_feed').select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return (data as JobPostRow | null) ?? null;
+}
+
 // `title` აღარ არის ველი — #72-ის მიხედვით Customer არასდროს წერდა
 // თავისუფალ title-ს (ის ისედაც კატეგორიის label-ს იმეორებდა), ამიტომ
-// input-იდანაც მოცილებულია.
+// input-იდანაც მოცილებულია. `photos` აღარაა შექმნის ველი (second
+// hardening pass, item 4) — job-ის ფოტოები კერძო storage-ში იტვირთება
+// job-ის id-ის ცოდნის შემდეგ, ცალკე `setJobPhotos`-ით.
 export type NewJobPostInput = {
   category: string;
   description: string;
   address: string;
   date: string;
   customerName: string;
-  photos: string[];
   // supabase/migrations/0041 — კანონიკური განრიგის ველები, `date`-ის
   // (თავისუფალი ტექსტის) გვერდით. ორივე optional — `undefined`/`null`,
   // თუ Customer-მა თარიღი/დრო არ აირჩია (PostJobScreen-ის ორივე ველი
@@ -179,28 +193,40 @@ export interface JobService {
   // `reasonCode` სავალდებულოა (fixed enum), `details` მხოლოდ
   // `reasonCode === 'other'`-ზეა სავალდებულო (RPC-ივე ამოწმებს სერვერზე).
   providerCancelJob(jobId: string, reasonCode: string, details?: string): Promise<void>;
+
+  // Second hardening pass, item 4 — job-ის ფოტოების ცალკე მიმაგრება
+  // `create_job`-ის შემდეგ (`private-media/job/{jobId}/...`-ს job-ის
+  // id სჭირდება, რომელიც შექმნამდე არ არსებობს). Owner-only, მხოლოდ
+  // `status='pending'`-ზე (supabase/migrations/0050).
+  setJobPhotos(jobId: string, photos: string[]): Promise<void>;
 }
 
 export const jobService: JobService = {
   async createCustomerJob(customerId, input) {
-    const { data, error } = await supabase
-      .from('job_posts')
-      .insert({
-        customer_id: customerId,
-        customer_name: input.customerName,
-        category: input.category,
-        description: input.description,
-        address: input.address,
-        date: input.date,
-        status: 'pending',
-        photos: input.photos,
-        preferred_date: input.preferredDate ?? null,
-        time_slot: input.timeSlot ?? null,
-      })
-      .select()
-      .single();
+    // Second hardening pass, items 6/7 — RPC-only (supabase/migrations/0050);
+    // `customerId` პარამეტრი აღარ იგზავნება (RPC თავად auth.uid()-იდან
+    // derives-ს) — მაინც `customerId: string`-ს ინარჩუნებს JobService-ის
+    // ინტერფეისში, არსებული call site-ების (uid უკვე ხელთ აქვთ) ცვლილების
+    // თავიდან ასაცილებლად. RPC თავად ამოწმებს role='customer', category-ს
+    // არსებობას/აქტიურობას, address-ის არარსებობას, და
+    // preferred_date-ისთვის სავალდებულო time_slot-ს — client-ის
+    // ვალიდაცია (PostJobScreen) მხოლოდ UX-ისთვისაა, არა უსაფრთხოების
+    // საზღვარი.
+    const { data, error } = await supabase.rpc('create_job', {
+      p_category: input.category,
+      p_description: input.description,
+      p_address: input.address,
+      p_date: input.date,
+      p_customer_name: input.customerName,
+      p_preferred_date: input.preferredDate ?? null,
+      p_time_slot: input.timeSlot ?? null,
+    });
     if (error) throw error;
     return fromJobPostRow(data as JobPostRow);
+  },
+  async setJobPhotos(jobId, photos) {
+    const { error } = await supabase.rpc('set_job_photos', { p_job_id: jobId, p_photos: photos });
+    if (error) throw error;
   },
   async listMyJobPosts(customerId) {
     const { data, error } = await supabase
@@ -212,8 +238,10 @@ export const jobService: JobService = {
     return (data as JobPostRow[]).map(fromJobPostRow);
   },
   async getOpenProviderFeedPosts() {
+    // Second hardening pass, item 3 — `job_posts_feed` (masked address),
+    // არა პირდაპირ `job_posts`.
     const { data, error } = await supabase
-      .from('job_posts')
+      .from('job_posts_feed')
       .select('*')
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
@@ -225,7 +253,7 @@ export const jobService: JobService = {
     return row ? fromJobPostRow(row) : null;
   },
   async getFeedJobPostById(id) {
-    const row = await fetchJobPostRow(id);
+    const row = await fetchFeedJobPostRow(id);
     return row ? fromJobPostRowToFeedJob(row) : null;
   },
   async listMyAssignedJobs(providerId) {

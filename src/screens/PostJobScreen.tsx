@@ -118,7 +118,14 @@ export function PostJobScreen({ navigation }: Props) {
       : submitTouched && !description.trim()
         ? 'ეს ველი სავალდებულოა'
         : '';
-  const canSubmit = !!category && description.trim().length >= DESCRIPTION_MIN;
+  // Second hardening pass, item 7 — მისამართი სავალდებულო ხდება (ადრე
+  // საერთოდ არ მოწმდებოდა), და თარიღის არჩევისას დრო/'ნებისმიერ დროსაც'
+  // სავალდებულოა (თარიღის გარეშე დროც არ მოწმდება — ორივე ერთად
+  // ივსება/არცერთი, DatePickerField-ის arსებული UX-ის მიხედვით).
+  const addressError = submitTouched && !address.trim() ? 'მისამართი სავალდებულოა' : '';
+  const dateTimeError = submitTouched && !!selectedDate && !selectedTime ? 'აირჩიე სასურველი დრო' : '';
+  const canSubmit =
+    !!category && description.trim().length >= DESCRIPTION_MIN && !!address.trim() && (!selectedDate || !!selectedTime);
   const selectedCategory = activeCategories.find((c) => c.id === category) ?? null;
   const SelectedCategoryIcon = getCategoryIcon(selectedCategory?.id ?? '');
 
@@ -130,18 +137,27 @@ export function PostJobScreen({ navigation }: Props) {
     const uid = authService.getCurrentUser()?.uid;
     try {
       if (!uid) throw new Error('არ ხარ ავტორიზებული.');
-      const photoUrls = await Promise.all(photos.map((uri) => storageService.uploadJobPhoto(uid, uri)));
+      // Second hardening pass, item 4 — job-ის row ჯერ იქმნება (photos-ის
+      // გარეშე), მხოლოდ ამის შემდეგ იტვირთება ფოტოები `private-media`-ში
+      // (`job/{jobId}/...` — ეს path-ი job-ის id-ის გარეშე არ არსებობს),
+      // და ბოლოს ერთვის job-ს ცალკე RPC-ით (`setJobPhotos`). მომხმარებლის
+      // თვალსაზრისით "გამოქვეყნება" კვლავ ერთი მოქმედებაა.
       const job = await jobService.createCustomerJob(uid, {
         category,
         description: description.trim(),
         address: address.trim(),
         date: selectedDate ? `${formatPickedDate(selectedDate)}${selectedTimeLabel ? ` ${selectedTimeLabel}` : ''}` : '',
         customerName: `${profile.firstName} ${profile.lastName}`.trim(),
-        photos: photoUrls,
         preferredDate: selectedDate ? toIsoDateString(selectedDate) : null,
         timeSlot: selectedTime || null,
       });
-      setCreatedJob(job);
+      let finalJob = job;
+      if (photos.length > 0) {
+        const photoRefs = await Promise.all(photos.map((uri) => storageService.uploadPrivateJobPhoto(job.id, uid, uri)));
+        await jobService.setJobPhotos(job.id, photoRefs);
+        finalJob = { ...job, photos: photoRefs };
+      }
+      setCreatedJob(finalJob);
       setPublished(true);
     } catch {
       setPublishError(true);
@@ -282,15 +298,16 @@ export function PostJobScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.field}>
-          <FieldLabel text="მისამართი" />
+          <FieldLabel text="მისამართი" required />
           <TextInput
             value={address}
             onChangeText={setAddress}
             placeholder="მაგ. ვაკე, ჭავჭავაძის 45"
             placeholderTextColor={colors.mutedForeground}
-            style={styles.input}
+            style={[styles.input, addressError && styles.inputError]}
           />
           <Text style={styles.hint}>ავტომატურად შეივსო შენი მისამართით — შეგიძლია შეცვალო ამ მოთხოვნისთვის.</Text>
+          <FieldError message={addressError} />
         </View>
 
         <View style={styles.field}>
@@ -301,7 +318,7 @@ export function PostJobScreen({ navigation }: Props) {
         <View style={styles.field}>
           <FieldLabel text="სასურველი დრო" />
           <Pressable
-            style={[styles.categoryButton, !selectedDate && styles.categoryButtonDisabled]}
+            style={[styles.categoryButton, !selectedDate && styles.categoryButtonDisabled, dateTimeError && styles.inputError]}
             disabled={!selectedDate}
             onPress={() => setTimeSheetOpen(true)}
           >
@@ -311,6 +328,7 @@ export function PostJobScreen({ navigation }: Props) {
             </Text>
             <ChevronRight size={16} color={colors.mutedForeground} />
           </Pressable>
+          <FieldError message={dateTimeError} />
         </View>
 
         <View style={styles.privacyCard}>

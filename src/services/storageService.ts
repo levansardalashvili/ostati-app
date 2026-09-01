@@ -34,6 +34,17 @@ export interface StorageService {
     localUri: string,
   ): Promise<string>;
 
+  // Second hardening pass, item 4 — private job-post photo. Path
+  // `job/{jobId}/{uploaderId}/{filename}`, matching
+  // can_access_private_job_photo() (supabase/migrations/0048): the job's
+  // customer, its assigned Provider, or any Provider while the job is
+  // still pending.
+  uploadPrivateJobPhoto(
+    jobId: string,
+    uploaderId: string,
+    localUri: string,
+  ): Promise<string>;
+
   // Converts private-media://... into a temporary signed URL.
   // Normal http/public URLs pass through unchanged.
   getDisplayUrl(reference: string): Promise<string>;
@@ -162,6 +173,18 @@ export const storageService: StorageService = {
   ) {
     const path =
       `completion/${jobId}/${uploaderId}/` +
+      createFilename(localUri);
+
+    return uploadPrivate(path, localUri);
+  },
+
+  async uploadPrivateJobPhoto(
+    jobId,
+    uploaderId,
+    localUri,
+  ) {
+    const path =
+      `job/${jobId}/${uploaderId}/` +
       createFilename(localUri);
 
     return uploadPrivate(path, localUri);

@@ -17,12 +17,17 @@ export interface ChatService {
   // კითხულობს (SECURITY DEFINER), კლიენტის მტკიცებას აღარ ენდობა.
   listRealMessages(customerId: string, providerId: string, myUid: string): Promise<ChatMsg[]>;
   sendRealMessage(customerId: string, providerId: string, senderId: string, text: string): Promise<ChatMsg>;
+  // `jobId` — second hardening pass, item 5 (supabase/migrations/0049):
+  // ყოველ ფასის შეთავაზებას ახლა თან ახლავს, რომელ job-ს ეხება,
+  // `respond_to_chat_offer`-ის (customer_id, provider_id)-დან
+  // "გამოცნობის" ნაცვლად.
   sendRealOffer(
     customerId: string,
     providerId: string,
     senderId: string,
     amount: number,
     comment: string | undefined,
+    jobId: string,
   ): Promise<ChatMsg>;
   sendRealImage(customerId: string, providerId: string, senderId: string, imageUrl: string): Promise<ChatMsg>;
   respondToRealOffer(messageId: string, status: Extract<OfferStatus, 'accepted' | 'declined'>): Promise<void>;
@@ -62,6 +67,7 @@ type MessageRow = {
   amount: number | null;
   comment: string | null;
   offer_status: OfferStatus | null;
+  job_id: string | null;
   created_at: string;
 };
 
@@ -105,6 +111,7 @@ function fromMessageRow(row: MessageRow, myUid: string): ChatMsg {
       amount: row.amount ?? undefined,
       comment: row.comment ?? undefined,
       offerStatus: row.offer_status ?? 'pending',
+      jobId: row.job_id ?? undefined,
     };
   }
   if (row.type === 'image') {
@@ -133,7 +140,7 @@ export const chatService: ChatService = {
     if (error) throw error;
     return fromMessageRow(data as MessageRow, senderId);
   },
-  async sendRealOffer(customerId, providerId, senderId, amount, comment) {
+  async sendRealOffer(customerId, providerId, senderId, amount, comment, jobId) {
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -145,6 +152,7 @@ export const chatService: ChatService = {
         amount,
         comment: comment ?? null,
         offer_status: 'pending',
+        job_id: jobId,
       })
       .select()
       .single();

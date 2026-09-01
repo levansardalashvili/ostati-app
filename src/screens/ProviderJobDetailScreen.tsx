@@ -198,6 +198,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       initials: job.customer[0],
       color: '#64748B',
       role: 'provider',
+      jobId: job.customerJobId,
     });
   };
   // #84-ის დროს "..." ღილაკს მხოლოდ ერთი მოქმედება (ზოგადი
@@ -428,10 +429,18 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
 
       {variant === 'browse' && (
         <View style={styles.footer}>
-          <Pressable style={styles.chatButton} onPress={handleChat}>
-            <MessageCircle size={17} color={colors.foreground} />
-            <Text style={styles.chatButtonText}>ჩატი</Text>
-          </Pressable>
+          {/* supabase/migrations/0046 — Provider→Customer chat now
+              requires a real job_responses row (or assignment) server-side;
+              the "any open pending job" exception is gone. Before
+              expressing interest there is no such row yet, so the chat
+              button would fail server-side — shown only once `expressed`
+              is true, matching the new backend rule exactly. */}
+          {expressed && (
+            <Pressable style={styles.chatButton} onPress={handleChat}>
+              <MessageCircle size={17} color={colors.foreground} />
+              <Text style={styles.chatButtonText}>ჩატი</Text>
+            </Pressable>
+          )}
           <Pressable
             style={[styles.interestButton, expressed && styles.interestButtonExpressed]}
             onPress={() => !expressed && setOfferSheetOpen(true)}

@@ -50,7 +50,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ChatConversation'>;
 // მომენტში იწერება (`select_provider()` RPC, #72) — ჩატში დათანხმებული
 // ფასის ამ ველში ავტომატურად ასახვა ცალკე, დარჩენილი ეტაპია.
 export function ChatConversationScreen({ navigation, route }: Props) {
-  const { chatId, name, initials, color, role } = route.params;
+  const { chatId, name, initials, color, role, jobId } = route.params;
   // ყველა navigation call site (#71) რეალურ Supabase UUID-ს გადასცემს
   // chatId-ად (მეორე მხარის auth.users.id) — mock chat-ის კუნძული
   // მთლიანად წაშლილია, ეს ეკრანი აღარ საჭიროებს mock/real branching-ს.
@@ -163,7 +163,12 @@ export function ChatConversationScreen({ navigation, route }: Props) {
 
   const sendOffer = () => {
     const amount = parseInt(offerAmount, 10);
-    if (!amount || amount <= 0) return;
+    // Second hardening pass, item 5 — ყოველ offer-ს job_id სჭირდება
+    // (supabase/migrations/0049); route.params.jobId Provider-ის ყველა
+    // ლეგიტიმური შესვლის წერტილიდან ხელთაა (ProviderJobDetailScreen/
+    // ProviderHomeScreen/ProviderJobFeedScreen) — offer-ის კომპოზერი
+    // ღილაკიც ჩანს მხოლოდ, როცა jobId არსებობს (footer-ის JSX).
+    if (!amount || amount <= 0 || !jobId) return;
     const id = `offer-${Date.now()}`;
     const comment = offerComment.trim() || undefined;
     setMessages((prev) => [
@@ -177,6 +182,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
         amount,
         comment,
         offerStatus: 'pending',
+        jobId,
       },
     ]);
     setOfferSheetOpen(false);
@@ -184,7 +190,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     setOfferComment('');
     if (!customerId || !providerId || !myUid) return;
     chatService
-      .sendRealOffer(customerId, providerId, myUid, amount, comment)
+      .sendRealOffer(customerId, providerId, myUid, amount, comment, jobId)
       .then((real) => {
         setMessages((prev) => prev.map((m) => (m.id === id ? { ...real, state: 'sent' } : m)));
       })
@@ -212,7 +218,8 @@ export function ChatConversationScreen({ navigation, route }: Props) {
       if (msg.type === 'text') {
         real = await chatService.sendRealMessage(customerId, providerId, myUid, msg.text ?? '');
       } else if (msg.type === 'offer') {
-        real = await chatService.sendRealOffer(customerId, providerId, myUid, msg.amount ?? 0, msg.comment);
+        if (!msg.jobId) throw new Error('Offer message is missing jobId');
+        real = await chatService.sendRealOffer(customerId, providerId, myUid, msg.amount ?? 0, msg.comment, msg.jobId);
       } else if (msg.type === 'image') {
         // თუ ატვირთვა უკვე მოხერხდა და მხოლოდ insert ჩავარდა, `imageUrl`
         // უკვე რეალური http(s) URL-ია — ხელახლა აღარ ვტვირთავთ (image
@@ -409,7 +416,10 @@ if (
           <Pressable style={styles.attachButton} onPress={() => setAttachSheetOpen(true)}>
             <Camera size={17} color={colors.mutedForeground} />
           </Pressable>
-          {role === 'provider' && (
+          {/* Second hardening pass, item 5 — offer-ს job_id სჭირდება
+              (supabase/migrations/0049), ამიტომ ღილაკი ჩანს მხოლოდ, როცა
+              route.params.jobId არსებობს. */}
+          {role === 'provider' && jobId && (
             <Pressable style={styles.attachButton} onPress={() => setOfferSheetOpen(true)}>
               <Wallet size={17} color={colors.mutedForeground} />
             </Pressable>

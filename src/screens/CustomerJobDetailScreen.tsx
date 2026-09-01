@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Briefcase,
@@ -21,6 +21,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { ReportJobSheet } from '../components/ReportJobSheet';
+import { SecureStorageImage } from '../components/SecureStorageImage';
 import { Skeleton } from '../components/Skeleton';
 import { StatusPill, type JobStatus } from '../components/StatusPill';
 import { VerifiedBadge } from '../components/VerifiedBadge';
@@ -376,7 +377,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
             <View style={styles.photoRow}>
               {job.photos.map((uri) => (
                 <View key={uri} style={styles.photoThumb}>
-                  <Image source={{ uri }} style={styles.photoThumbImage} />
+                  <SecureStorageImage reference={uri} style={styles.photoThumbImage} />
                 </View>
               ))}
             </View>

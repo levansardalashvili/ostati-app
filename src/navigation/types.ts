@@ -32,7 +32,16 @@ export type RootStackParamList = {
   // თუ არ არის გადაცემული, ეკრანი თავად წამოიღებს (jobService.getJobPostById,
   // #71) — notification deep-link-ებისთვის, სადაც მხოლოდ jobId ცნობილია.
   CustomerJobDetail: { jobId: string; job?: CustomerJob };
-  ChatConversation: { chatId: string; name: string; initials: string; color: string; role: Role };
+  // `jobId` — second hardening pass, item 5 (supabase/migrations/0049):
+  // ჩატის სტრუქტურირებული ფასის შეთავაზება ახლა job-ზეა მიბმული
+  // (`messages.job_id`), აღარ არის (customer_id, provider_id)-დან
+  // inferred. Optional — Provider-ის ყველა შესვლის წერტილს (Job Feed/
+  // job detail/Home) ეს ხელთ აქვს job-კონტექსტიდან; Customer-ის
+  // დირექტორია-დაფუძნებული ჩატის (SavedProviders/ViewProviderProfile)
+  // ან notification-deep-link-ის შესვლისას `undefined`-ია — ამ
+  // შემთხვევებში (Provider-ის მხრიდან) ფასის შეთავაზების ღილაკი
+  // უბრალოდ არ ჩანს (ChatConversationScreen).
+  ChatConversation: { chatId: string; name: string; initials: string; color: string; role: Role; jobId?: string };
   Notifications: { role: Role };
   NotificationSettings: { role: Role };
   ProfileSettings: undefined;

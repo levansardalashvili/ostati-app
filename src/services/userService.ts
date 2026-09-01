@@ -55,14 +55,24 @@ type ProviderProfileRow = {
   // (owner-ს არასდროს არ შეუძლია საკუთარი თავი გაავერიფიციროს), ამიტომ
   // ეს მნიშვნელობა ყოველთვის სანდოა, საიდანაც არ უნდა წამოვიდეს.
   verification_status: VerificationStatus;
-  // Verification request metadata (supabase/migrations/0035) — ორივე
-  // client-ისთვის წერადობით ჩაკეტილია, ისევე როგორც verification_status
-  // (0026-ის column-level grant allowlist-ში არც ერთი მათგანი არ შედის).
-  verification_requested_at: string | null;
-  verification_rejection_reason: string | null;
 };
 
-function fromProviderProfileRow(row: ProviderProfileRow): ProviderProfile {
+// Second hardening pass, item 8 (supabase/migrations/0051) —
+// `verification_requested_at`/`verification_rejection_reason` აღარ
+// არსებობს `provider_profiles`-ზე (ის საჯაროდ readable-ია ყველა
+// authenticated user-ისთვის, #3-დანვე — ეს ორი ველი კი მოდერაციის
+// შიდა ინფორმაციაა, საჯაროდ არასდროს არ უნდა ყოფილიყო წაკითხვადი).
+// ცალკე, owner-only ცხრილზეა გატანილი.
+type ProviderVerificationRequestRow = {
+  provider_id: string;
+  requested_at: string | null;
+  rejection_reason: string | null;
+};
+
+function fromProviderProfileRow(
+  row: ProviderProfileRow,
+  verificationRequest?: ProviderVerificationRequestRow | null,
+): ProviderProfile {
   return {
     // #86: იგივე defensive coalesce, რაც fromRow-შია — იხ. იქაური შენიშვნა.
     firstName: row.first_name ?? '',
@@ -76,8 +86,8 @@ function fromProviderProfileRow(row: ProviderProfileRow): ProviderProfile {
     portfolio: row.portfolio,
     sqmPrices: row.sqm_prices,
     verificationStatus: row.verification_status,
-    verificationRequestedAt: row.verification_requested_at,
-    verificationRejectionReason: row.verification_rejection_reason,
+    verificationRequestedAt: verificationRequest?.requested_at ?? null,
+    verificationRejectionReason: verificationRequest?.rejection_reason ?? null,
   };
 }
 
@@ -264,10 +274,22 @@ export const userService: UserService = {
   },
 
   async getProviderProfileRecord(uid) {
-    const { data, error } = await supabase.from('provider_profiles').select('*').eq('id', uid).maybeSingle();
+    // Second hardening pass, item 8 — verification-request metadata
+    // (requested_at/rejection_reason) ცალკე, owner-only ცხრილშია
+    // (0051) — ორივე query ერთდროულად, ეს ყოველთვის caller-ის
+    // საკუთარი პროფილისთვისაა გამოძახებული (ProviderProfileContext/
+    // RootNavigator-ის boot hydration/ProviderEditProfileScreen), ასე
+    // რომ owner-only RLS ორივეს გაუშვებს.
+    const [{ data, error }, verificationResult] = await Promise.all([
+      supabase.from('provider_profiles').select('*').eq('id', uid).maybeSingle(),
+      supabase.from('provider_verification_requests').select('*').eq('provider_id', uid).maybeSingle(),
+    ]);
     if (error) throw error;
     if (!data) return null;
-    return fromProviderProfileRow(data as ProviderProfileRow);
+    const verificationRequest = !verificationResult.error
+      ? (verificationResult.data as ProviderVerificationRequestRow | null)
+      : null;
+    return fromProviderProfileRow(data as ProviderProfileRow, verificationRequest);
   },
   async upsertProviderProfileRecord(uid, record) {
     const { error } = await supabase.from('provider_profiles').upsert({
