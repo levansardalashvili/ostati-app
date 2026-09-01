@@ -31,6 +31,14 @@ export type JobStatus =
   | 'completed'
   | 'cancelled';
 
+// job_posts.time_slot-ის ფიქსირებული მნიშვნელობები (supabase/migrations/
+// 0041, `job_posts_time_slot_check`-ის ზუსტი ანარეკლი) — PostJobScreen-ის
+// "სასურველი დრო" BottomSheet-ის თითოეული ვარიანტი. `job_scheduled_start()`
+// SQL ფუნქცია (იქვე) განსაზღვრავს, რომელი დროიდან ითვლება job-ის
+// "დაწყებული" — 'flexible'/`undefined`-ისთვის უბრალოდ თარიღის დასაწყისი
+// (00:00, Asia/Tbilisi).
+export type TimeSlot = '09-12' | '12-15' | '15-18' | '18-21' | 'flexible';
+
 // Provider-ის მხრიდან ხილული job-ის ჩანაწერი (Job Feed) — რეალურად
 // Supabase-ის `job_posts` ცხრილზეა აგებული (#55 "ეტაპი B", jobService.ts-ის
 // `getOpenProviderFeedPosts`/`listMyAssignedJobs`).
@@ -85,6 +93,14 @@ export type FeedJob = {
   // რომ არასწორად "მომხმარებელმა გააუქმა" არ დაწეროს, როცა სინამდვილეში
   // Provider-მა თავად გააუქმა საკუთარი job.
   cancellationActor?: 'customer' | 'provider' | 'admin' | null;
+  // job_posts.preferred_date/time_slot (supabase/migrations/0041) —
+  // კანონიკური (structured) დანართი არსებული თავისუფალ-ტექსტური
+  // `date`-ის გვერდით, რომელიც ჩვენებისთვის უცვლელად რჩება. `undefined`
+  // ძველ, migration-მდელ job-ებზე (განრიგის შეზღუდვის გარეშე, ისევე
+  // როგორც აქამდე). `provider_request_completion()` RPC (0041) სწორედ
+  // ამ ორ ველზეა აგებული, არა თავისუფალ `date`-ზე.
+  preferredDate?: string | null;
+  timeSlot?: TimeSlot | null;
 };
 
 // Customer-ის მხრიდან ხილული job-ის ჩანაწერი — რეალურად Supabase-ის
@@ -118,4 +134,7 @@ export type CustomerJob = {
   // job_posts.dispute_reason (#72) — customer_report_problem() RPC-ის
   // მიერ შენახული თავისუფალი ტექსტი, მხოლოდ 'disputed' სტატუსზე.
   disputeReason?: string | null;
+  // იხ. FeedJob-ის იგივე ველების შენიშვნა ზემოთ (supabase/migrations/0041).
+  preferredDate?: string | null;
+  timeSlot?: TimeSlot | null;
 };

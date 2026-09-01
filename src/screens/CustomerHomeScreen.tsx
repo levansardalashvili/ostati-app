@@ -22,6 +22,7 @@ import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
 import { TBILISI_AREAS as DISTRICTS } from '../data/districts';
 import { authService } from '../services/authService';
+import { categoryService } from '../services/categoryService';
 import { jobService } from '../services/jobService';
 import { notificationService } from '../services/notificationService';
 import { userService } from '../services/userService';
@@ -35,10 +36,6 @@ type Props = CompositeScreenProps<
   BottomTabScreenProps<CustomerTabParamList, 'Home'>,
   NativeStackScreenProps<RootStackParamList>
 >;
-
-// 3 ყველაზე მოთხოვნადი სერვისი, რომლებიც პირდაპირ Home-ის ეკრანზე ჩანს
-// (დანარჩენი 12 კატეგორია "ყველა სერვისი" ღილაკის მიღმაა)
-const TOP_CATEGORY_IDS = ['plumbing', 'electrical', 'cleaning'];
 
 // "ტოპ ოსტატები" რანჟირება — არა უბრალო ბოლო რეგისტრაცია (მომხმარებლის
 // მოთხოვნით), წონიანი/Bayesian ფორმულით (src/utils/providerRank.ts) —
@@ -136,9 +133,29 @@ export function CustomerHomeScreen({ navigation }: Props) {
     navigation.navigate('CustomerCategories');
   };
 
-  const topCategories = TOP_CATEGORY_IDS.map((id) => CATEGORIES.find((c) => c.id === id)).filter(
-    (c): c is (typeof CATEGORIES)[number] => !!c,
-  );
+  // Task 6 (audit) — "ტოპ 3" ახლა ბექენდის `featured` დროშაზეა აგებული
+  // (`categoryService`, `categories.featured`), ადრინდელი ჰარდქოდილი
+  // `TOP_CATEGORY_IDS`-ის ნაცვლად. bg/dot ფერები კვლავ ლოკალურია.
+  const [categoryList, setCategoryList] = useState(() => categoryService.getCached());
+  useEffect(() => {
+    let cancelled = false;
+    categoryService
+      .listCategories()
+      .then((list) => {
+        if (!cancelled) setCategoryList(list);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const topCategories = [...categoryList]
+    .filter((c) => c.featured && c.isActive)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((c) => {
+      const style = CATEGORIES.find((sc) => sc.id === c.id);
+      return { id: c.id, label: c.name, bg: style?.bg ?? colors.muted, dot: style?.dot ?? colors.mutedForeground };
+    });
 
   // "მიმდინარე სამუშაო" — ჩანს მხოლოდ მაშინ, როცა Customer-მა კონკრეტულ
   // Provider-ს აირჩია (status === 'active'). დაჭერისას იხსნება არსებული

@@ -20,6 +20,18 @@ function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+// "YYYY-MM-DD" — კანონიკური, timezone-უსაფრთხო ფორმატი (supabase/migrations/
+// 0041-ის `preferred_date`-ისთვის). ლოკალური calendar-ველებით (getFullYear/
+// getMonth/getDate), არა `.toISOString()`-ით — ეს უკანასკნელი UTC-ზე
+// გარდაქმნის თარიღს და შუაღამესთან ახლოს შეიძლება თარიღი გადაწიოს
+// მოწყობილობის timezone-ის მიხედვით.
+export function toIsoDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 // "დღეს"/"ხვალ" ან "D თვე" ფორმატში — job-ის თარიღების არსებული
 // ჩვენების კონვენციასთან თანხვედრით (მაგ. "20 დეკ.").
 export function formatPickedDate(date: Date): string {

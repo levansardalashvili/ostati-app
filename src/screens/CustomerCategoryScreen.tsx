@@ -7,7 +7,8 @@ import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
-import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
+import { SPECIALTY_LABEL } from '../data/categories';
+import { categoryService } from '../services/categoryService';
 import { userService } from '../services/userService';
 import type { Provider } from '../types/provider';
 import { isNewProvider } from '../utils/providerRank';
@@ -19,7 +20,21 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CustomerCategory'>;
 // (ზიპის App.tsx-ის CustomerCategory-ის მიხედვით, გასწორებული ბაგით —
 // ზიპში ეს ეკრანი ყველა ოსტატს უფილტრაციოდ აჩვენებდა).
 export function CustomerCategoryScreen({ navigation, route }: Props) {
-  const category = CATEGORIES.find((c) => c.id === route.params.id);
+  // Task 6 (audit) — სახელი ბექენდიდანაა (`categoryService`, cache-ით/
+  // fallback-ით), ლოკალური `CATEGORIES.find`-ის ნაცვლად.
+  const [categoryName, setCategoryName] = useState(() => categoryService.getCached().find((c) => c.id === route.params.id)?.name);
+  useEffect(() => {
+    let cancelled = false;
+    categoryService
+      .listCategories()
+      .then((list) => {
+        if (!cancelled) setCategoryName(list.find((c) => c.id === route.params.id)?.name);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [route.params.id]);
   const [allProviders, setAllProviders] = useState<Provider[]>([]);
   useEffect(() => {
     let cancelled = false;
@@ -40,7 +55,7 @@ export function CustomerCategoryScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <BackHeader title={category?.label ?? 'ყველა ოსტატი'} onBack={() => navigation.goBack()} />
+      <BackHeader title={categoryName ?? 'ყველა ოსტატი'} onBack={() => navigation.goBack()} />
       {providers.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>

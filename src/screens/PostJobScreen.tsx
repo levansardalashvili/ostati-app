@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Image,
   Pressable,
@@ -27,20 +27,32 @@ import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { getCategoryIcon } from '../components/CategoryIcon';
 import { DatePickerField } from '../components/DatePickerField';
-import { formatPickedDate } from '../components/CalendarPicker';
+import { formatPickedDate, toIsoDateString } from '../components/CalendarPicker';
 import { InlineBanner } from '../components/InlineBanner';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
 import { authService } from '../services/authService';
+import { categoryService } from '../services/categoryService';
 import { jobService } from '../services/jobService';
 import { storageService } from '../services/storageService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
-import type { CustomerJob } from '../types/job';
+import type { CategoryRecord } from '../types/category';
+import type { CustomerJob, TimeSlot } from '../types/job';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PostJob'>;
 
-const TIMES = ['9:00–12:00', '12:00–15:00', '15:00–18:00', '18:00–21:00', 'ნებისმიერ დროს'];
+// კოდი + ქართული ლეიბლი, ცალკე (supabase/migrations/0041-ის
+// `job_posts_time_slot_check`-ის ზუსტი ანარეკლი) — არა თავისუფალი ტექსტი,
+// რომ RPC-მ (`provider_request_completion`) რეალურად შეძლოს დაგეგმილი
+// დროის სერვერზე ვალიდაცია.
+const TIME_SLOTS: { code: TimeSlot; label: string }[] = [
+  { code: '09-12', label: '9:00–12:00' },
+  { code: '12-15', label: '12:00–15:00' },
+  { code: '15-18', label: '15:00–18:00' },
+  { code: '18-21', label: '18:00–21:00' },
+  { code: 'flexible', label: 'ნებისმიერ დროს' },
+];
 // პროდუქტული წესი (product-spec.md) — job post-ში მაქს. 3 ფოტო,
 // არა 5, როგორც დიზაინის რეფერენსშია
 const MAX_PHOTOS = 3;
@@ -64,13 +76,40 @@ export function PostJobScreen({ navigation }: Props) {
   // კონკრეტული job post-ის მისამართია) — მომხმარებლის მოთხოვნით.
   const [address, setAddress] = useState(profile.defaultAddress);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedTime, setSelectedTime] = useState('');
+  const [selectedTime, setSelectedTime] = useState<TimeSlot | ''>('');
+  const selectedTimeLabel = TIME_SLOTS.find((t) => t.code === selectedTime)?.label ?? '';
   const [timeSheetOpen, setTimeSheetOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [published, setPublished] = useState(false);
   const [submitTouched, setSubmitTouched] = useState(false);
   const [publishError, setPublishError] = useState(false);
   const [createdJob, setCreatedJob] = useState<CustomerJob | null>(null);
+
+  // Task 6 (audit) — კატეგორიების სია ახლა ბექენდიდანაა (`categories`
+  // ცხრილი, supabase/migrations/0043): სახელი/რიგითობა/აქტიურობა
+  // სანდოა backend-დან, `is_active=false` კატეგორია ამ სიაშივე აღარ
+  // ჩანს (task: "inactive categories cannot be selected for new jobs").
+  // საწყისი მნიშვნელობა `categoryService.getCached()`-ია (სტატიკური
+  // fallback, სანამ backend-fetch არ დასრულდება/ჩავარდნისას) — ეკრანი
+  // არასდროს ცარიელი/loading-ბლოკირებული არ დგება.
+  const [categoryList, setCategoryList] = useState<CategoryRecord[]>(() => categoryService.getCached());
+  useEffect(() => {
+    let cancelled = false;
+    categoryService
+      .listCategories()
+      .then((list) => {
+        if (!cancelled) setCategoryList(list);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const activeCategories = [...categoryList].filter((c) => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder);
+  // bg/dot ფერები კვლავ ლოკალურია (`src/data/categories.ts`) — ეს
+  // ვიზუალური/დიზაინის ტოკენებია, არა backend-მონაცემი (0043-ის სქემას
+  // მათთვის სვეტი განზრახ არ აქვს).
+  const selectedStyle = CATEGORIES.find((c) => c.id === category);
 
   const categoryError = submitTouched && !category ? 'აირჩიე კატეგორია' : '';
   const descriptionError =
@@ -80,7 +119,7 @@ export function PostJobScreen({ navigation }: Props) {
         ? 'ეს ველი სავალდებულოა'
         : '';
   const canSubmit = !!category && description.trim().length >= DESCRIPTION_MIN;
-  const selectedCategory = CATEGORIES.find((c) => c.id === category) ?? null;
+  const selectedCategory = activeCategories.find((c) => c.id === category) ?? null;
   const SelectedCategoryIcon = getCategoryIcon(selectedCategory?.id ?? '');
 
   const handlePublish = async () => {
@@ -96,9 +135,11 @@ export function PostJobScreen({ navigation }: Props) {
         category,
         description: description.trim(),
         address: address.trim(),
-        date: selectedDate ? `${formatPickedDate(selectedDate)}${selectedTime ? ` ${selectedTime}` : ''}` : '',
+        date: selectedDate ? `${formatPickedDate(selectedDate)}${selectedTimeLabel ? ` ${selectedTimeLabel}` : ''}` : '',
         customerName: `${profile.firstName} ${profile.lastName}`.trim(),
         photos: photoUrls,
+        preferredDate: selectedDate ? toIsoDateString(selectedDate) : null,
+        timeSlot: selectedTime || null,
       });
       setCreatedJob(job);
       setPublished(true);
@@ -182,11 +223,11 @@ export function PostJobScreen({ navigation }: Props) {
           >
             <SelectedCategoryIcon
               size={18}
-              color={selectedCategory ? selectedCategory.dot : colors.mutedForeground}
+              color={selectedStyle ? selectedStyle.dot : colors.mutedForeground}
               strokeWidth={2}
             />
             <Text style={[styles.categoryButtonText, !selectedCategory && styles.categoryButtonPlaceholder]} numberOfLines={1}>
-              {selectedCategory?.label ?? 'აირჩიე კატეგორია'}
+              {selectedCategory?.name ?? 'აირჩიე კატეგორია'}
             </Text>
             <ChevronRight size={16} color={colors.mutedForeground} />
           </Pressable>
@@ -266,7 +307,7 @@ export function PostJobScreen({ navigation }: Props) {
           >
             <Clock size={16} color={colors.mutedForeground} />
             <Text style={[styles.categoryButtonText, !selectedTime && styles.categoryButtonPlaceholder]} numberOfLines={1}>
-              {selectedTime || (selectedDate ? 'აირჩიე დრო' : 'ჯერ აირჩიე თარიღი')}
+              {selectedTimeLabel || (selectedDate ? 'აირჩიე დრო' : 'ჯერ აირჩიე თარიღი')}
             </Text>
             <ChevronRight size={16} color={colors.mutedForeground} />
           </Pressable>
@@ -303,9 +344,10 @@ export function PostJobScreen({ navigation }: Props) {
       <BottomSheet visible={categorySheetOpen} onClose={() => setCategorySheetOpen(false)}>
         <Text style={styles.sheetTitle}>კატეგორია</Text>
         <ScrollView style={styles.categorySheetList} showsVerticalScrollIndicator={false}>
-          {CATEGORIES.map((c) => {
+          {activeCategories.map((c) => {
             const on = category === c.id;
             const Icon = getCategoryIcon(c.id);
+            const style = CATEGORIES.find((sc) => sc.id === c.id);
             return (
               <Pressable
                 key={c.id}
@@ -316,9 +358,9 @@ export function PostJobScreen({ navigation }: Props) {
                 style={styles.categorySheetRow}
               >
                 <View style={styles.categoryIconWrap}>
-                  <Icon size={18} color={c.dot} strokeWidth={2} />
+                  <Icon size={18} color={style?.dot ?? colors.mutedForeground} strokeWidth={2} />
                 </View>
-                <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{c.label}</Text>
+                <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{c.name}</Text>
                 {on && <Check size={16} color={colors.primary} strokeWidth={3} />}
               </Pressable>
             );
@@ -328,18 +370,18 @@ export function PostJobScreen({ navigation }: Props) {
 
       <BottomSheet visible={timeSheetOpen} onClose={() => setTimeSheetOpen(false)}>
         <Text style={styles.sheetTitle}>სასურველი დრო</Text>
-        {TIMES.map((t) => {
-          const on = selectedTime === t;
+        {TIME_SLOTS.map((t) => {
+          const on = selectedTime === t.code;
           return (
             <Pressable
-              key={t}
+              key={t.code}
               onPress={() => {
-                setSelectedTime(t);
+                setSelectedTime(t.code);
                 setTimeSheetOpen(false);
               }}
               style={styles.categorySheetRow}
             >
-              <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{t}</Text>
+              <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{t.label}</Text>
               {on && <Check size={16} color={colors.primary} strokeWidth={3} />}
             </Pressable>
           );

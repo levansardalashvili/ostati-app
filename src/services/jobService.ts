@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
-import { CATEGORIES } from '../data/categories';
-import type { CustomerJob, FeedJob } from '../types/job';
+import { categoryService } from './categoryService';
+import type { CustomerJob, FeedJob, TimeSlot } from '../types/job';
 
 // `job_posts` ცხრილის Postgres row shape — CustomerJob-ის (camelCase)
 // შესატყვისი, სერვისის საზღვარზე კონვერტაციით. `provider_id`/`provider_name`
@@ -36,14 +36,26 @@ type JobPostRow = {
   // variant-ის ტექსტისთვის) — `CustomerJob`-ს ჯერ არ სჭირდება, generic
   // StatusPill-ი უკვე საკმარისია Customer-ის მხარეს.
   cancellation_actor: 'customer' | 'provider' | 'admin' | null;
+  // supabase/migrations/0041 — კანონიკური განრიგის ველები, თავისუფალ-ტექსტური
+  // `date`-ის გვერდით (რომელიც უცვლელად რჩება, ჩვენებისთვის). იხ.
+  // src/types/job.ts-ის FeedJob/CustomerJob-ის იგივე შენიშვნა.
+  preferred_date: string | null;
+  time_slot: TimeSlot | null;
 };
 
-// `title` აღარ ინახება ბაზაში — ყოველთვის კატეგორიის label-იდანაა
+// `title` აღარ ინახება ბაზაში — ყოველთვის კატეგორიის სახელიდანაა
 // გამოთვლილი (ეს ისედაც იყო ერთადერთი წყარო job-ის შექმნისას, #23),
 // ამიტომ ეს drop მონაცემის დაკარგვა არ არის. UI-ს (`job.title`)
 // ცვლილება არ სჭირდება.
+//
+// Task 6 (audit) — `CATEGORIES`-ის (local, static) პირდაპირი `.find()`-ის
+// ნაცვლად `categoryService.getCategoryName()` (სინქრონული, cache-ზეა
+// აგებული — backend-დან, თუ ჩატვირთულა, თორემ იმავე სტატიკურ სიაზე
+// fallback-ით) — კატეგორიის სახელი ახლა ბექენდიდანაა სანდო, ძველი
+// job-ების ჩვენებაც ისევე მუშაობს (fallback ზუსტად ძველ მონაცემს
+// იმეორებს).
 export function deriveJobTitle(category: string): string {
-  return CATEGORIES.find((c) => c.id === category)?.label ?? category;
+  return categoryService.getCategoryName(category);
 }
 
 function fromJobPostRow(row: JobPostRow): CustomerJob {
@@ -59,6 +71,8 @@ function fromJobPostRow(row: JobPostRow): CustomerJob {
     desc: row.description,
     photos: row.photos,
     agreedPrice: row.agreed_price,
+    preferredDate: row.preferred_date,
+    timeSlot: row.time_slot,
   };
 }
 
@@ -94,6 +108,8 @@ function fromJobPostRowToFeedJob(row: JobPostRow): FeedJob {
     customerId: row.customer_id,
     agreedPrice: row.agreed_price,
     cancellationActor: row.cancellation_actor,
+    preferredDate: row.preferred_date,
+    timeSlot: row.time_slot,
   };
 }
 
@@ -113,6 +129,12 @@ export type NewJobPostInput = {
   date: string;
   customerName: string;
   photos: string[];
+  // supabase/migrations/0041 — კანონიკური განრიგის ველები, `date`-ის
+  // (თავისუფალი ტექსტის) გვერდით. ორივე optional — `undefined`/`null`,
+  // თუ Customer-მა თარიღი/დრო არ აირჩია (PostJobScreen-ის ორივე ველი
+  // არასავალდებულოა).
+  preferredDate?: string | null;
+  timeSlot?: TimeSlot | null;
 };
 
 export interface JobService {
@@ -172,6 +194,8 @@ export const jobService: JobService = {
         date: input.date,
         status: 'pending',
         photos: input.photos,
+        preferred_date: input.preferredDate ?? null,
+        time_slot: input.timeSlot ?? null,
       })
       .select()
       .single();

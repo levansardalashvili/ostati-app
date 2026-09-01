@@ -1,7 +1,8 @@
 import React from 'react';
-import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Trash2, X, type LucideIcon } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
+import { SecureStorageImage } from './SecureStorageImage';
 import type { MediaItem } from './MediaUploadGrid';
 
 type Props = {
@@ -21,7 +22,7 @@ export function MediaPreviewModal({ item, icon: Icon, onClose, onDelete }: Props
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={[styles.card, { backgroundColor: item.bg }]} onPress={() => {}}>
           {item.uri ? (
-            <Image source={{ uri: item.uri }} style={styles.cardImage} />
+            <SecureStorageImage reference={item.uri} style={styles.cardImage} />
           ) : (
             <Icon size={48} color="rgba(100,116,139,0.6)" />
           )}

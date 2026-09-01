@@ -1,4 +1,6 @@
 import { supabase } from './supabaseClient';
+import { userService } from './userService';
+import type { Provider } from '../types/provider';
 import type { JobQuote } from '../types/quote';
 
 // `job_responses` ცხრილის Postgres row shape — Provider-ის საჯარო
@@ -19,12 +21,16 @@ type JobResponseRow = {
   offered_price: number | null;
 };
 
-// რეალური response-იდან აგებული Provider — მხოლოდ დენორმალიზებული
-// (name/initials/color) ველებია ცნობილი, დანარჩენი (rating/reviews/years/...)
-// mock `Provider`-ის სრული საჯარო დირექტორიისგან განსხვავებით ჯერ არ
-// არსებობს (#48-ის შენიშვნა) — ნაგულისხმევებზეა, `isNewProvider`-ის (#42)
-// "ახალი ოსტატი" ვიზუალური მდგომარეობა ამას უკვე გამართულად ამუშავებს.
-function fromJobResponseRow(row: JobResponseRow): JobQuote {
+// Task 5 (audit) — მანამდე `listResponsesForJob` ყოველთვის ამ minimal
+// reconstruction-ს აბრუნებდა (rating/reviews/years/jobs/verified/areas/
+// specialties ყველა ნაგულისხმევზე, #48-ის ძველი შენიშვნა) — Customer-ს
+// დაინტერესებული Provider-ების რეალურად ვერ შეედარებინა. ახლა ეს
+// მხოლოდ **fallback**-ია (`listResponsesForJob`-ში), თუ Provider-ს
+// რატომღაც `provider_profiles` row საერთოდ არ ჰყავს (თეორიულად
+// არარსებული მდგომარეობა, რადგან რეგისტრაცია ყოველთვის ქმნის მას, #53) —
+// ჩვეულებრივ ყოველთვის `userService.getRealProvidersByIds`-ის სრული,
+// რეალური Provider ობიექტი გამოიყენება.
+function fromJobResponseRowFallback(row: JobResponseRow): JobQuote {
   return {
     provider: {
       id: row.provider_id,
@@ -98,6 +104,22 @@ export const quoteService: QuoteService = {
       .eq('job_id', jobId)
       .order('created_at', { ascending: true });
     if (error) throw error;
-    return (data as JobResponseRow[]).map(fromJobResponseRow);
+    const rows = data as JobResponseRow[];
+    if (rows.length === 0) return [];
+
+    // ერთი batched query ყველა დაინტერესებული Provider-ისთვის (N+1-ის
+    // გარეშე) — enrichment-ის ჩავარდნაზე (ქსელი/RPC) ყველა row უბრალოდ
+    // fallback-ზე vardebა, სია მაინც ბრუნდება ცარიელი/crashed-ის ნაცვლად.
+    const providerIds = rows.map((r) => r.provider_id);
+    const realProviders = await userService.getRealProvidersByIds(providerIds).catch(() => [] as Provider[]);
+    const providerMap = new Map(realProviders.map((p) => [p.id, p]));
+
+    return rows.map((row) => {
+      const real = providerMap.get(row.provider_id);
+      return {
+        provider: real ?? fromJobResponseRowFallback(row).provider,
+        offeredPrice: row.offered_price ?? undefined,
+      };
+    });
   },
 };

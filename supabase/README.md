@@ -68,6 +68,11 @@ before applying them. None of the files drop tables.
 | `0037_push_tokens.sql` | `push_tokens` (new table, RPC-only writes); RPCs `register_push_token`/`deactivate_push_token` |
 | `0038_notifications_push_types.sql` | `notifications`: +`type` (+ best-effort backfill); all 8 existing notification-writing functions now also set `type` |
 | `0039_new_job_provider_notify.sql` | new `specialty_to_category()` helper + `handle_new_job_notify` trigger on `job_posts` (type=`new_jobs_in_area`, specialty+area+availability matched) |
+| `0040_private_media_storage.sql` | new `private-media` bucket (non-public) + `can_access_private_chat_media()`/`can_access_private_job_media()` helpers + path-scoped `storage.objects` policies, for chat images and completion/rating photos |
+| `0041_job_schedule.sql` | `job_posts`: +`preferred_date`/`time_slot` (additive, alongside the unchanged free-text `date`); new `job_scheduled_start()` helper (Asia/Tbilisi); `provider_request_completion` now rejects completion requests before the job's scheduled window starts |
+| `0042_chat_offer_price_sync.sql` | `messages` INSERT policy: only a Provider may send `type='offer'`; UPDATE(offer_status) is now RPC-only (`respond_to_chat_offer`), which also syncs `job_responses.offered_price` on acceptance when exactly one open job matches |
+| `0043_categories.sql` | new `categories` table (id/name/icon_key/sort_order/is_active/featured), public-read, no client write; seeded with the existing 15 category ids |
+| `0044_function_permissions_hardening.sql` | Security Advisor hardening — revokes the implicit PUBLIC/anon EXECUTE every function had by default (client RPCs → authenticated-only; trigger/internal-helper functions → no direct EXECUTE for anyone); fixes `set_updated_at`'s missing search_path |
 
 See `supabase/functions/send-push-notifications/README.md` for the Edge Function that actually sends pushes (deploy + Database Webhook setup — both manual, cannot be done from a migration).
 

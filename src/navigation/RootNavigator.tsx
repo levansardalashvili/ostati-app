@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { authService } from '../services/authService';
+import { categoryService } from '../services/categoryService';
 import { userService } from '../services/userService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
@@ -53,6 +54,15 @@ export function RootNavigator() {
   const [initialRoute, setInitialRoute] = useState<BootRoute>('Welcome');
   const { setProfile: setCustomerProfile } = useCustomerProfile();
   const { setProfile: setProviderProfile } = useProviderProfile();
+
+  // Task 6 (audit) — categoryService-ის cache-ის ადრეული "warm-up",
+  // session-restore-ისგან დამოუკიდებლად (booting-ს არ აყოვნებს/არ ეხება)
+  // — რომ `deriveJobTitle`-ის და კატეგორიის სიების პირველივე გამომძახებლებმა
+  // უკვე რეალური backend-მონაცემი დახვდეთ, არა მხოლოდ სტატიკური fallback.
+  // ჩავარდნაზე (ქსელი) categoryService თავადვე vardebა სტატიკურ fallback-ზე.
+  useEffect(() => {
+    categoryService.listCategories().catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

@@ -168,7 +168,13 @@ export const chatService: ChatService = {
     return fromMessageRow(data as MessageRow, senderId);
   },
   async respondToRealOffer(messageId, status) {
-    const { error } = await supabase.from('messages').update({ offer_status: status }).eq('id', messageId);
+    // Task 4 (audit) — RPC-only, supabase/migrations/0042. Accepting also
+    // atomically syncs the canonical `job_responses.offered_price` when
+    // exactly one still-open job connects this Customer/Provider pair —
+    // a plain column-scoped `.update()` could never do that safely. The
+    // client's own optimistic UI update (respondToOffer, ChatConversationScreen)
+    // is unaffected — it already treats this as fire-and-forget.
+    const { error } = await supabase.rpc('respond_to_chat_offer', { p_message_id: messageId, p_response: status });
     if (error) throw error;
   },
   subscribeToMessages(customerId, providerId, myUid, onMessage) {

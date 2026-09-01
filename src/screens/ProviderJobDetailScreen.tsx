@@ -156,8 +156,17 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       // იხ. supabase/migrations/0022.
       await jobService.providerRequestCompletion(job.customerJobId);
       setStatus(job.customerJobId, 'awaiting_customer_confirmation');
-    } catch {
-      Alert.alert('ვერ მოხერხდა', 'სამუშაოს დასრულების მონიშვნა ვერ მოხერხდა — სცადე თავიდან.');
+    } catch (err) {
+      // supabase/migrations/0041 — RPC-ის სპეციფიკური, greppable
+      // შეცდომა ("SCHEDULED_TIME_NOT_REACHED"), authService.ts-ის
+      // getAuthErrorMessage-ის იგივე პატერნით — ზუსტი ტექსტის ნაცვლად
+      // მკაფიო, ცნობადი მარკერ-სტრიქონი.
+      const message = (err as { message?: string } | null)?.message ?? '';
+      if (message.includes('SCHEDULED_TIME_NOT_REACHED')) {
+        Alert.alert('ჯერ ადრეა', 'სამუშაოს დასრულება ვერ მოინიშნება დაგეგმილ თარიღ/დრომდე ადრე.');
+      } else {
+        Alert.alert('ვერ მოხერხდა', 'სამუშაოს დასრულების მონიშვნა ვერ მოხერხდა — სცადე თავიდან.');
+      }
     } finally {
       setMarkingWorkDone(false);
     }

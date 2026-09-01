@@ -30,13 +30,7 @@ const STAR_LABELS = ['', 'ძალიან ცუდი', 'ცუდი', 'ს
 // გაგზავნის შემდეგ Customer პირდაპირ Customer Home-ზე ბრუნდება
 // (`navigation.reset`), არა CustomerJobDetailScreen-ზე უკან.
 export function RatingScreen({ navigation, route }: Props) {
- const {
-  jobId,
-  providerName,
-  providerInitials,
-  providerColor,
-  onRate,
-} = route.params;
+  const { jobId, providerName, providerInitials, providerColor, onRate } = route.params;
 
   const [stars, setStars] = useState(0);
   const [review, setReview] = useState('');
@@ -83,34 +77,24 @@ export function RatingScreen({ navigation, route }: Props) {
     const uid = authService.getCurrentUser()?.uid;
     let uploadedPhotos = photos;
     if (uid && photos.length > 0) {
-      try {
-        uploadedPhotos = await Promise.all(
-          photos.map(async (item) => {
-           if (
-  !item.uri ||
-  item.uri.startsWith('http') ||
-  storageService.isPrivateReference(item.uri)
-) {
-  return item;
-}
-            const privateReference =
-  await storageService.uploadPrivateCompletionPhoto(
-    jobId,
-    uid,
-    item.uri,
-  );
-
-return {
-  ...item,
-  uri: privateReference,
-};
-          }),
-        );
-      } catch {
-  // ფოტო ვერ აიტვირთა — შეფასება მაინც გაიგზავნება,
-  // მაგრამ ლოკალური file:// URI database-ში არ ჩაიწერება.
-  uploadedPhotos = [];
-      }
+      // `Promise.allSettled` — არა `Promise.all`: ერთი ფოტოს ატვირთვის
+      // ჩავარდნამ არ უნდა წაშალოს დანარჩენი უკვე წარმატებით ატვირთული
+      // ფოტოები (`Promise.all` მთლიანად reject-დებოდა პირველივე
+      // ჩავარდნაზე, რაც ქვემოთ ყველა ფოტოს კარგავდა, არა მხოლოდ
+      // ჩავარდნილს).
+      const results = await Promise.allSettled(
+        photos.map(async (item) => {
+          if (!item.uri || item.uri.startsWith('http') || storageService.isPrivateReference(item.uri)) {
+            return item;
+          }
+          const privateReference = await storageService.uploadPrivateCompletionPhoto(jobId, uid, item.uri);
+          return { ...item, uri: privateReference };
+        }),
+      );
+      // ჩავარდნილი ცალკეული ფოტოები უბრალოდ გამოტოვებულია (ლოკალური
+      // file:// URI database-ში არ ჩაიწერება) — წარმატებულები კი
+      // ინახება, თუნდაც სხვა რომელიმემ ვერ იტვირთოს.
+      uploadedPhotos = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
     }
     onRate?.({ stars, review, chips, photos: uploadedPhotos.length > 0 ? uploadedPhotos : undefined });
     setSubmitting(false);

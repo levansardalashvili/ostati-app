@@ -201,6 +201,13 @@ export interface UserService {
   // (ViewProviderProfileScreen-ის deep-link ან პირდაპირი id-ით გახსნა).
   getRealProviderById(id: string): Promise<Provider | null>;
 
+  // Task 5 — რამდენიმე Provider-ის ერთდროული, batched წაკითხვა id-ების
+  // მიხედვით (`quoteService.listResponsesForJob`-ის Provider-ის
+  // გამდიდრებისთვის — N+1-ის ნაცვლად ერთი `provider_profiles.in(ids)` +
+  // ერთი `get_provider_stats()` query, `listRealProviders()`-ის იგივე
+  // batching-პრინციპით).
+  getRealProvidersByIds(ids: string[]): Promise<Provider[]>;
+
   // Task 2 — Provider Home-ის ხელმისაწვდომობის toggle, `provider_profiles.is_available`-ზე
   // (მანამდე ლოკალური `useState`). ცალკე, მსუბუქი მეთოდებია (არა
   // getProviderProfileRecord/upsertProviderProfileRecord-ის ნაწილი), რომ
@@ -303,6 +310,19 @@ export const userService: UserService = {
     if (!data) return null;
     const stats = !statsResult.error ? (statsResult.data as ProviderStatsRow[] | null)?.[0] : undefined;
     return fromProviderProfileRowToPublicProvider(data as ProviderProfileRow, stats);
+  },
+  async getRealProvidersByIds(ids) {
+    if (ids.length === 0) return [];
+    const [{ data, error }, statsResult] = await Promise.all([
+      supabase.from('provider_profiles').select('*').in('id', ids),
+      supabase.rpc('get_provider_stats'),
+    ]);
+    if (error) throw error;
+    const statsMap = new Map<string, ProviderStatsRow>();
+    if (!statsResult.error) {
+      (statsResult.data as ProviderStatsRow[]).forEach((s) => statsMap.set(s.provider_id, s));
+    }
+    return (data as ProviderProfileRow[]).map((row) => fromProviderProfileRowToPublicProvider(row, statsMap.get(row.id)));
   },
 
   async getProviderAvailability(uid) {
