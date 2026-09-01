@@ -22,7 +22,15 @@
 // შენიშვნა: StatusPill.tsx ამ ტიპს რეექსპორტავს (`export type { JobStatus }`),
 // რომ არსებული `import { StatusPill, type JobStatus } from '../components/StatusPill'`
 // import-ები ხელუხლებელი დარჩეს.
+// 'draft' — third hardening pass, priority 2 (supabase/migrations/0053):
+// create_job() creates a row in this status; it is invisible to every
+// Provider read and every workflow RPC, readable only by the owning
+// Customer (used to resume a failed publish attempt — see
+// PostJobScreen.tsx). It is never expected to reach StatusPill in normal
+// use (jobService.listMyJobPosts() excludes it), but is part of the type
+// because a direct getJobPostById() read can legitimately return one.
 export type JobStatus =
+  | 'draft'
   | 'active'
   | 'pending'
   | 'awaiting_customer_confirmation'

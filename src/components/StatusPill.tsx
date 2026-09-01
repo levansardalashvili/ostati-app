@@ -13,6 +13,9 @@ export type { JobStatus };
 // → "დადასტურებულია" → "დასრულებულია". შიდა ტიპის key-ები (`active` და ა.შ.)
 // უცვლელია — მხოლოდ ნაჩვენები ტექსტი შეიცვალა.
 const STATUS_MAP: Record<JobStatus, { label: string; bg: string; text: string; dot: string }> = {
+  // არასდროს არ უნდა გამოჩნდეს UI-ში ნორმალურ ნაკადში (listMyJobPosts
+  // გამორიცხავს, #53) — მხოლოდ ტიპის სისრულისთვის (Record<JobStatus, ...>).
+  draft: { label: 'დაუსრულებელი', bg: colors.muted, text: colors.mutedForeground, dot: colors.mutedForeground },
   active: { label: 'დადასტურებულია', bg: colors.successBackground, text: colors.success, dot: colors.success },
   pending: { label: 'მომლოდინე', bg: colors.warningBackground, text: colors.warning, dot: colors.warning },
   awaiting_customer_confirmation: {

@@ -119,15 +119,15 @@ async function fetchJobPostRow(id: string): Promise<JobPostRow | null> {
   return (data as JobPostRow | null) ?? null;
 }
 
-// Second hardening pass, item 3 — Provider-ის feed-კითხვები (`job_posts`
-// ნაცვლად `job_posts_feed`-ს იყენებენ, supabase/migrations/0047) — view-ის
-// `address`-ის სვეტი caller-ის auth.uid()-ის მიხედვით masked-ია (მხოლოდ
-// job-ის საკუთარი customer_id/provider_id ხედავს ზუსტ მისამართს, სხვა
-// ნებისმიერი Provider — მხოლოდ `area_label`-ს). Row shape იდენტურია
-// `JobPostRow`-ის — view-ს დამატებით აქვს `address_is_exact` (აქ არ
-// გამოიყენება).
+// Third hardening pass, priority 1 — `job_posts_feed` (a security_invoker
+// VIEW) is gone: it never granted row access by itself, and a direct
+// `job_posts` SELECT policy for Providers browsing pending jobs was the
+// actual (leaky) access path. That base-table policy is now removed
+// entirely (supabase/migrations/0052) — Provider open-job reads go
+// through two SECURITY DEFINER RPCs instead, which are themselves the
+// security boundary (never "the client happens to query the safe view").
 async function fetchFeedJobPostRow(id: string): Promise<JobPostRow | null> {
-  const { data, error } = await supabase.from('job_posts_feed').select('*').eq('id', id).maybeSingle();
+  const { data, error } = await supabase.rpc('get_feed_job_by_id', { p_job_id: id }).maybeSingle();
   if (error) throw error;
   return (data as JobPostRow | null) ?? null;
 }
@@ -142,7 +142,10 @@ export type NewJobPostInput = {
   description: string;
   address: string;
   date: string;
-  customerName: string;
+  // Third hardening pass, priority 3 — `customerName` აღარ არსებობს ამ
+  // ტიპში: create_job() RPC აღარ იღებს client-supplied სახელს (RPC თავად
+  // derives-ს `public.users`-იდან, supabase/migrations/0053) — client
+  // ვეღარასდროს "იმპერსონირებს" სხვა display name-ს Provider-ის feed-ში.
   // supabase/migrations/0041 — კანონიკური განრიგის ველები, `date`-ის
   // (თავისუფალი ტექსტის) გვერდით. ორივე optional — `undefined`/`null`,
   // თუ Customer-მა თარიღი/დრო არ აირჩია (PostJobScreen-ის ორივე ველი
@@ -197,27 +200,32 @@ export interface JobService {
   // Second hardening pass, item 4 — job-ის ფოტოების ცალკე მიმაგრება
   // `create_job`-ის შემდეგ (`private-media/job/{jobId}/...`-ს job-ის
   // id სჭირდება, რომელიც შექმნამდე არ არსებობს). Owner-only, მხოლოდ
-  // `status='pending'`-ზე (supabase/migrations/0050).
+  // `status='draft'`-ზე (third hardening pass-ის მიხედვით გამკვრივებული —
+  // supabase/migrations/0054), მაქს. 3 რეფერენცია, ყველა უნდა ეკუთვნოდეს
+  // ზუსტად ამ job-ს/ამ caller-ს.
   setJobPhotos(jobId: string, photos: string[]): Promise<void>;
+
+  // Third hardening pass, priority 2 — draft -> pending. ერთადერთი გზაა,
+  // რომლითაც job Provider-ის feed-ში ხილული ხდება (supabase/migrations/0053).
+  finalizeJobPublish(jobId: string): Promise<CustomerJob>;
 }
 
 export const jobService: JobService = {
   async createCustomerJob(customerId, input) {
-    // Second hardening pass, items 6/7 — RPC-only (supabase/migrations/0050);
-    // `customerId` პარამეტრი აღარ იგზავნება (RPC თავად auth.uid()-იდან
-    // derives-ს) — მაინც `customerId: string`-ს ინარჩუნებს JobService-ის
-    // ინტერფეისში, არსებული call site-ების (uid უკვე ხელთ აქვთ) ცვლილების
-    // თავიდან ასაცილებლად. RPC თავად ამოწმებს role='customer', category-ს
-    // არსებობას/აქტიურობას, address-ის არარსებობას, და
-    // preferred_date-ისთვის სავალდებულო time_slot-ს — client-ის
-    // ვალიდაცია (PostJobScreen) მხოლოდ UX-ისთვისაა, არა უსაფრთხოების
-    // საზღვარი.
+    // Third hardening pass, priorities 2/3/4 — RPC-only
+    // (supabase/migrations/0050/0053); `customerId`/`customerName` are no
+    // longer sent (the RPC derives both auth.uid() and the display name
+    // from public.users server-side — a client can no longer impersonate
+    // another display name in the Provider feed). Creates a DRAFT job —
+    // invisible to every Provider read until finalizeJobPublish() runs.
+    // The RPC itself re-validates description length, address, category,
+    // and preferred_date<->time_slot consistency — PostJobScreen's own
+    // validation is UX-only, not the security boundary.
     const { data, error } = await supabase.rpc('create_job', {
       p_category: input.category,
       p_description: input.description,
       p_address: input.address,
       p_date: input.date,
-      p_customer_name: input.customerName,
       p_preferred_date: input.preferredDate ?? null,
       p_time_slot: input.timeSlot ?? null,
     });
@@ -228,23 +236,31 @@ export const jobService: JobService = {
     const { error } = await supabase.rpc('set_job_photos', { p_job_id: jobId, p_photos: photos });
     if (error) throw error;
   },
+  async finalizeJobPublish(jobId) {
+    const { data, error } = await supabase.rpc('finalize_job_publish', { p_job_id: jobId });
+    if (error) throw error;
+    return fromJobPostRow(data as JobPostRow);
+  },
   async listMyJobPosts(customerId) {
+    // Third hardening pass, priority 2 — drafts (create_job() succeeded
+    // but publish was never finalized) must never render as if they were
+    // a real posted job.
     const { data, error } = await supabase
       .from('job_posts')
       .select('*')
       .eq('customer_id', customerId)
+      .neq('status', 'draft')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data as JobPostRow[]).map(fromJobPostRow);
   },
   async getOpenProviderFeedPosts() {
-    // Second hardening pass, item 3 — `job_posts_feed` (masked address),
-    // არა პირდაპირ `job_posts`.
-    const { data, error } = await supabase
-      .from('job_posts_feed')
-      .select('*')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
+    // Third hardening pass, priority 1 — `get_open_provider_feed()` RPC
+    // (supabase/migrations/0052), not a view over `job_posts` — Providers
+    // have no direct base-table read access to pending rows any more, so
+    // this RPC (SECURITY DEFINER, masked address, pending-only) is the
+    // only way this list can be read at all.
+    const { data, error } = await supabase.rpc('get_open_provider_feed');
     if (error) throw error;
     return (data as JobPostRow[]).map(fromJobPostRowToFeedJob);
   },

@@ -84,6 +84,13 @@ export function PostJobScreen({ navigation }: Props) {
   const [submitTouched, setSubmitTouched] = useState(false);
   const [publishError, setPublishError] = useState(false);
   const [createdJob, setCreatedJob] = useState<CustomerJob | null>(null);
+  // Third hardening pass, priority 2 — the created draft job, kept across
+  // a failed retry. create_job() now creates a status='draft' row (never
+  // visible to any Provider) instead of an immediately-published one, so
+  // a retry after a photo-upload/finalize failure resumes THIS SAME job
+  // instead of calling createCustomerJob() again — a network failure can
+  // no longer produce two published jobs for one "გამოქვეყნება" tap.
+  const [draftJob, setDraftJob] = useState<CustomerJob | null>(null);
 
   // Task 6 (audit) — კატეგორიების სია ახლა ბექენდიდანაა (`categories`
   // ცხრილი, supabase/migrations/0043): სახელი/რიგითობა/აქტიურობა
@@ -137,27 +144,52 @@ export function PostJobScreen({ navigation }: Props) {
     const uid = authService.getCurrentUser()?.uid;
     try {
       if (!uid) throw new Error('არ ხარ ავტორიზებული.');
-      // Second hardening pass, item 4 — job-ის row ჯერ იქმნება (photos-ის
-      // გარეშე), მხოლოდ ამის შემდეგ იტვირთება ფოტოები `private-media`-ში
-      // (`job/{jobId}/...` — ეს path-ი job-ის id-ის გარეშე არ არსებობს),
-      // და ბოლოს ერთვის job-ს ცალკე RPC-ით (`setJobPhotos`). მომხმარებლის
-      // თვალსაზრისით "გამოქვეყნება" კვლავ ერთი მოქმედებაა.
-      const job = await jobService.createCustomerJob(uid, {
-        category,
-        description: description.trim(),
-        address: address.trim(),
-        date: selectedDate ? `${formatPickedDate(selectedDate)}${selectedTimeLabel ? ` ${selectedTimeLabel}` : ''}` : '',
-        customerName: `${profile.firstName} ${profile.lastName}`.trim(),
-        preferredDate: selectedDate ? toIsoDateString(selectedDate) : null,
-        timeSlot: selectedTime || null,
-      });
-      let finalJob = job;
+      // Third hardening pass, priority 2 — idempotent publish. The job
+      // row is created ONCE, as a draft (invisible to every Provider
+      // read) — a retry after a later step fails resumes that SAME
+      // draft (`draftJob`) instead of calling createCustomerJob() again,
+      // so a network failure/retry can never create a duplicate
+      // published job. Photos upload to `private-media/job/{jobId}/...`
+      // (needs the job's id, which doesn't exist until the row does),
+      // then finalizeJobPublish() flips draft -> pending — the only step
+      // that actually makes the job visible to Providers. From the
+      // user's side, "გამოქვეყნება" is still one action; a failed
+      // mid-flow retry silently continues from wherever it left off.
+      let job = draftJob;
+      if (!job) {
+        job = await jobService.createCustomerJob(uid, {
+          category,
+          description: description.trim(),
+          address: address.trim(),
+          date: selectedDate ? `${formatPickedDate(selectedDate)}${selectedTimeLabel ? ` ${selectedTimeLabel}` : ''}` : '',
+          preferredDate: selectedDate ? toIsoDateString(selectedDate) : null,
+          timeSlot: selectedTime || null,
+        });
+        setDraftJob(job);
+      } else {
+        // Resuming after a previous attempt failed client-side — but
+        // finalizeJobPublish() may have actually SUCCEEDED server-side
+        // before the response reached us (lost network response, app
+        // backgrounded, etc.). Re-check the real state before doing
+        // anything else: a draft can only have photos set once
+        // (set_job_photos requires status='draft'), so blindly retrying
+        // an already-finished publish would fail forever otherwise.
+        const current = await jobService.getJobPostById(job.id);
+        if (current && current.status !== 'draft') {
+          setCreatedJob(current);
+          setPublished(true);
+          setLoading(false);
+          return;
+        }
+      }
       if (photos.length > 0) {
         const photoRefs = await Promise.all(photos.map((uri) => storageService.uploadPrivateJobPhoto(job.id, uid, uri)));
         await jobService.setJobPhotos(job.id, photoRefs);
-        finalJob = { ...job, photos: photoRefs };
       }
-      setCreatedJob(finalJob);
+      // finalize_job_publish() returns the up-to-date row (including any
+      // photos just attached above) — no need to re-derive it client-side.
+      const publishedJob = await jobService.finalizeJobPublish(job.id);
+      setCreatedJob(publishedJob);
       setPublished(true);
     } catch {
       setPublishError(true);
