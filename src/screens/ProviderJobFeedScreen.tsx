@@ -11,7 +11,6 @@ import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
 import { quoteService } from '../services/quoteService';
-import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { FeedJob } from '../types/job';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -24,7 +23,6 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
   const [interests, setInterests] = useState<Set<string>>(new Set());
   const [filtered, setFiltered] = useState<FeedJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { profile: providerProfile } = useProviderProfile();
 
   useFocusEffect(
     useCallback(() => {
@@ -76,16 +74,7 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
     if (!uid) return;
     setSendingInterest(true);
     try {
-      await quoteService.expressInterest(
-        offerJob.id,
-        {
-          id: uid,
-          name: `${providerProfile.firstName} ${providerProfile.lastName}`.trim(),
-          initials: `${providerProfile.firstName.charAt(0)}${providerProfile.lastName.charAt(0)}`,
-          color: colors.primary,
-        },
-        priceNum,
-      );
+      await quoteService.expressInterest(offerJob.id, priceNum);
       setInterests((prev) => {
         const next = new Set(prev);
         next.add(offerJob.id);

@@ -191,10 +191,36 @@ export function PostJobScreen({ navigation }: Props) {
         job = await jobService.updateJobDraft(job.id, currentInput);
         setDraftJob(job);
       }
-      if (photos.length > 0) {
-        const photoRefs = await Promise.all(photos.map((uri) => storageService.uploadPrivateJobPhoto(job.id, uid, uri)));
-        await jobService.setJobPhotos(job.id, photoRefs);
-      }
+      // Latest hardening pass, item 3 — documented, not changed: this
+      // `Promise.all` is all-or-nothing. If e.g. photo A and B upload
+      // successfully but C fails, the whole call rejects, setJobPhotos()
+      // is never reached, and A/B's already-uploaded private-media
+      // objects are never attached to (or referenced by) this job. A
+      // retry re-runs `photos.map(...)` from scratch — the local `photos`
+      // state still holds all three original URIs, so A and B are
+      // uploaded AGAIN as new objects; the first attempt's A/B objects
+      // become orphaned (same class of "abandoned draft" byproduct
+      // 0053/0060 already documented for a fully-abandoned draft — this
+      // is the partial-upload-within-one-draft variant of it). No fix
+      // applied here: switching to per-photo tracking so a retry only
+      // re-uploads the ones that actually failed would be a reasonable
+      // future improvement, but is a real behavior change beyond this
+      // pass's scope, not a "simple" one — see 0060's
+      // list_stale_draft_jobs() for the read-only cleanup building block
+      // a future admin script could use for both cases.
+      // Latest hardening pass, item 2 — CONFIRMED bug fix. setJobPhotos()
+      // must always run, even with zero current photos: if a prior failed
+      // attempt already attached refs to this draft (job.photos from an
+      // earlier upload) and the Customer then removed all photos before
+      // retrying, skipping this call (the old `if (photos.length > 0)`
+      // guard) would leave those stale refs on the draft and publish them
+      // — the UI's current photo list must always become the canonical
+      // one, including "now zero".
+      const photoRefs =
+        photos.length > 0
+          ? await Promise.all(photos.map((uri) => storageService.uploadPrivateJobPhoto(job.id, uid, uri)))
+          : [];
+      await jobService.setJobPhotos(job.id, photoRefs);
       // finalize_job_publish() returns the up-to-date row (including any
       // photos just attached above) — no need to re-derive it client-side.
       const publishedJob = await jobService.finalizeJobPublish(job.id);

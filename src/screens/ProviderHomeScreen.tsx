@@ -194,16 +194,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
     if (!uid) return;
     setSendingInterest(true);
     try {
-      await quoteService.expressInterest(
-        offerJob.id,
-        {
-          id: uid,
-          name: `${providerProfile.firstName} ${providerProfile.lastName}`.trim(),
-          initials: `${providerProfile.firstName.charAt(0)}${providerProfile.lastName.charAt(0)}`,
-          color: colors.primary,
-        },
-        priceNum,
-      );
+      await quoteService.expressInterest(offerJob.id, priceNum);
       setInterests((prev) => {
         const next = new Set(prev);
         next.add(offerJob.id);

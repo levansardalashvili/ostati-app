@@ -58,8 +58,6 @@ function fromJobResponseRowFallback(row: JobResponseRow): JobQuote {
   };
 }
 
-export type InterestedProvider = { id: string; name: string; initials: string; color: string };
-
 export interface QuoteService {
   // Supabase-ის `job_responses` ცხრილი (#56) — Provider-ის "დაინტერესება"-ს
   // რეალური ჩაწერა/წაკითხვა. "ახალი ოსტატი დაინტერესდა" შეტყობინება Customer-ს
@@ -69,7 +67,15 @@ export interface QuoteService {
   // `offeredPrice` სავალდებულო, კონკრეტული რიცხვია (#72) — აღარ არის
   // არასავალდებულო თავისუფალი ტექსტი; "ფასი სამუშაოს ნახვის შემდეგ" აღარ
   // არსებობს, როგორც შესაძლებლობა.
-  expressInterest(jobId: string, provider: InterestedProvider, offeredPrice: number): Promise<void>;
+  //
+  // Latest hardening pass — RPC-only (supabase/migrations/0064,
+  // `express_interest`). Provider identity (id/name/initials/color) is no
+  // longer a parameter at all — the RPC derives provider_id from
+  // auth.uid() and provider_name/initials/color from the caller's own
+  // provider_profiles row server-side, so a client can never spoof
+  // another display identity. Direct client INSERT on job_responses is
+  // revoked; this RPC is the only way to create a response.
+  expressInterest(jobId: string, offeredPrice: number): Promise<void>;
   // Provider-ის საკუთარი პასუხების job-id-ების სია — Feed/დეტალის ეკრანებზე
   // "უკვე დაინტერესებული ხარ" state-ის აღსადგენად.
   listMyResponseJobIds(providerId: string): Promise<Set<string>>;
@@ -81,14 +87,10 @@ export interface QuoteService {
 // (ChatMsg-ის type:'offer') ცალკე რჩება — ის კონკრეტული საუბრის ნაწილია
 // და chatService-ის დომენშია, არა აქ.
 export const quoteService: QuoteService = {
-  async expressInterest(jobId, provider, offeredPrice) {
-    const { error } = await supabase.from('job_responses').insert({
-      job_id: jobId,
-      provider_id: provider.id,
-      provider_name: provider.name,
-      provider_initials: provider.initials,
-      provider_color: provider.color,
-      offered_price: offeredPrice,
+  async expressInterest(jobId, offeredPrice) {
+    const { error } = await supabase.rpc('express_interest', {
+      p_job_id: jobId,
+      p_offered_price: offeredPrice,
     });
     if (error) throw error;
   },

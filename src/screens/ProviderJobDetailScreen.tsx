@@ -28,7 +28,6 @@ import { jobService } from '../services/jobService';
 import { quoteService } from '../services/quoteService';
 import { reviewService } from '../services/reviewService';
 import { useJobStatus } from '../state/JobStatusContext';
-import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { FeedJob } from '../types/job';
 import type { RatingData } from '../types/review';
 import type { RootStackParamList } from '../navigation/types';
@@ -97,7 +96,6 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   const [offerSheetOpen, setOfferSheetOpen] = useState(false);
   const [offerPrice, setOfferPrice] = useState('');
   const { getStatus, setStatus } = useJobStatus();
-  const { profile: providerProfile } = useProviderProfile();
 
   // უკვე გაგზავნილი ინტერესის state-ის აღდგენა, თუ Provider ამ job-ის
   // დეტალზე ხელახლა შემოვიდა (Supabase-ის job_responses, #56).
@@ -255,16 +253,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     if (!uid) return;
     setSendingInterest(true);
     try {
-      await quoteService.expressInterest(
-        job.id,
-        {
-          id: uid,
-          name: `${providerProfile.firstName} ${providerProfile.lastName}`.trim(),
-          initials: `${providerProfile.firstName.charAt(0)}${providerProfile.lastName.charAt(0)}`,
-          color: colors.primary,
-        },
-        priceNum,
-      );
+      await quoteService.expressInterest(job.id, priceNum);
       setExpressed(true);
       setOfferSheetOpen(false);
     } catch {
