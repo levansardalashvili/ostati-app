@@ -1,0 +1,129 @@
+appId: com.ostati.app
+---
+# Provider core journey — register → complete mandatory setup (specialty +
+# work area) → express interest on a real open job from the feed → edit
+# profile → logout. Same conventions as customer_core_journey.yaml — see
+# .maestro/README.md for the reasoning behind the wait/selector patterns
+# used throughout (dev-client boot gap, .*text.* vs ^text$, testID usage).
+#
+# Express-interest step depends on at least one real open (status='pending')
+# job existing in the feed — customer_core_journey.yaml's own run always
+# leaves one behind ("სანტექნიკა"), so run that flow at least once before
+# this one if the dev database is otherwise empty.
+
+- launchApp
+- extendedWaitUntil:
+    notVisible: "Loading from"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: ".*(პროფილი|დაწყება).*"
+    timeout: 25000
+
+- tapOn:
+    text: ".*პროფილი.*"
+    optional: true
+# ProviderProfileScreen has more content above "გასვლა" than
+# CustomerProfileScreen (profile-completeness card, verification card,
+# "ნახე ჩემი პროფილი") — confirmed via a failed run that the row can sit
+# below the fold, unlike the customer flow where it never needed this.
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: ".*გასვლა.*"
+    optional: true
+- tapOn:
+    id: "logout-confirm-button"
+    optional: true
+
+# --- Register a brand-new Provider account ----------------------------
+# No address field for a Provider (product rule — a Provider never enters
+# a home address at registration, only a work area later in setup).
+- evalScript: ${output.email = 'e2e.provider.' + Date.now() + '@example.com'}
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*ოსტატი.*"
+
+- tapOn:
+    id: "register-first-name"
+- inputText: "TestProvider"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.email}"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+# --- ProviderSetup (mandatory — no skip option exists by product rule) -----
+- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- tapOn: ".*აირჩიე სპეციალობა.*"
+- tapOn: ".*სანტექნიკოსი.*"
+- tapOn: "^არჩევა$"
+
+- tapOn: ".*აირჩიე არეალი.*"
+- assertVisible: ".*სამუშაო არეალი.*"
+- tapOn: ".*ყველას მონიშვნა.*"
+- tapOn: "^შენახვა$"
+
+# Anchored — the screen title is "შექმენი ოსტატის პროფილი" and the button
+# is "პროფილის შექმნა"; no substring overlap today, but anchoring here too
+# since both share the root "პროფილის შექმნა/შექმენი" and this is exactly
+# the class of bug already hit twice on the customer flow.
+- tapOn: "^პროფილის შექმნა$"
+
+# --- Provider Home -------------------------------------------------------
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+# --- Express interest on the first open job in the feed -------------------
+# index: 0 — this is a repeated list-item button (one per card), not a
+# single unique element; without it Maestro would refuse to pick among
+# however many open jobs currently exist.
+- tapOn:
+    text: ".*დაინტ. ვარ.*"
+    index: 0
+- tapOn: ".*ჩაწერეთ თანხა.*"
+- inputText: "150"
+- hideKeyboard
+- tapOn:
+    id: "offer-price-submit"
+- assertVisible: ".*ინტერესი გაგზავნილია.*"
+
+# --- Edit profile ----------------------------------------------------------
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*პროფილის რედაქტირება.*"
+- tapOn:
+    id: "provider-edit-last-name"
+- eraseText
+- inputText: "Edited"
+- hideKeyboard
+- tapOn: ".*ცვლილებების შენახვა.*"
+- assertVisible: ".*TestProvider Edited.*"
+
+# --- Logout ------------------------------------------------------------
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"

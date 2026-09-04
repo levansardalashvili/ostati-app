@@ -24,6 +24,10 @@ type Props = {
   icon?: IconComponent;
   keyboardType?: KeyboardTypeOptions;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  // E2E (Maestro) support — some screens have two fields with the same
+  // placeholder (e.g. password/confirm-password both show "••••••••"),
+  // which text-based selectors can't disambiguate.
+  testID?: string;
 };
 
 // საერთო ტექსტური ველი — label, არასავალდებულო წამყვანი აიქონი,
@@ -41,6 +45,7 @@ export function TextField({
   icon: Icon,
   keyboardType,
   autoCapitalize = 'sentences',
+  testID,
 }: Props) {
   const [hidden, setHidden] = useState(!!secureTextEntry);
 
@@ -54,6 +59,7 @@ export function TextField({
           </View>
         )}
         <TextInput
+          testID={testID}
           value={value}
           onChangeText={onChangeText}
           onBlur={onBlur}

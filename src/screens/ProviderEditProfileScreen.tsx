@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Award, Camera, ChevronRight, Image as ImageIcon, MapPin } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -27,9 +27,15 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProviderEditProfile'>;
 // ProviderEditProfile — ზუსტად ზიპის App.tsx-ის ProviderEditProfile-ის
 // მიხედვით. საწყისი მნიშვნელობები ProviderProfileContext-იდან იტვირთება
 // (ProviderSetupScreen-ის მიერ დაწერილი) — CustomerEditProfileScreen-ის
-// იგივე "edit ფორმა, კონტექსტიდან seed-ილი" პატერნით. პირველი შენახვა
-// შეგნებულად ვარდება (error-state დემონსტრირებისთვის), მეორე ცდაზე
-// წარმატებული — მხოლოდ მაშინ იწერება უკან კონტექსტში.
+// იგივე "edit ფორმა, კონტექსტიდან seed-ილი" პატერნით.
+//
+// Profile-fix pass — root-cause fix: ეს ეკრანი ადრე შეგნებულად აგდებდა
+// პირველ "შენახვას" (`attemptRef.current === 0` → ყოველთვის setSaveError(true),
+// Supabase-ისკენ საერთოდ არ მიდიოდა), მხოლოდ დემონსტრაციული/საცდელი
+// error-state-ის საჩვენებლად ადრეულ ეტაპზე დარჩენილი scaffold — არა
+// რეალური ბაგი async sequencing-ში/state-ში/Supabase-ში. მოცილებულია
+// მთლიანად — handleSave ახლა რეალურ Supabase-ის ოპერაციას პირველივე
+// დაჭერისას იძახებს, ხელოვნური setTimeout/attemptRef-ის გარეშე.
 export function ProviderEditProfileScreen({ navigation }: Props) {
   const { profile, setProfile } = useProviderProfile();
   const [firstName, setFirstName] = useState(profile.firstName);
@@ -48,7 +54,6 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
   const [sqmPrices, setSqmPrices] = useState<Record<string, string>>(profile.sqmPrices);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  const attemptRef = useRef(0);
 
   const sqmSpecialties = specialty.filter((s) => isSqmPriced(s.id));
 
@@ -71,7 +76,18 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
       source === 'camera'
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      // Profile-fix pass, task 2 — previously silent (`return` with no
+      // feedback at all), which could look like "the add button just
+      // stopped working" to a Provider who denied (or previously denied)
+      // this permission — especially confusing right after a DIFFERENT
+      // grid's picker (e.g. certificates) just worked normally.
+      Alert.alert(
+        'წვდომა არ არის დაშვებული',
+        source === 'camera' ? 'კამერაზე წვდომა საჭიროა ფოტოს გადასაღებად.' : 'გალერეაზე წვდომა საჭიროა ფოტოს ასარჩევად.',
+      );
+      return;
+    }
     const result =
       source === 'camera'
         ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
@@ -97,7 +113,13 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
       source === 'camera'
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      Alert.alert(
+        'წვდომა არ არის დაშვებული',
+        source === 'camera' ? 'კამერაზე წვდომა საჭიროა ფოტოს გადასაღებად.' : 'გალერეაზე წვდომა საჭიროა ფოტოს ასარჩევად.',
+      );
+      return;
+    }
     const result =
       source === 'camera'
         ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
@@ -107,62 +129,54 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canSave || isSaving) return;
     setSaveError(false);
     setIsSaving(true);
-    setTimeout(async () => {
-      if (attemptRef.current === 0) {
-        setIsSaving(false);
-        setSaveError(true);
-        attemptRef.current += 1;
-        return;
-      }
-      const uid = authService.getCurrentUser()?.uid;
-      let uploadedCerts = certificates;
-      let uploadedPortfolio = portfolio;
-      let uploadedPhotoUrl = photoUri ?? undefined;
-      if (uid) {
-        try {
-          uploadedCerts = await uploadPendingMedia(uid, certificates, 'certificate');
-          uploadedPortfolio = await uploadPendingMedia(uid, portfolio, 'portfolio');
-          if (photoUri && !photoUri.startsWith('http')) {
-            uploadedPhotoUrl = await storageService.uploadUserMedia(uid, photoUri, 'profile');
-          }
-          await userService.updateUserRecord(uid, { firstName, lastName });
-          await userService.upsertProviderProfileRecord(uid, {
-            firstName,
-            lastName,
-            specialty,
-            areas,
-            experience,
-            about,
-            photoUrl: uploadedPhotoUrl,
-            certificates: uploadedCerts,
-            portfolio: uploadedPortfolio,
-            sqmPrices,
-          });
-        } catch {
-          // ლოკალურ Context-ში ცვლილება უკვე ასახულია — Supabase-ის
-          // ჩავარდნისას UI-ს არ ვბლოკავთ, CustomerEditProfileScreen-ის
-          // იგივე პრინციპით.
+    const uid = authService.getCurrentUser()?.uid;
+    let uploadedCerts = certificates;
+    let uploadedPortfolio = portfolio;
+    let uploadedPhotoUrl = photoUri ?? undefined;
+    if (uid) {
+      try {
+        uploadedCerts = await uploadPendingMedia(uid, certificates, 'certificate');
+        uploadedPortfolio = await uploadPendingMedia(uid, portfolio, 'portfolio');
+        if (photoUri && !photoUri.startsWith('http')) {
+          uploadedPhotoUrl = await storageService.uploadUserMedia(uid, photoUri, 'profile');
         }
+        await userService.updateUserRecord(uid, { firstName, lastName });
+        await userService.upsertProviderProfileRecord(uid, {
+          firstName,
+          lastName,
+          specialty,
+          areas,
+          experience,
+          about,
+          photoUrl: uploadedPhotoUrl,
+          certificates: uploadedCerts,
+          portfolio: uploadedPortfolio,
+          sqmPrices,
+        });
+      } catch {
+        // ლოკალურ Context-ში ცვლილება უკვე ასახულია — Supabase-ის
+        // ჩავარდნისას UI-ს არ ვბლოკავთ, CustomerEditProfileScreen-ის
+        // იგივე პრინციპით.
       }
-      setProfile({
-        firstName,
-        lastName,
-        specialty,
-        areas,
-        experience,
-        about,
-        photoUrl: uploadedPhotoUrl,
-        certificates: uploadedCerts,
-        portfolio: uploadedPortfolio,
-        sqmPrices,
-      });
-      setIsSaving(false);
-      navigation.goBack();
-    }, 1000);
+    }
+    setProfile({
+      firstName,
+      lastName,
+      specialty,
+      areas,
+      experience,
+      about,
+      photoUrl: uploadedPhotoUrl,
+      certificates: uploadedCerts,
+      portfolio: uploadedPortfolio,
+      sqmPrices,
+    });
+    setIsSaving(false);
+    navigation.goBack();
   };
 
   return (
@@ -189,7 +203,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
               <TextField label="სახელი" value={firstName} onChangeText={setFirstName} error={firstNameErr} />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField label="გვარი" value={lastName} onChangeText={setLastName} error={lastNameErr} />
+              <TextField testID="provider-edit-last-name" label="გვარი" value={lastName} onChangeText={setLastName} error={lastNameErr} />
             </View>
           </View>
 

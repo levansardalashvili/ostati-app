@@ -41,7 +41,15 @@ export type RootStackParamList = {
   // ან notification-deep-link-ის შესვლისას `undefined`-ია — ამ
   // შემთხვევებში (Provider-ის მხრიდან) ფასის შეთავაზების ღილაკი
   // უბრალოდ არ ჩანს (ChatConversationScreen).
-  ChatConversation: { chatId: string; name: string; initials: string; color: string; role: Role; jobId?: string };
+  // `jobStatus` — Audit fix: the chat price-offer composer must only be
+  // offered while the linked job is still negotiable (`status='pending'`,
+  // before a Provider is selected) — `respond_to_chat_offer`'s own RLS/RPC
+  // guard (supabase/migrations/0049/0066) already rejects any offer once
+  // the job goes 'active', but the client previously kept showing the
+  // Wallet button regardless, so the send would silently fail. Optional —
+  // when the caller doesn't have it handy, the composer button is hidden
+  // rather than risk showing a broken affordance.
+  ChatConversation: { chatId: string; name: string; initials: string; color: string; role: Role; jobId?: string; jobStatus?: string };
   Notifications: { role: Role };
   NotificationSettings: { role: Role };
   ProfileSettings: undefined;
@@ -54,6 +62,10 @@ export type RootStackParamList = {
   SavedProviders: undefined;
   CustomerCategories: undefined;
   CustomerCategory: { id: string };
+  // CustomerHomeScreen-ის "ტოპ ოსტატები შენს არეალში" სექციის "ყველას
+  // ნახვა" — ყველა Provider + კატეგორია/არეალის ფილტრები (Home-იდან
+  // მოცილებული UI აქ ცოცხლდება).
+  CustomerProviderList: undefined;
   RegionAreaPicker: { selected: string[]; onSave: (areas: string[]) => void };
   RatingScreen: {
     jobId: string;

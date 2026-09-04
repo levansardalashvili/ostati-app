@@ -42,6 +42,7 @@ export function OfferPriceSheet({ visible, price, onChangePrice, onSubmit, onClo
         <Text style={styles.offerSuffix}>₾</Text>
       </View>
       <Button
+        testID="offer-price-submit"
         label="დაინტერესების გაგზავნა"
         loadingLabel="იგზავნება..."
         onPress={onSubmit}

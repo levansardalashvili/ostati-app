@@ -1,0 +1,281 @@
+appId: com.ostati.app
+---
+# Cross-role job lifecycle — Customer posts a job, a Provider expresses
+# interest, Customer selects that Provider, both exchange a chat message,
+# Provider marks the work done, Customer confirms + rates.
+#
+# Single continuous flow (not split into two files) because `output.*`
+# variables (customer/provider emails, the unique job marker) only persist
+# within one Maestro flow-file execution — the two accounts must be
+# switched between (login/logout) several times within this one run.
+
+- launchApp
+- extendedWaitUntil:
+    notVisible: "Loading from"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: ".*(პროფილი|დაწყება).*"
+    timeout: 25000
+
+- tapOn:
+    text: ".*პროფილი.*"
+    optional: true
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: ".*გასვლა.*"
+    optional: true
+- tapOn:
+    id: "logout-confirm-button"
+    optional: true
+
+# --- Phase 1: Customer registers and posts a job -----------------------
+- evalScript: ${output.customerEmail = 'e2e.cross.customer.' + Date.now() + '@example.com'}
+- evalScript: ${output.providerEmail = 'e2e.cross.provider.' + Date.now() + '@example.com'}
+- evalScript: ${output.jobMarker = 'CrossRoleE2E' + Date.now()}
+
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*მომხმარებელი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "CrossCustomer"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.customerEmail}"
+- tapOn: ".*ჭავჭავაძის.*"
+- inputText: "Test address 1"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*პროფილის დასრულება.*"
+- tapOn: "^დასრულება$"
+- assertVisible: ".*სერვისები.*"
+
+- tapOn: ".*განცხადებები.*"
+- tapOn:
+    id: "post-job-fab"
+- assertVisible: ".*მოთხოვნის გამოქვეყნება.*"
+- tapOn: ".*აირჩიე კატეგორია.*"
+- tapOn: ".*სანტექნიკა.*"
+- tapOn:
+    id: "post-job-description"
+- inputText: "${output.jobMarker} - kitchen faucet leak needs urgent repair, please help fix this soon"
+- hideKeyboard
+- tapOn: "^გამოქვეყნება$"
+- assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
+- tapOn: ".*მთავარზე დაბრუნება.*"
+
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 2: Provider registers, sets up, expresses interest ----------
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*ოსტატი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "CrossProvider"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.providerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- tapOn: ".*აირჩიე სპეციალობა.*"
+- tapOn: ".*სანტექნიკოსი.*"
+- tapOn: "^არჩევა$"
+- tapOn: ".*აირჩიე არეალი.*"
+- assertVisible: ".*სამუშაო არეალი.*"
+- tapOn: ".*ყველას მონიშვნა.*"
+- tapOn: "^შენახვა$"
+- tapOn: "^პროფილის შექმნა$"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+- tapOn:
+    text: ".*დაინტ. ვარ.*"
+    below: ".*${output.jobMarker}.*"
+- tapOn: ".*ჩაწერეთ თანხა.*"
+- inputText: "150"
+- hideKeyboard
+- tapOn:
+    id: "offer-price-submit"
+- assertVisible: ".*ინტერესი გაგზავნილია.*"
+
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 3: Customer logs back in, selects the Provider, sends a chat message
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.customerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*სერვისები.*"
+
+- tapOn: ".*განცხადებები.*"
+- tapOn:
+    text: ".*${output.jobMarker}.*"
+- assertVisible: ".*დაინტერესებული.*"
+- tapOn: "^არჩევა$"
+- assertVisible: ".*ოსტატის არჩევა.*"
+- tapOn: "^დადასტურება$"
+
+- tapOn: ".*მიწერა.*"
+- tapOn:
+    id: "chat-message-input"
+- inputText: "გამარჯობა, როდის შეგიძლიათ მოსვლა?"
+# Dismiss the keyboard by tapping a blank coordinate (NOT `hideKeyboard`,
+# which on Android falls back to a raw back-press when the keyboard has
+# already auto-closed by this point — that back-press then escapes the
+# screen entirely instead of just closing a keyboard that isn't there,
+# eating one of the screen-navigation `back`s below). A coordinate tap
+# on blank message-list background only blurs the input, never navigates.
+- tapOn:
+    point: "50%, 25%"
+- tapOn:
+    id: "chat-send-button"
+- assertVisible: ".*გამარჯობა, როდის შეგიძლიათ მოსვლა.*"
+
+- back
+- back
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 4: Provider logs back in, replies, marks work done ----------
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.providerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+- tapOn: ".*სამუშაოები.*"
+- tapOn: "^დადასტურებული$"
+- tapOn: ".*CrossCustomer.*"
+
+- tapOn: ".*ჩატი.*"
+- assertVisible: ".*გამარჯობა, როდის შეგიძლიათ მოსვლა.*"
+- tapOn:
+    id: "chat-message-input"
+- inputText: "დიახ, ხვალ დილით შემიძლია."
+- tapOn:
+    point: "50%, 25%"
+- tapOn:
+    id: "chat-send-button"
+- assertVisible: ".*დიახ, ხვალ დილით შემიძლია.*"
+- back
+
+- tapOn: "^სამუშაო დავასრულე$"
+- assertVisible: ".*ელოდება მომხმარებლის დადასტურებას.*"
+
+- back
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 5: Customer logs back in, confirms completion, rates --------
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.customerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*სერვისები.*"
+
+- tapOn: ".*განცხადებები.*"
+- tapOn: "^დადასტურებული$"
+- tapOn:
+    text: ".*${output.jobMarker}.*"
+
+- assertVisible: ".*ოსტატმა სამუშაო დასრულებულად მონიშნა.*"
+- tapOn: "^დადასტურება$"
+- assertVisible: ".*ოსტატის შეფასება.*"
+- tapOn: ".*ოსტატის შეფასება.*"
+
+- assertVisible: ".*შეაფასე.*"
+- tapOn:
+    id: "rating-star-5"
+- tapOn: ".*შეფასების გაგზავნა.*"
+- assertVisible: ".*მადლობა შეფასებისთვის.*"
+- tapOn: ".*მთავარზე დაბრუნება.*"
+
+- assertVisible: ".*სერვისები.*"
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"

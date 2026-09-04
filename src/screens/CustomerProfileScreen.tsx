@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Briefcase, Camera, Heart, HelpCircle, LogOut, MapPin, Pencil, Settings } from 'lucide-react-native';
+import { Bell, Briefcase, Camera, Heart, LogOut, MapPin, Pencil, Settings } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -57,7 +57,6 @@ export function CustomerProfileScreen({ navigation }: Props) {
     { icon: Heart, label: 'შენახული ოსტატები', bg: '#FEF2F2', color: '#DC2626', badge: favoriteIds.size },
     { icon: Pencil, label: 'პროფილის რედაქტირება', bg: '#F5F3FF', color: '#7C3AED', badge: 0 },
     { icon: Bell, label: 'შეტყობინებები', bg: '#FFFBEB', color: '#D97706', badge: unreadNotifCount },
-    { icon: HelpCircle, label: 'დახმარება', bg: '#ECFDF5', color: '#059669', badge: 0 },
     { icon: Settings, label: 'ანგარიშის პარამეტრები', bg: colors.muted, color: colors.mutedForeground, badge: 0 },
   ];
 
@@ -66,14 +65,13 @@ export function CustomerProfileScreen({ navigation }: Props) {
       navigation.navigate('MyJobsTab');
     } else if (label === 'შენახული ოსტატები') {
       navigation.navigate('SavedProviders');
-    } else if (label === 'პროფილის რედაქტირება' || label === 'edit') {
+    } else if (label === 'პროფილის რედაქტირება') {
       navigation.navigate('CustomerEditProfile');
     } else if (label === 'შეტყობინებები') {
       navigation.navigate('Notifications', { role: 'customer' });
     } else if (label === 'ანგარიშის პარამეტრები') {
       navigation.navigate('ProfileSettings');
     }
-    // "დახმარება" — TODO: ეს ეკრანი ზიპშივე არ არსებობდა (screen: null)
   };
 
   const confirmLogout = () => {
@@ -86,6 +84,14 @@ export function CustomerProfileScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Nav-fix pass, task 3 — restructured to visually/structurally match
+          ProviderProfileScreen.tsx's header (same spacing/typography/
+          layout hierarchy: avatar+camera-badge, name, one subtitle line,
+          then a stats row) — ProviderProfileScreen.tsx itself is
+          unchanged. Content below the photo is deliberately NOT identical
+          (per the task): address instead of specialty/experience/rating,
+          job/favorites counts instead of rating/reviews/jobs, and no
+          availability-style status row (no Customer equivalent exists). */}
       <View style={styles.header}>
         <Text style={styles.title}>პროფილი</Text>
         <View style={styles.profileRow}>
@@ -103,10 +109,17 @@ export function CustomerProfileScreen({ navigation }: Props) {
               <MapPin size={12} color={colors.mutedForeground} />
               <Text style={styles.locationText}>{profile.defaultAddress}</Text>
             </View>
-            <Pressable style={styles.editButton} onPress={() => handleMenuPress('edit')}>
-              <Pencil size={11} color={colors.primary} />
-              <Text style={styles.editButtonText}>პროფილის რედაქტირება</Text>
-            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{myJobsCount}</Text>
+            <Text style={styles.statLabel}>მოთხოვნა</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statValue}>{favoriteIds.size}</Text>
+            <Text style={styles.statLabel}>შენახული ოსტატი</Text>
           </View>
         </View>
       </View>
@@ -138,7 +151,7 @@ export function CustomerProfileScreen({ navigation }: Props) {
         </View>
         <Text style={styles.sheetTitle}>გასვლა</Text>
         <Text style={styles.sheetSubtitle}>ნამდვილად გსურს ანგარიშიდან გასვლა?</Text>
-        <Button label="გასვლა" variant="destructive" onPress={confirmLogout} />
+        <Button testID="logout-confirm-button" label="გასვლა" variant="destructive" onPress={confirmLogout} />
         <Pressable style={styles.sheetCancelLink} onPress={() => setLogoutSheetOpen(false)}>
           <Text style={styles.sheetCancelLinkText}>გაუქმება</Text>
         </Pressable>
@@ -169,6 +182,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.lg,
+    marginBottom: spacing.md,
   },
   avatarWrap: {
     position: 'relative',
@@ -200,21 +214,32 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.mutedForeground,
   },
-  editButton: {
+  // Task 3 — same values as ProviderProfileScreen.tsx's statsRow/statBox/
+  // statValue/statLabel (that file is unchanged; these are duplicated
+  // here rather than shared, per the chosen "leave Provider Profile
+  // untouched" approach).
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    backgroundColor: colors.secondary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs + 2,
-    marginTop: spacing.sm,
+    gap: spacing.sm,
   },
-  editButtonText: {
-    ...typography.small,
-    color: colors.secondaryForeground,
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: colors.muted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  statValue: {
+    ...typography.captionMedium,
+    color: colors.foreground,
     fontWeight: '700',
+  },
+  statLabel: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    marginTop: 2,
   },
   body: {
     flex: 1,

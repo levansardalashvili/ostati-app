@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight, Eye, EyeOff, Shield } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -7,6 +7,7 @@ import { BackHeader } from '../components/BackHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { colors, radius, spacing, typography } from '../theme';
+import { authService, getAuthErrorMessage } from '../services/authService';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProfileSettings'>;
@@ -19,6 +20,7 @@ export function ProfileSettingsScreen({ navigation }: Props) {
   const [newPw, setNewPw] = useState('');
   const [showOld, setShowOld] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const canSave = !!oldPw && newPw.length >= 6;
 
@@ -30,10 +32,19 @@ export function ProfileSettingsScreen({ navigation }: Props) {
     setShowNew(false);
   };
 
-  const handleSave = () => {
-    if (!canSave) return;
-    // TODO: Supabase Auth-ის supabase.auth.updateUser({ password }) გამოძახება
-    closeSheet();
+  const handleSave = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      await authService.updatePassword(oldPw, newPw);
+      closeSheet();
+      Alert.alert('პაროლი შეიცვალა', 'თქვენი პაროლი წარმატებით განახლდა.');
+    } catch (error) {
+      const message = (error as { message?: string } | null)?.message;
+      Alert.alert('ვერ შეიცვალა', message === 'Invalid login credentials' ? 'მიმდინარე პაროლი არასწორია.' : getAuthErrorMessage(error));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -86,8 +97,8 @@ export function ProfileSettingsScreen({ navigation }: Props) {
             </Pressable>
           </View>
         </View>
-        <Button label="შენახვა" onPress={handleSave} disabled={!canSave} />
-        <Pressable style={styles.cancelLink} onPress={closeSheet}>
+        <Button label="შენახვა" loadingLabel="ინახება..." onPress={handleSave} disabled={!canSave} loading={saving} />
+        <Pressable style={styles.cancelLink} onPress={closeSheet} disabled={saving}>
           <Text style={styles.cancelLinkText}>გაუქმება</Text>
         </Pressable>
       </BottomSheet>

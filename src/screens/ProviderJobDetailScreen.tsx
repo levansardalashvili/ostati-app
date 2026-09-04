@@ -197,6 +197,10 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       color: '#64748B',
       role: 'provider',
       jobId: job.customerJobId,
+      // Audit fix — `linkedStatus` (not the possibly-stale `job.status`)
+      // so the chat's offer composer stays hidden once this job is no
+      // longer 'pending' (Provider already selected, price locked).
+      jobStatus: linkedStatus,
     });
   };
   // #84-ის დროს "..." ღილაკს მხოლოდ ერთი მოქმედება (ზოგადი
@@ -911,32 +915,6 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     textAlign: 'center',
     marginBottom: spacing.lg,
-  },
-  offerLabel: {
-    ...typography.small,
-    color: colors.mutedForeground,
-    fontWeight: '700',
-    marginBottom: spacing.sm,
-  },
-  offerInputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.muted,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  offerInput: {
-    ...typography.body,
-    color: colors.foreground,
-    flex: 1,
-    paddingVertical: spacing.md,
-  },
-  offerSuffix: {
-    ...typography.bodyMedium,
-    color: colors.mutedForeground,
-    fontWeight: '700',
-    marginLeft: spacing.sm,
   },
   sheetCancelLink: {
     alignItems: 'center',

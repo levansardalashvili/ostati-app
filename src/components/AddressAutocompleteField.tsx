@@ -5,6 +5,68 @@ import { colors, radius, spacing, typography } from '../theme';
 
 type Suggestion = { id: string; label: string };
 
+// Nominatim's structured address breakdown (`addressdetails=1`) — only the
+// pieces this component actually reads; the real response has many more
+// (state/county/postcode/country/...), all ignored here on purpose (task:
+// "avoid unnecessary repeated district / city / postal code / country").
+type NominatimAddress = {
+  house_number?: string;
+  road?: string;
+  neighbourhood?: string;
+  suburb?: string;
+  quarter?: string;
+  city_district?: string;
+  city?: string;
+  town?: string;
+  village?: string;
+};
+
+type NominatimResult = {
+  place_id?: number | string;
+  display_name: string;
+  address?: NominatimAddress;
+};
+
+// Address-fix pass, task 1 — Nominatim's raw `display_name` includes every
+// administrative layer it has (house number, street, neighbourhood,
+// district-with-"რაიონი" suffix, city, postcode, country — CLAUDE.md's own
+// example: "12, ალიო მირცხულავას ქუჩა, დიდუბე, დიდუბის რაიონი, თბილისი,
+// 0119, საქართველო"). Using `addressdetails=1`'s STRUCTURED fields (not
+// truncating the raw string by length/comma-count) to keep exactly:
+// house number + street + neighbourhood/local area — "12, ალიო
+// მირცხულავას ქუჩა, დიდუბე". The area/neighbourhood piece is always
+// preserved deliberately — CustomerHomeScreen's own district filter
+// (CLAUDE.md #20) substring-matches district names against whatever text
+// ends up in this field, so dropping it here would silently break that
+// unrelated feature.
+function shortAddressLabel(result: NominatimResult): string {
+  const a = result.address;
+  if (!a) return result.display_name;
+
+  const parts: string[] = [];
+  if (a.house_number) parts.push(a.house_number);
+  if (a.road) parts.push(a.road);
+  const area = a.neighbourhood || a.suburb || a.quarter || a.city_district;
+  if (area) parts.push(area);
+
+  if (parts.length > 0) return parts.join(', ');
+
+  // No street-level match at all (e.g. the query matched a whole
+  // neighbourhood/city, not a specific address) — fall back to whatever
+  // coarse place name is available, never literally nothing, and never
+  // the full raw string with postcode/country still attached.
+  return area || a.city || a.town || a.village || result.display_name;
+}
+
+// Address-fix pass, task 2 — normalize before comparing, not a positional
+// "drop every other item": lowercasing is a no-op for Georgian script (no
+// case distinction), but this also collapses incidental whitespace
+// differences between two results that would otherwise render as visibly
+// identical rows.
+function normalizeForDedup(label: string): string {
+  return label.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 type Props = {
   label: string;
   value: string;
@@ -58,16 +120,34 @@ export function AddressAutocompleteField({ label, value, onChangeText, onSelect,
       const seq = ++requestSeq.current;
       setLoading(true);
       try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=ge&accept-language=ka&q=${encodeURIComponent(query)}`;
+        // `addressdetails=1` — structured fields, needed for both the
+        // shortened display format (task 1) and a meaningful dedup key
+        // (task 2); without it we'd only ever have the long raw string.
+        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=ge&accept-language=ka&q=${encodeURIComponent(query)}`;
         const res = await fetch(url, { headers: { 'User-Agent': 'ostati-app (Georgia local services marketplace)' } });
         const data = await res.json();
         if (seq !== requestSeq.current) return;
-        setSuggestions(
-          (Array.isArray(data) ? data : []).map((item: { place_id?: number | string; display_name: string }, idx: number) => ({
-            id: `${item.place_id ?? idx}`,
-            label: item.display_name,
-          }))
-        );
+
+        const results = Array.isArray(data) ? (data as NominatimResult[]) : [];
+        // Dedup by the NORMALIZED SHORT label, not by index/position and
+        // not by raw display_name — two Nominatim results can be
+        // different OSM features (different place_id, different exact
+        // display_name — e.g. differing only in postcode or a minor
+        // district-name variant) that collapse to the exact same
+        // house-number+street+area once shortened; showing both would
+        // just be two visually identical rows. Results that genuinely
+        // differ in house number, street, or area keep distinct short
+        // labels and are never merged.
+        const seen = new Set<string>();
+        const deduped: Suggestion[] = [];
+        results.forEach((item, idx) => {
+          const label = shortAddressLabel(item);
+          const key = normalizeForDedup(label);
+          if (seen.has(key)) return;
+          seen.add(key);
+          deduped.push({ id: `${item.place_id ?? idx}`, label });
+        });
+        setSuggestions(deduped);
       } catch {
         if (seq === requestSeq.current) setSuggestions([]);
       } finally {

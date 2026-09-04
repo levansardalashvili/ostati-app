@@ -5,6 +5,7 @@ import { FileText, MessageCircle, Plus } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { type CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { BackHeader } from '../components/BackHeader';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { Skeleton } from '../components/Skeleton';
 import { StatusPill } from '../components/StatusPill';
@@ -21,10 +22,11 @@ type Props = CompositeScreenProps<
 >;
 type Tab = 'active' | 'pending' | 'done';
 
-// ტაბის ლეიბლები StatusPill-ის ლეიბლებთან შესატყვისობაშია (#32).
+// ტაბის ლეიბლები StatusPill-ის ლეიბლებთან შესატყვისობაშია (#32). რიგი:
+// მომლოდინე → დადასტურებული → დასრულებული.
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'active', label: 'დადასტურებული' },
   { id: 'pending', label: 'მომლოდინე' },
+  { id: 'active', label: 'დადასტურებული' },
   { id: 'done', label: 'დასრულებული' },
 ];
 
@@ -42,7 +44,7 @@ const EMPTY_TEXT: Record<Tab, string> = {
 // მოთხოვნები" მენიუც ამავე ტაბზე გადადის (CustomerProfileScreen.tsx),
 // push-ის ნაცვლად.
 export function CustomerJobsScreen({ navigation }: Props) {
-  const [tab, setTab] = useState<Tab>('active');
+  const [tab, setTab] = useState<Tab>('pending');
   const [isLoading, setIsLoading] = useState(true);
   const [jobs, setJobs] = useState<CustomerJob[]>([]);
   const { getStatus } = useJobStatus();
@@ -75,12 +77,21 @@ export function CustomerJobsScreen({ navigation }: Props) {
     }, []),
   );
 
-  // "awaiting_customer_confirmation"/"disputed" — job ჯერ კიდევ აქტიურ
-  // მუშაობშია (არ არის დასრულებული), ამიტომ "დადასტურებული" ტაბში რჩება
-  // (ორმხრივი დასრულების flow, JobStatusContext.tsx).
+  // "awaiting_customer_confirmation"/"confirmed_awaiting_rating"/"disputed" —
+  // job ჯერ კიდევ აქტიურ მუშაობშია ან დასრულების დადასტურების პროცესშია
+  // (არ არის საბოლოოდ "completed", სანამ შეფასება არ გაიგზავნება), ამიტომ
+  // "დადასტურებული" ტაბში რჩება (ორმხრივი დასრულების flow,
+  // JobStatusContext.tsx).
   const items = jobs.filter((j) => {
     const status = getStatus(j.id) ?? j.status;
-    if (tab === 'active') return status === 'active' || status === 'awaiting_customer_confirmation' || status === 'disputed';
+    if (tab === 'active') {
+      return (
+        status === 'active' ||
+        status === 'awaiting_customer_confirmation' ||
+        status === 'confirmed_awaiting_rating' ||
+        status === 'disputed'
+      );
+    }
     if (tab === 'pending') return status === 'pending';
     return status === 'completed';
   });
@@ -98,12 +109,22 @@ export function CustomerJobsScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>ჩემი განცხადებები</Text>
-        <Pressable style={styles.addButton} onPress={() => navigation.navigate('PostJob')}>
-          <Plus size={20} color={colors.primaryForeground} strokeWidth={2.5} />
-        </Pressable>
-      </View>
+      {/* Nav-fix pass, task 2 — same reasoning as ProviderMyJobsScreen.tsx:
+          MyJobsTab is a bottom tab, `backBehavior: 'history'` (CustomerTabs.tsx,
+          unchanged/default) means goBack() returns to whichever tab was
+          focused before this one — Profile in the "Profile → განცხადებები"
+          flow, without hardcoding that destination. The existing "+" post-job
+          button is preserved exactly (BackHeader's `right` slot), unstyled by
+          BackHeader itself. */}
+      <BackHeader
+        title="ჩემი განცხადებები"
+        onBack={() => navigation.goBack()}
+        right={
+          <Pressable testID="post-job-fab" style={styles.addButton} onPress={() => navigation.navigate('PostJob')}>
+            <Plus size={20} color={colors.primaryForeground} strokeWidth={2.5} />
+          </Pressable>
+        }
+      />
       <View style={styles.tabsRow}>
         {TABS.map((t) => (
           <Pressable key={t.id} style={[styles.tab, tab === t.id && styles.tabActive]} onPress={() => setTab(t.id)}>
@@ -191,21 +212,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.md,
-  },
-  headerTitle: {
-    ...typography.h2,
-    color: colors.foreground,
   },
   addButton: {
     width: 40,

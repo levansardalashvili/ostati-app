@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera } from 'lucide-react-native';
@@ -17,11 +17,18 @@ import type { RootStackParamList } from '../navigation/types';
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerEditProfile'>;
 
 // CustomerEditProfile — ზუსტად ზიპის App.tsx-ის CustomerEditProfile-ის
-// მიხედვით. პირველი შენახვა შეგნებულად ვარდება (საცდელი error-state
-// დემონსტრირებისთვის), მეორე ცდაზე წარმატებული. წარმატებულ შენახვაზე
-// მონაცემები იწერება CustomerProfileContext-ში (მყისიერი UI feedback)
-// და პარალელურად Supabase-ის `users` ცხრილში (userService.updateUserRecord) —
-// რომ ცვლილება რეალურად შენარჩუნდეს, არა მხოლოდ ამ სესიაში.
+// მიხედვით. წარმატებულ შენახვაზე მონაცემები იწერება CustomerProfileContext-ში
+// (მყისიერი UI feedback) და პარალელურად Supabase-ის `users` ცხრილში
+// (userService.updateUserRecord) — რომ ცვლილება რეალურად შენარჩუნდეს, არა
+// მხოლოდ ამ სესიაში.
+//
+// Profile-fix pass — root-cause fix: ეს ეკრანი ადრე შეგნებულად აგდებდა
+// პირველ "შენახვას" (`attemptRef.current === 0` → ყოველთვის setSaveError(true),
+// Supabase-ისკენ საერთოდ არ მიდიოდა), მხოლოდ დემონსტრაციული/საცდელი
+// error-state-ის საჩვენებლად ადრეულ ეტაპზე დარჩენილი scaffold — არა
+// რეალური ბაგი async sequencing-ში/state-ში/Supabase-ში. მოცილებულია
+// მთლიანად — handleSave ახლა რეალურ Supabase-ის ოპერაციას პირველივე
+// დაჭერისას იძახებს, ხელოვნური setTimeout/attemptRef-ის გარეშე.
 export function CustomerEditProfileScreen({ navigation }: Props) {
   const { profile, setProfile } = useCustomerProfile();
   const [firstName, setFirstName] = useState(profile.firstName);
@@ -29,38 +36,29 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
   const [address, setAddress] = useState(profile.defaultAddress);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  const attemptRef = useRef(0);
 
   const firstNameErr = !firstName.trim() ? 'ეს ველი სავალდებულოა' : '';
   const lastNameErr = !lastName.trim() ? 'ეს ველი სავალდებულოა' : '';
   const canSave = !!firstName.trim() && !!lastName.trim();
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canSave || isSaving) return;
     setSaveError(false);
     setIsSaving(true);
-    setTimeout(async () => {
-      if (attemptRef.current === 0) {
-        setIsSaving(false);
-        setSaveError(true);
-        attemptRef.current += 1;
-        return;
+    const patch = { firstName: firstName.trim(), lastName: lastName.trim(), defaultAddress: address.trim() };
+    setProfile(patch);
+    const uid = authService.getCurrentUser()?.uid;
+    if (uid) {
+      try {
+        await userService.updateUserRecord(uid, patch);
+      } catch {
+        // ლოკალურ Context-ში ცვლილება უკვე ასახულია — Supabase-ის
+        // ჩავარდნისას UI-ს არ ვბლოკავთ, უბრალოდ ჩუმად რჩება
+        // შემდეგ სინქრონიზაციამდე (მომავალში: retry/queue).
       }
-      const patch = { firstName: firstName.trim(), lastName: lastName.trim(), defaultAddress: address.trim() };
-      setProfile(patch);
-      const uid = authService.getCurrentUser()?.uid;
-      if (uid) {
-        try {
-          await userService.updateUserRecord(uid, patch);
-        } catch {
-          // ლოკალურ Context-ში ცვლილება უკვე ასახულია — Supabase-ის
-          // ჩავარდნისას UI-ს არ ვბლოკავთ, უბრალოდ ჩუმად რჩება
-          // შემდეგ სინქრონიზაციამდე (მომავალში: retry/queue).
-        }
-      }
-      setIsSaving(false);
-      navigation.goBack();
-    }, 1000);
+    }
+    setIsSaving(false);
+    navigation.goBack();
   };
 
   return (
@@ -79,10 +77,10 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
         <View style={{ gap: spacing.md }}>
           <View style={styles.nameRow}>
             <View style={{ flex: 1 }}>
-              <TextField label="სახელი" value={firstName} onChangeText={setFirstName} error={firstNameErr} />
+              <TextField testID="customer-edit-first-name" label="სახელი" value={firstName} onChangeText={setFirstName} error={firstNameErr} />
             </View>
             <View style={{ flex: 1 }}>
-              <TextField label="გვარი" value={lastName} onChangeText={setLastName} error={lastNameErr} />
+              <TextField testID="customer-edit-last-name" label="გვარი" value={lastName} onChangeText={setLastName} error={lastNameErr} />
             </View>
           </View>
           <TextField label="მისამართი" value={address} onChangeText={setAddress} placeholder="ქ., არეალი" />

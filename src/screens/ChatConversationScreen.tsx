@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -10,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AlertCircle,
   ArrowLeft,
@@ -50,7 +52,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ChatConversation'>;
 // მომენტში იწერება (`select_provider()` RPC, #72) — ჩატში დათანხმებული
 // ფასის ამ ველში ავტომატურად ასახვა ცალკე, დარჩენილი ეტაპია.
 export function ChatConversationScreen({ navigation, route }: Props) {
-  const { chatId, name, initials, color, role, jobId } = route.params;
+  const { chatId, name, initials, color, role, jobId, jobStatus } = route.params;
   // ყველა navigation call site (#71) რეალურ Supabase UUID-ს გადასცემს
   // chatId-ად (მეორე მხარის auth.users.id) — mock chat-ის კუნძული
   // მთლიანად წაშლილია, ეს ეკრანი აღარ საჭიროებს mock/real branching-ს.
@@ -84,13 +86,32 @@ export function ChatConversationScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (!customerId || !providerId || !myUid) return;
     return chatService.subscribeToMessages(customerId, providerId, myUid, (msg) => {
+      let isNewIncoming = false;
       setMessages((prev) => {
         const idx = prev.findIndex((m) => m.id === msg.id);
-        if (idx === -1) return [...prev, msg];
+        if (idx === -1) {
+          isNewIncoming = true;
+          return [...prev, msg];
+        }
         const next = [...prev];
         next[idx] = msg;
         return next;
       });
+      // Chat-fix pass, task 3 — the mount-time markConversationRead()
+      // below only covers messages that already existed when the screen
+      // opened. If the OTHER participant sends something new while this
+      // screen is still open (realtime), the server-side trigger still
+      // increments this user's own unread counter (they weren't the
+      // sender) even though it's on screen right now — re-clear it here
+      // too. `subscribeToMessages` already filters out the caller's own
+      // new INSERTs (chatService.ts), so `msg` here is always something
+      // genuinely incoming, never an outgoing message being echoed back;
+      // `isNewIncoming` additionally excludes UPDATE events (e.g. an
+      // offer's accepted/declined status changing) from triggering this,
+      // since those aren't "new unread messages".
+      if (isNewIncoming) {
+        chatService.markConversationRead(customerId, providerId).catch(() => {});
+      }
     });
   }, [customerId, providerId, myUid]);
 
@@ -101,6 +122,24 @@ export function ChatConversationScreen({ navigation, route }: Props) {
   const [offerAmount, setOfferAmount] = useState('');
   const [offerComment, setOfferComment] = useState('');
   const scrollRef = useRef<ScrollView>(null);
+  // Chat-fix pass, task 1 — real bottom safe-area inset (home indicator/
+  // gesture bar), not a fixed guess (`SafeAreaView` above only reserves
+  // `top`, deliberately — see the composer style comment below for why).
+  const insets = useSafeAreaInsets();
+
+  // "message list adjusts correctly" — when the keyboard opens, the
+  // ScrollView's own height shrinks (KeyboardAvoidingView's `padding`
+  // behavior on iOS, native `windowSoftInputMode="resize"` on Android,
+  // app.json), which can leave the latest message hidden behind the
+  // now-taller composer/keyboard until the user manually scrolls. Re-run
+  // the same scrollToEnd() used for new messages whenever the keyboard
+  // shows, on both platforms.
+  useEffect(() => {
+    const sub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, []);
 
   // ჩატის ზედა ბანერზე ფასის სტატუსი ბოლო 'offer' შეტყობინებიდან
   // გამოითვლება დინამიურად (არა სტატიკური mock ველი) — "მომლოდინე"
@@ -253,10 +292,18 @@ if (
   };
 
   const respondToOffer = (id: string, offerStatus: 'accepted' | 'declined') => {
+    const previous = messages.find((m) => m.id === id)?.offerStatus;
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, offerStatus } : m)));
     chatService.respondToRealOffer(id, offerStatus).catch(() => {
-      // ლოკალურ state-ში პასუხი უკვე ასახულია — Supabase-ის ჩავარდნისას
-      // UI-ს არ ვბლოკავთ, დანარჩენი optimistic-update-ების იგივე პრინციპით.
+      // Audit fix — `respond_to_chat_offer()` (0049/0066) legitimately
+      // rejects this (e.g. the job stopped being 'pending' between the
+      // offer being sent and this tap — the Customer selected a Provider
+      // through the normal "select" flow in the meantime). The optimistic
+      // update above must be rolled back here, or the UI permanently
+      // shows "accepted"/"declined" while the database still has
+      // 'pending' — until an unrelated refetch corrects it.
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, offerStatus: previous } : m)));
+      Alert.alert('ვერ მოხერხდა', 'ფასზე პასუხის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
     });
     // შენიშვნა: დათანხმებული ფასის job-ის ჩანაწერში (job_posts) შენახვა
     // ცალკე, დარჩენილი ეტაპია — job_posts-ს ჯერ არ აქვს დათანხმებული
@@ -363,6 +410,15 @@ if (
                     <View style={[styles.msgFooter, isMe ? styles.msgFooterMe : styles.msgFooterOther]}>
                       <Text style={styles.msgTime}>{m.t}</Text>
                       <MessageStateIcon state={m.state} isMine={isMe} />
+                      {/* Audit fix — retryMsg() already handled type==='offer'
+                          (msg.jobId re-send), but no bubble ever rendered this
+                          link for a failed offer — the send-failure dead-ended
+                          with no way to recover except reopening the sheet. */}
+                      {m.state === 'failed' && (
+                        <Pressable onPress={() => retryMsg(m.id)}>
+                          <Text style={styles.retryText}>ხელახლა</Text>
+                        </Pressable>
+                      )}
                     </View>
                   </View>
                 </View>
@@ -385,6 +441,14 @@ if (
                     <View style={[styles.msgFooter, isMe ? styles.msgFooterMe : styles.msgFooterOther]}>
                       <Text style={styles.msgTime}>{m.t}</Text>
                       <MessageStateIcon state={m.state} isMine={isMe} />
+                      {/* Audit fix — same gap as the offer bubble above: image
+                          retry was already implemented in retryMsg() but the
+                          bubble itself never surfaced a way to trigger it. */}
+                      {m.state === 'failed' && (
+                        <Pressable onPress={() => retryMsg(m.id)}>
+                          <Text style={styles.retryText}>ხელახლა</Text>
+                        </Pressable>
+                      )}
                     </View>
                   </View>
                 </View>
@@ -412,20 +476,37 @@ if (
           })}
         </ScrollView>
 
-        <View style={styles.composer}>
+        {/* Chat-fix pass, task 1 — root cause: `paddingBottom: spacing.lg`
+            was a fixed guess, not tied to the device's real safe-area
+            inset (`edges={['top']}` on the SafeAreaView above deliberately
+            does NOT reserve `bottom` itself — if it did, that fixed inset
+            padding would stack with KeyboardAvoidingView's own dynamic
+            keyboard-height padding once the keyboard opens, leaving an
+            extra empty gap above it). `insets.bottom` is 0 on devices with
+            no home-indicator/gesture-bar (older phones), where a small
+            fixed floor is still wanted for visual breathing room. */}
+        <View style={[styles.composer, { paddingBottom: insets.bottom > 0 ? insets.bottom + spacing.xs : spacing.sm + 2 }]}>
           <Pressable style={styles.attachButton} onPress={() => setAttachSheetOpen(true)}>
             <Camera size={17} color={colors.mutedForeground} />
           </Pressable>
           {/* Second hardening pass, item 5 — offer-ს job_id სჭირდება
               (supabase/migrations/0049), ამიტომ ღილაკი ჩანს მხოლოდ, როცა
-              route.params.jobId არსებობს. */}
-          {role === 'provider' && jobId && (
+              route.params.jobId არსებობს. Audit fix — დამატებით მხოლოდ
+              status='pending'-ზე: Provider-ის არჩევის (select_provider())
+              შემდეგ ფასი job_posts.agreed_price-ზეა ჩაკეტილი და
+              respond_to_chat_offer() (0049/0066) ისედაც უარყოფდა ახალ
+              შეთავაზებას აქტიურ job-ზე — ღილაკი აქამდე მაინც ჩანდა
+              (ProviderJobDetailScreen-ის 'active'/'awaiting_confirmation'/
+              'disputed' variant-ებზეც), ფასის გაგზავნა კი ყოველთვის
+              ჩუმად ვარდებოდა. */}
+          {role === 'provider' && jobId && jobStatus === 'pending' && (
             <Pressable style={styles.attachButton} onPress={() => setOfferSheetOpen(true)}>
               <Wallet size={17} color={colors.mutedForeground} />
             </Pressable>
           )}
           <View style={styles.textInputWrap}>
             <TextInput
+              testID="chat-message-input"
               value={msgText}
               onChangeText={setMsgText}
               placeholder="დაწერე შეტყობინება..."
@@ -435,6 +516,7 @@ if (
             />
           </View>
           <Pressable
+            testID="chat-send-button"
             style={[styles.sendButton, msgText.trim() && styles.sendButtonActive]}
             onPress={sendMsg}
             disabled={!msgText.trim()}
@@ -468,12 +550,17 @@ if (
         }}
       >
         <Text style={styles.sheetTitle}>ფასის შეთავაზება</Text>
-        <Text style={styles.sheetSubtitle}>Customer-მა უნდა დაადასტუროს, სანამ ფასი ძალაში შევა.</Text>
+        <Text style={styles.sheetSubtitle}>შემკვეთმა უნდა დაადასტუროს, სანამ ფასი ძალაში შევა.</Text>
+        {/* Chat-fix pass, task 2 — clearer label + a real bordered field
+            (was a borderless, centered "hero number" with a vague
+            "მიუთითეთ ფასი" placeholder) — same state/validation/RPC call
+            underneath, only the wording and input styling changed. */}
+        <Text style={styles.offerAmountLabel}>შეთავაზებული ფასი</Text>
         <View style={styles.offerAmountInputWrap}>
           <TextInput
             value={offerAmount}
             onChangeText={(t) => setOfferAmount(t.replace(/[^0-9]/g, ''))}
-            placeholder="მიუთითეთ ფასი"
+            placeholder="ჩაწერეთ თანხა"
             placeholderTextColor={colors.mutedForeground}
             keyboardType="number-pad"
             style={styles.offerAmountInput}
@@ -775,23 +862,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
+  // Chat-fix pass, task 2 — a real bordered field ("[ ჩაწერეთ თანხა   ₾ ]"),
+  // not the previous borderless, centered large-number display.
+  offerAmountLabel: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    fontWeight: '700',
+    marginBottom: spacing.xs + 2,
+  },
   offerAmountInputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
+    backgroundColor: colors.muted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 4,
+    gap: spacing.sm,
     marginBottom: spacing.md,
   },
   offerAmountInput: {
-    ...typography.h1,
+    ...typography.bodyMedium,
     color: colors.foreground,
-    textAlign: 'center',
-    minWidth: 80,
+    flex: 1,
     padding: 0,
   },
   offerAmountSuffix: {
-    ...typography.h2,
+    ...typography.bodyMedium,
     color: colors.mutedForeground,
+    fontWeight: '700',
   },
   offerCommentInput: {
     ...typography.caption,
@@ -812,7 +912,8 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingHorizontal: spacing.sm + 4,
     paddingTop: spacing.sm + 2,
-    paddingBottom: spacing.lg,
+    // paddingBottom is applied inline (safe-area-aware, see call site) —
+    // not a fixed value here.
   },
   attachButton: {
     width: 36,

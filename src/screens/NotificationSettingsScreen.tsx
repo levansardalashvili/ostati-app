@@ -96,7 +96,7 @@ export function NotificationSettingsScreen({ navigation, route }: Props) {
             <Text style={styles.infoEmoji}>ℹ️</Text>
             <Text style={styles.infoText}>
               „ახალი მოთხოვნები ჩემს არეალში" — ეს შეტყობინება მუშაობს მხოლოდ მაშინ, როდესაც ხელმისაწვდომობა ჩართულია
-              Provider Home-ზე.
+              მთავარ გვერდზე.
             </Text>
           </View>
         )}

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import { radius } from '../theme';
 import { CATEGORIES } from '../data/categories';
+import { specialtyIdToCategoryId } from '../data/specialties';
 
 // ერთადერთი ცენტრალიზებული კატეგორია → Lucide ვექტორული აიქონის მაპინგი
 // მთელი აპისთვის (ემოჯის ნაცვლად) — Customer-ის და Provider-ის ეკრანები
@@ -44,26 +45,17 @@ const CATEGORY_ICON_MAP: Record<string, LucideIcon> = {
   moving: Package,
 };
 
-// src/data/specialties.ts-ის id-სივრცე CATEGORIES-ისგან ოდნავ განსხვავდება
-// (მაგ. "plumber" ≠ "plumbing", "drywall"-ს კი CATEGORIES-ში პირდაპირი
-// შესატყვისი საერთოდ არა აქვს) — ეს ალიასი იმავე აიქონების ხელახლა
-// გამოყენების საშუალებას იძლევა, ცალკე სპეციალობის აიქონების ნაკრების
-// გამეორების გარეშე.
-const SPECIALTY_ID_ALIASES: Record<string, string> = {
-  plumber: 'plumbing',
-  electrician: 'electrical',
-  painter: 'painting',
-  drywall: 'renovation',
-};
-
 const DEFAULT_ICON: LucideIcon = Wrench;
 
 // კატეგორია/სპეციალობის id-სთვის შესაბამისი Lucide აიქონის კომპონენტი —
 // გამოსაყენებელია, როცა უკვე არსებული ფონის კონტეინერის სტილში (ფორმა,
 // ზომა, border radius) მხოლოდ თავად აიქონის ჩასმაა საჭირო, `CategoryIcon`-ის
-// საკუთარი კონტეინერის გარეშე.
+// საკუთარი კონტეინერის გარეშე. სპეციალობის (`plumber`) → კატეგორიის
+// (`plumbing`) ალიასი გატანილია src/data/specialties.ts-ში, ერთადერთი
+// წყაროდ (userService.ts-იც ამავე ფუნქციას იყენებს Provider.category-ის
+// derivation-ისთვის).
 export function getCategoryIcon(categoryId: string): LucideIcon {
-  return CATEGORY_ICON_MAP[categoryId] ?? CATEGORY_ICON_MAP[SPECIALTY_ID_ALIASES[categoryId]] ?? DEFAULT_ICON;
+  return CATEGORY_ICON_MAP[categoryId] ?? CATEGORY_ICON_MAP[specialtyIdToCategoryId(categoryId) ?? ''] ?? DEFAULT_ICON;
 }
 
 type Props = {

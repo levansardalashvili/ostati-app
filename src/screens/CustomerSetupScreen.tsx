@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, Check, User } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
 import { ProgressBar } from '../components/ProgressBar';
@@ -19,19 +19,20 @@ function getInitials(name: string) {
     .join('');
 }
 
-// A4 — პროფილის შევსება (Customer) — მარტივი ფოტოს დამატების ეკრანი
-// (product-spec.md; დიზაინის რეფერენსის CustomerSetupScreen-ის მიხედვით)
+// A4 — პროფილის დასრულების ეკრანი (product-spec.md; დიზაინის რეფერენსის
+// CustomerSetupScreen-ის მიხედვით). ფოტოს დამატების ღილაკები აქედან
+// მოცილებულია — Customer-ის პროფილს (users ცხრილს/CustomerProfile ტიპს)
+// საერთოდ არ აქვს photo_url ველი, ისინი მხოლოდ ვიზუალურად ცვლიდნენ
+// ავატარს (initials-ს), არაფერს არ ინახავდნენ. Provider-ის საკუთარი
+// პროფილის ფოტო (#65) რეალურია, Customer-ისთვის ეს ჯერ არ აშენებულა.
 export function CustomerSetupScreen({ navigation, route }: Props) {
   const { userName } = route.params;
   const [loading, setLoading] = useState(false);
-  const [hasPhoto, setHasPhoto] = useState(false);
 
   const initials = getInitials(userName);
 
   const handleDone = () => {
     setLoading(true);
-    // TODO: პროფილის ფოტოს ატვირთვა Supabase Storage-ში (Provider-ის
-    // პროფილის ფოტოს #65-ის იგივე პატერნით — Customer-ისთვის ჯერ არ აშენებულა)
     setTimeout(() => {
       setLoading(false);
       navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
@@ -48,7 +49,7 @@ export function CustomerSetupScreen({ navigation, route }: Props) {
         </View>
 
         <Text style={styles.title}>პროფილის დასრულება</Text>
-        <Text style={styles.subtitle}>სურვილისამებრ დაამატე პროფილის ფოტო.</Text>
+        <Text style={styles.subtitle}>თითქმის მზად ხარ.</Text>
 
         <View style={styles.nameCard}>
           <Check size={16} color={colors.success} strokeWidth={2.5} />
@@ -57,28 +58,8 @@ export function CustomerSetupScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.photoSection}>
-          <View style={styles.avatarWrap}>
-            <View style={styles.avatar}>
-              {hasPhoto ? (
-                <Text style={styles.avatarInitials}>{initials || '+'}</Text>
-              ) : (
-                <User size={38} color={colors.primary} />
-              )}
-            </View>
-            <Pressable style={styles.cameraBadge} onPress={() => setHasPhoto((p) => !p)}>
-              <Camera size={14} color={colors.primaryForeground} />
-            </Pressable>
-          </View>
-
-          <View style={styles.photoActions}>
-            <Pressable style={styles.photoActionButton} onPress={() => setHasPhoto(true)}>
-              <Camera size={14} color={colors.mutedForeground} />
-              <Text style={styles.photoActionText}>ფოტოს გადაღება</Text>
-            </Pressable>
-            <Pressable style={styles.photoActionButton} onPress={() => setHasPhoto(true)}>
-              <User size={14} color={colors.mutedForeground} />
-              <Text style={styles.photoActionText}>გალერეიდან</Text>
-            </Pressable>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarInitials}>{initials || '+'}</Text>
           </View>
         </View>
       </View>
@@ -148,9 +129,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
-  avatarWrap: {
-    position: 'relative',
-  },
   avatar: {
     width: 96,
     height: 96,
@@ -165,39 +143,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     color: colors.primary,
-  },
-  cameraBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-    borderWidth: 2,
-    borderColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  photoActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  photoActionText: {
-    ...typography.small,
-    color: colors.mutedForeground,
-    fontWeight: '600',
   },
   footer: {
     backgroundColor: colors.card,

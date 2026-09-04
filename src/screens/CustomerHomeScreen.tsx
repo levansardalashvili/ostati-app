@@ -8,16 +8,14 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, ChevronRight, LayoutGrid, MapPin, MessageCircle, Search, Star, X } from 'lucide-react-native';
+import { Bell, ChevronRight, LayoutGrid, Search, X } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useFocusEffect, type CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { CategoryIcon, getCategoryIcon } from '../components/CategoryIcon';
-import { Chip } from '../components/Chip';
-import { Skeleton } from '../components/Skeleton';
+import { ProviderCard, ProviderCardSkeleton } from '../components/ProviderCard';
 import { StatusPill } from '../components/StatusPill';
-import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
 import { TBILISI_AREAS as DISTRICTS } from '../data/districts';
@@ -29,7 +27,7 @@ import { userService } from '../services/userService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { CustomerJob } from '../types/job';
 import type { Provider } from '../types/provider';
-import { isNewProvider, providerRankScore } from '../utils/providerRank';
+import { providerRankScore } from '../utils/providerRank';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -48,9 +46,6 @@ export function CustomerHomeScreen({ navigation }: Props) {
   const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`;
   const [search, setSearch] = useState('');
   const [selCats, setSelCats] = useState<Set<string>>(new Set());
-  // 'mine' — სპეციალური სენტინელ მნიშვნელობა "ჩემი არეალი" ჩიპისთვის,
-  // არასდროს ემთხვევა რეალურ რაიონის სახელს.
-  const [selDistrict, setSelDistrict] = useState<string | 'mine' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [providers, setProviders] = useState<Provider[]>([]);
   useEffect(() => {
@@ -92,25 +87,32 @@ export function CustomerHomeScreen({ navigation }: Props) {
       return next;
     });
 
-  const filtered = useMemo(() => {
-    const effectiveDistrict = selDistrict === 'mine' ? myDistrict : selDistrict;
-    return providers.filter((p) => {
-      if (selCats.size > 0 && !selCats.has(p.category)) return false;
-      // მთხოვნის მიხედვით — ოსტატის საცხოვრებელი მისამართის (`location`) ნაცვლად
-      // მისი სამუშაო არეალით (`areas`) ვფილტრავთ.
-      if (effectiveDistrict && !p.areas.includes(effectiveDistrict)) return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        const spec = (SPECIALTY_LABEL[p.category] ?? '').toLowerCase();
-        if (!p.name.toLowerCase().includes(q) && !spec.includes(q)) return false;
-      }
-      return true;
-    }).sort((a, b) => providerRankScore(b) - providerRankScore(a));
-  }, [providers, search, selCats, selDistrict, myDistrict]);
+  // მთხოვნის მიხედვით — არეალის ფილტრის UI (ჩიპები) Home-იდან მოცილებულია
+  // მთლიანად, მაგრამ "ტოპ ოსტატები შენს არეალში" კვლავ ავტომატურად
+  // ითვლის Customer-ის საკუთარ არეალში (myDistrict) — მომხმარებელს აღარ
+  // შეუძლია ამის ხელით შეცვლა/გამორთვა Home-ზე. თუ არეალი ვერ დგინდება
+  // (myDistrict === null), ფილტრი უბრალოდ არ გამოიყენება (fallback —
+  // ცარიელი/გატეხილი სექციის ნაცვლად საერთო ტოპ სია ჩანს).
+  const rankedInArea = useMemo(() => {
+    return providers
+      .filter((p) => {
+        if (selCats.size > 0 && !selCats.has(p.category)) return false;
+        if (myDistrict && !p.areas.includes(myDistrict)) return false;
+        if (search.trim()) {
+          const q = search.toLowerCase();
+          const spec = (SPECIALTY_LABEL[p.category] ?? '').toLowerCase();
+          if (!p.name.toLowerCase().includes(q) && !spec.includes(q)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => providerRankScore(b) - providerRankScore(a));
+  }, [providers, search, selCats, myDistrict]);
+  // Home-ზე მხოლოდ ტოპ 5 ჩანს — "ყველას ნახვა" ხსნის სრულ სიას
+  // (CustomerProviderListScreen), საკუთარი არეალის/სხვა ფილტრებით.
+  const topProviders = rankedInArea.slice(0, 5);
 
   const clearFilters = () => {
     setSelCats(new Set());
-    setSelDistrict(null);
     setSearch('');
   };
 
@@ -131,6 +133,9 @@ export function CustomerHomeScreen({ navigation }: Props) {
   };
   const handleAllServices = () => {
     navigation.navigate('CustomerCategories');
+  };
+  const handleViewAllProviders = () => {
+    navigation.navigate('CustomerProviderList');
   };
 
   // Task 6 (audit) — "ტოპ 3" ახლა ბექენდის `featured` დროშაზეა აგებული
@@ -299,41 +304,10 @@ export function CustomerHomeScreen({ navigation }: Props) {
 
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>არეალი</Text>
-            {selDistrict && (
-              <Pressable onPress={() => setSelDistrict(null)}>
-                <Text style={styles.clearLink}>გასუფთ.</Text>
-              </Pressable>
-            )}
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-            <Chip variant="filled" label="ყველა" selected={!selDistrict} onPress={() => setSelDistrict(null)} />
-            {myDistrict && (
-              <Chip
-                variant="filled"
-                label="ჩემი არეალი"
-                selected={selDistrict === 'mine'}
-                onPress={() => setSelDistrict(selDistrict === 'mine' ? null : 'mine')}
-              />
-            )}
-            {DISTRICTS.map((d) => (
-              <Chip
-                key={d}
-                variant="filled"
-                label={d}
-                selected={selDistrict === d}
-                onPress={() => setSelDistrict(d === selDistrict ? null : d)}
-              />
-            ))}
-          </ScrollView>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
             <Text style={styles.resultsTitle}>ტოპ ოსტატები შენს არეალში</Text>
             {!isLoading && (
               <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{filtered.length}</Text>
+                <Text style={styles.countBadgeText}>{rankedInArea.length}</Text>
               </View>
             )}
           </View>
@@ -344,117 +318,38 @@ export function CustomerHomeScreen({ navigation }: Props) {
                 <ProviderCardSkeleton key={i} />
               ))}
             </View>
-          ) : filtered.length === 0 ? (
+          ) : topProviders.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIcon}>
                 <Search size={24} color={colors.mutedForeground} />
               </View>
               <Text style={styles.emptyTitle}>ოსტატები ვერ მოიძებნა</Text>
-              <Text style={styles.emptySubtitle}>სცადე სხვა კატეგორიის ან არეალის არჩევა.</Text>
+              <Text style={styles.emptySubtitle}>სცადე სხვა კატეგორიის არჩევა.</Text>
               <Pressable style={styles.emptyButton} onPress={clearFilters}>
                 <Text style={styles.emptyButtonText}>ფილტრების შეცვლა</Text>
               </Pressable>
             </View>
           ) : (
-            <View style={{ gap: spacing.md }}>
-              {filtered.map((p) => (
-                <ProviderCard
-                  key={p.id}
-                  provider={p}
-                  onOpenProfile={() => handleOpenProvider(p.id)}
-                  onMessage={() => handleOpenChat(p)}
-                />
-              ))}
-            </View>
+            <>
+              <View style={{ gap: spacing.md }}>
+                {topProviders.map((p) => (
+                  <ProviderCard
+                    key={p.id}
+                    provider={p}
+                    onOpenProfile={() => handleOpenProvider(p.id)}
+                    onMessage={() => handleOpenChat(p)}
+                  />
+                ))}
+              </View>
+              <Pressable style={styles.viewAllButton} onPress={handleViewAllProviders}>
+                <Text style={styles.viewAllButtonText}>ყველას ნახვა</Text>
+                <ChevronRight size={16} color={colors.primary} />
+              </Pressable>
+            </>
           )}
         </View>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function ProviderCard({
-  provider,
-  onOpenProfile,
-  onMessage,
-}: {
-  provider: Provider;
-  onOpenProfile: () => void;
-  onMessage: () => void;
-}) {
-  const specialty = SPECIALTY_LABEL[provider.category] ?? CATEGORIES.find((c) => c.id === provider.category)?.label ?? '';
-  const district = provider.location.replace(', თბილისი', '');
-
-  return (
-    <View style={styles.providerCard}>
-      <Pressable style={styles.providerCardBody} onPress={onOpenProfile}>
-        <Avatar initials={provider.initials} color={provider.color} size={54} online={provider.online} uri={provider.photoUrl} />
-        <View style={styles.providerInfo}>
-          <View style={styles.providerNameRow}>
-            <Text style={styles.providerName} numberOfLines={1}>
-              {provider.name}
-            </Text>
-            {provider.verified && <VerifiedBadge size={15} />}
-          </View>
-          <Text style={styles.providerMeta}>
-            {specialty} • {provider.years} წ. გამოცდ.
-          </Text>
-          <View style={styles.providerStatsRow}>
-            {isNewProvider(provider) ? (
-              <View style={styles.newProviderBadge}>
-                <Text style={styles.newProviderBadgeText}>ახალი ოსტატი</Text>
-              </View>
-            ) : (
-              <View style={styles.ratingRow}>
-                <Star size={12} color="#FBBF24" fill="#FBBF24" />
-                <Text style={styles.ratingText}>{provider.rating}</Text>
-                <Text style={styles.reviewsText}>({provider.reviews} შეფ.)</Text>
-              </View>
-            )}
-            <Text style={styles.dotSeparator}>•</Text>
-            <View style={styles.locationRow}>
-              <MapPin size={11} color={colors.mutedForeground} />
-              <Text style={styles.locationText}>{district}</Text>
-            </View>
-          </View>
-          <View style={styles.availabilityRow}>
-            {provider.online ? (
-              <View style={styles.availableRow}>
-                <View style={styles.availableDot} />
-                <Text style={styles.availableText}>ხელმისაწვდომი</Text>
-              </View>
-            ) : (
-              <Text style={styles.busyText}>დაკავებული</Text>
-            )}
-          </View>
-        </View>
-      </Pressable>
-
-      <View style={styles.providerActionRow}>
-        <Text style={styles.priceText} numberOfLines={1}>
-          {provider.price}
-        </Text>
-        <Pressable style={styles.messageButton} onPress={onMessage}>
-          <MessageCircle size={14} color={colors.primaryForeground} />
-          <Text style={styles.messageButtonText}>მიწერა</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-function ProviderCardSkeleton() {
-  return (
-    <View style={styles.providerCard}>
-      <View style={[styles.providerCardBody, { paddingBottom: spacing.md }]}>
-        <Skeleton width={54} height={54} borderRadius={radius.full} />
-        <View style={[styles.providerInfo, { gap: spacing.xs }]}>
-          <Skeleton width="70%" height={16} />
-          <Skeleton width="50%" height={12} />
-          <Skeleton width="60%" height={12} />
-        </View>
-      </View>
-    </View>
   );
 }
 
@@ -550,10 +445,6 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.primary,
     fontWeight: '600',
-  },
-  chipRow: {
-    gap: spacing.sm,
-    paddingRight: spacing.lg,
   },
   currentJobCard: {
     flexDirection: 'row',
@@ -675,132 +566,21 @@ const styles = StyleSheet.create({
     color: colors.primaryForeground,
     fontWeight: '700',
   },
-  providerCard: {
-    backgroundColor: colors.card,
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm + 4,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
+    backgroundColor: colors.card,
   },
-  providerCardBody: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    padding: spacing.md,
-  },
-  providerInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  providerNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: 2,
-  },
-  providerName: {
-    ...typography.bodyMedium,
-    color: colors.foreground,
-    flexShrink: 1,
-  },
-  providerMeta: {
-    ...typography.caption,
-    color: colors.mutedForeground,
-    marginBottom: spacing.xs,
-  },
-  providerStatsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
+  viewAllButtonText: {
     ...typography.captionMedium,
-    color: colors.foreground,
-  },
-  reviewsText: {
-    ...typography.small,
-    color: colors.mutedForeground,
-  },
-  newProviderBadge: {
-    backgroundColor: colors.secondary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 1,
-  },
-  newProviderBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.secondaryForeground,
-  },
-  dotSeparator: {
-    color: colors.border,
-    fontSize: 9,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  locationText: {
-    ...typography.small,
-    color: colors.mutedForeground,
-  },
-  availabilityRow: {
-    marginTop: spacing.xs,
-  },
-  availableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  availableDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.success,
-  },
-  availableText: {
-    ...typography.small,
-    color: colors.success,
-    fontWeight: '700',
-  },
-  busyText: {
-    ...typography.small,
-    color: colors.mutedForeground,
-  },
-  providerActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  priceText: {
-    ...typography.small,
-    color: colors.mutedForeground,
-    flexShrink: 1,
-  },
-  messageButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm - 2,
-  },
-  messageButtonText: {
-    ...typography.small,
-    color: colors.primaryForeground,
+    color: colors.primary,
     fontWeight: '700',
   },
 });

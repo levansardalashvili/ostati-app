@@ -8,7 +8,6 @@ import {
   ChevronRight,
   ClipboardList,
   Eye,
-  HelpCircle,
   LogOut,
   MapPin,
   Pencil,
@@ -89,7 +88,6 @@ export function ProviderProfileScreen({ navigation }: Props) {
     { icon: Briefcase, label: 'შესრულებული სამუშაოები', bg: '#F5F3FF', color: '#7C3AED', badge: displayStats.jobs },
     { icon: Star, label: 'შეფასებები', bg: '#FFFBEB', color: '#D97706', badge: displayStats.reviews },
     { icon: Bell, label: 'შეტყობინებები', bg: colors.muted, color: colors.mutedForeground, badge: unreadNotifCount },
-    { icon: HelpCircle, label: 'დახმარება', bg: '#ECFEFF', color: '#0891B2', badge: 0 },
     { icon: Settings, label: 'ანგარიშის პარამეტრები', bg: colors.muted, color: colors.mutedForeground, badge: 0 },
   ];
 
@@ -111,7 +109,6 @@ export function ProviderProfileScreen({ navigation }: Props) {
     } else if (label === 'ანგარიშის პარამეტრები') {
       navigation.navigate('ProfileSettings');
     }
-    // "დახმარება" — TODO: ეს ეკრანი ზიპშივე არ არსებობდა (screen: null)
   };
 
   const confirmLogout = () => {
@@ -243,7 +240,7 @@ export function ProviderProfileScreen({ navigation }: Props) {
         </View>
         <Text style={styles.sheetTitle}>გასვლა</Text>
         <Text style={styles.sheetSubtitle}>ნამდვილად გსურს ანგარიშიდან გასვლა?</Text>
-        <Button label="გასვლა" variant="destructive" onPress={confirmLogout} />
+        <Button testID="logout-confirm-button" label="გასვლა" variant="destructive" onPress={confirmLogout} />
         <Pressable style={styles.sheetCancelLink} onPress={() => setLogoutSheetOpen(false)}>
           <Text style={styles.sheetCancelLinkText}>გაუქმება</Text>
         </Pressable>

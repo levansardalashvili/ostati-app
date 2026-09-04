@@ -19,6 +19,12 @@ export interface AuthService {
   signInWithEmail(credentials: EmailCredentials): Promise<AuthResult>;
   signInWithGoogle(): Promise<AuthResult>;
   sendPasswordReset(email: string): Promise<void>;
+  // Re-authenticates with the current password first (Supabase's
+  // updateUser() itself does not verify it — only the active session is
+  // required), then changes it. Throws on a wrong current password
+  // (same 'Invalid login credentials' as signInWithEmail) or if there is
+  // no signed-in user with an email (e.g. a Google-only account).
+  updatePassword(currentPassword: string, newPassword: string): Promise<void>;
   signOut(): Promise<void>;
   getCurrentUser(): AppUser | null;
   subscribeToAuthState(callback: (user: AppUser | null) => void): () => void;
@@ -90,6 +96,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   'Email not confirmed': 'ჯერ დაადასტურე ელ. ფოსტა — შემოწმდი ინბოქსი.',
   'Password should be at least 6 characters': 'პაროლი ძალიან მარტივია — აირჩიე უფრო საიმედო პაროლი.',
   'Unable to validate email address: invalid format': 'შეიყვანე სწორი ელ. ფოსტა.',
+  'New password should be different from the old password.': 'ახალი პაროლი ძველისგან განსხვავებული უნდა იყოს.',
 };
 
 export function getAuthErrorMessage(error: unknown): string {
@@ -129,6 +136,14 @@ export const authService: AuthService = {
   },
   async sendPasswordReset(email) {
     const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) throw error;
+  },
+  async updatePassword(currentPassword, newPassword) {
+    const email = cachedUser?.email;
+    if (!email) throw new Error('ვერ მოიძებნა აქტიური სესია — თავიდან შედი ანგარიშში.');
+    const { error: reauthError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+    if (reauthError) throw reauthError;
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw error;
   },
   async signOut() {

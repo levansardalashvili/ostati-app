@@ -10,8 +10,20 @@ export type MediaItem = { id: number; bg: string; uri?: string };
 
 export const MEDIA_BG = ['#DBEAFE', '#D1FAE5', '#FEF3C7', '#FCE7F3', '#EDE9FE'];
 
+// Profile-fix pass, task 2 — `id: Date.now() + items.length` could produce
+// the SAME id from two INDEPENDENT calls (e.g. one for `certificates`, one
+// for `portfolio`, each with its own array length) if they land within the
+// same millisecond — a real, confirmed anomaly (DEFAULT_PROVIDER_PROFILE's
+// mock seed data in userService.ts had exactly this: certificates id=1 and
+// the first portfolio id=1). A module-level, monotonically increasing
+// counter guarantees every id this function ever returns — across every
+// caller, every array, every screen using it — is unique, closing that off
+// completely regardless of timing.
+let mediaItemSeq = 0;
+
 export function nextMediaItem(items: MediaItem[]): MediaItem {
-  return { id: Date.now() + items.length, bg: MEDIA_BG[items.length % MEDIA_BG.length] };
+  mediaItemSeq += 1;
+  return { id: Date.now() * 1000 + mediaItemSeq, bg: MEDIA_BG[items.length % MEDIA_BG.length] };
 }
 
 type Props = {

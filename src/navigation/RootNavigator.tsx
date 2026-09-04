@@ -35,6 +35,7 @@ import { SavedProvidersScreen } from '../screens/SavedProvidersScreen';
 import { RatingScreen } from '../screens/RatingScreen';
 import { CustomerCategoriesScreen } from '../screens/CustomerCategoriesScreen';
 import { CustomerCategoryScreen } from '../screens/CustomerCategoryScreen';
+import { CustomerProviderListScreen } from '../screens/CustomerProviderListScreen';
 import { RegionAreaPickerScreen } from '../screens/RegionAreaPickerScreen';
 import { RootStackParamList } from './types';
 
@@ -156,6 +157,7 @@ export function RootNavigator() {
       <Stack.Screen name="RatingScreen" component={RatingScreen} />
       <Stack.Screen name="CustomerCategories" component={CustomerCategoriesScreen} />
       <Stack.Screen name="CustomerCategory" component={CustomerCategoryScreen} />
+      <Stack.Screen name="CustomerProviderList" component={CustomerProviderListScreen} />
       <Stack.Screen name="RegionAreaPicker" component={RegionAreaPickerScreen} />
     </Stack.Navigator>
   );

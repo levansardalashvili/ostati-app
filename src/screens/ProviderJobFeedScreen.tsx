@@ -56,6 +56,7 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
       color: '#64748B',
       role: 'provider',
       jobId: job.customerJobId,
+      jobStatus: job.status,
     });
   };
   // #72: ფასი სავალდებულო, კონკრეტული რიცხვია — ProviderHomeScreen-ის

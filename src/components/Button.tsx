@@ -25,6 +25,10 @@ type Props = {
   loadingLabel?: string;
   fullWidth?: boolean;
   style?: ViewStyle;
+  // E2E (Maestro) support — several screens have more than one button with
+  // the same label text (e.g. a menu row and its confirmation sheet both
+  // saying "გასვლა"), which text-based selectors can't disambiguate.
+  testID?: string;
 };
 
 // საერთო Button კომპონენტი — იზიარებს ერთსა და იმავე ზომებსა და სტილს
@@ -38,11 +42,13 @@ export function Button({
   loadingLabel,
   fullWidth = true,
   style,
+  testID,
 }: Props) {
   const isDisabled = disabled || loading;
 
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       disabled={isDisabled}
       style={({ pressed }) => [

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, ChevronRight } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, spacing, typography } from '../theme';
 import type { Role, RootStackParamList } from '../navigation/types';
@@ -42,7 +42,19 @@ export function RoleSelectScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Nav-fix pass, task 7 — this screen previously had no Back
+          navigation at all (Welcome → RoleSelect was a normal stack push,
+          so goBack() already correctly returns to Welcome; it just had no
+          on-screen affordance to trigger it). A plain top-left button, not
+          a full header (no title needed alongside the existing eyebrow/
+          title text below) — kept outside the centered `content` block so
+          the role cards' vertical centering is unaffected. */}
+      <View style={styles.topRow}>
+        <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={18} color={colors.foreground} />
+        </Pressable>
+      </View>
       <View style={styles.content}>
         <Text style={styles.eyebrow}>კეთილი იყოს თქვენი მობრძანება</Text>
         <Text style={styles.title}>აირჩიეთ თქვენი სტატუსი</Text>
@@ -81,6 +93,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  topRow: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: colors.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     flex: 1,

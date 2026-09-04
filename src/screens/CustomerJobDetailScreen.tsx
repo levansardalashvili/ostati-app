@@ -9,7 +9,6 @@ import {
   MapPin,
   MessageCircle,
   MoreVertical,
-  Pencil,
   Star,
   X,
   Image as ImageIcon,
@@ -121,9 +120,30 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   // მოქმედება — იხ. src/components/ReportJobSheet.tsx-ის თავსართის შენიშვნა.
   const [reportSheetOpen, setReportSheetOpen] = useState(false);
   const [confirmProvider, setConfirmProvider] = useState<Provider | null>(null);
-  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(
-    () => interestedList.find((entry) => entry.provider.name === job.provider)?.provider ?? null,
-  );
+  // Profile-fix pass, task 4 — CONFIRMED root cause. This used to be a lazy
+  // `useState` INITIALIZER (`() => interestedList.find(...)`), which only
+  // ever runs once, on the very first render — at that point `interestedList`
+  // is still its initial empty array (the real list only arrives later,
+  // via the async effect above), so this always evaluated to `null` on
+  // mount. For a job that was already decided in an EARLIER session (the
+  // common case: opening Job Details on an already-active/in-progress job,
+  // not the one just-selected in this same screen instance), nothing ever
+  // re-derived it afterward — `selectedProvider` stayed `null` for the
+  // entire session, silently hiding the assigned Provider's name/photo
+  // everywhere this screen shows them (the completion banner, the chat
+  // button, and the RatingScreen navigation params below — which is why
+  // `openRating()` needed a hardcoded 'გიორგი ბერიძე'/'გბ' MOCK fallback
+  // at all: real data existed in `interestedList`/`job.provider`, this
+  // screen just never looked at it again after mount). `confirmSelection()`
+  // (below) still calls `setSelectedProvider(confirmProvider)` directly
+  // for the live-selection case — unchanged; this effect only ADDS the
+  // missing re-sync for every other case, and never clears an
+  // already-set value back to null.
+  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
+  useEffect(() => {
+    const match = interestedList.find((entry) => entry.provider.name === job.provider)?.provider;
+    if (match) setSelectedProvider(match);
+  }, [interestedList, job.provider]);
   const [sortBy, setSortBy] = useState<'price' | 'rating' | 'experience' | null>(null);
 
   // #72: Provider ყოველთვის კონკრეტულ რიცხვს წარადგენს — "ფასი სამუშაოს
@@ -188,10 +208,6 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     { label: 'სამუშაო დასრულდა', done: effectiveStatus === 'completed' },
   ];
 
-  const handleEdit = () => {
-    // TODO: სამუშაოს რედაქტირების ეკრანი ჯერ არ არსებობს
-    setMenuOpen(false);
-  };
   const handleOpenChat = (provider: Provider) => {
     navigation.navigate('ChatConversation', {
       chatId: provider.id,
@@ -274,8 +290,14 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const openRating = () => {
     navigation.navigate('RatingScreen', {
       jobId: job.id,
-      providerName: selectedProvider?.name ?? 'გიორგი ბერიძე',
-      providerInitials: selectedProvider?.initials ?? 'გბ',
+      // `job.provider` (real, denormalized on job_posts) as the fallback —
+      // never a hardcoded mock name — for the narrow edge case where
+      // `selectedProvider` genuinely couldn't be resolved (e.g. the
+      // interestedList fetch failed); by this point in the flow the job
+      // always has a real assigned provider, so this is only a defensive
+      // floor, not the expected path.
+      providerName: selectedProvider?.name ?? job.provider ?? 'ოსტატი',
+      providerInitials: selectedProvider?.initials ?? (job.provider ? job.provider.charAt(0).toUpperCase() : 'O'),
       providerColor: selectedProvider?.color ?? colors.primary,
       onRate: async (data) => {
         const uid = authService.getCurrentUser()?.uid;
@@ -628,12 +650,6 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       )}
 
       <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)}>
-        {effectiveStatus === 'pending' && (
-          <Pressable style={styles.menuRow} onPress={handleEdit}>
-            <Pencil size={15} color={colors.mutedForeground} />
-            <Text style={styles.menuRowText}>სამუშაოს რედაქტირება</Text>
-          </Pressable>
-        )}
         <Pressable
           style={styles.menuRow}
           onPress={() => {

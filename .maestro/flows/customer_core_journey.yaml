@@ -1,0 +1,144 @@
+appId: com.ostati.app
+---
+# Customer core journey — register → post a job → verify it's listed →
+# edit profile → logout. Runs against the real dev Supabase project (no
+# mock backend exists) — every run creates a brand-new Customer account
+# with a timestamp-unique email, so it never collides with a previous run
+# and never needs seeded fixture data.
+#
+# No `clearState` on launchApp: this is an Expo dev-client build, and
+# clearState would also wipe the dev-client's own "which Metro server to
+# connect to" preference, dropping back to the connect-to-server screen
+# instead of the app. Login state is handled explicitly below instead.
+#
+# Text selectors are written as ".*text.*" (regex "contains") rather than
+# the bare-string exact-match shorthand — confirmed empirically that some
+# elements here (e.g. the bottom tab bar's own label, likely composited
+# into a larger accessibility label by @react-navigation/bottom-tabs) fail
+# an exact-match lookup even though the same text is plainly on screen.
+# Partial matching is a strictly safer default for this app.
+
+- launchApp
+# Expo dev-client: `launchApp` restarts the process from scratch, which
+# always re-fetches the JS bundle from Metro over LAN ("Loading from
+# 192.168.x.x:8081...") before any app screen renders — a plain
+# `launchApp` is not enough on its own. Wait for that banner to clear
+# rather than a fixed sleep, so this doesn't get flaky if the LAN/Metro
+# is briefly slower on a given run.
+- extendedWaitUntil:
+    notVisible: "Loading from"
+    timeout: 20000
+# The "Loading from ..." banner only covers the JS *bundle download* —
+# this app's own RootNavigator then gates its first real render behind an
+# async Supabase session-restore ("booting" state, so an already-logged-in
+# user never flashes the Welcome screen first) before ANYTHING besides the
+# OS status bar and the dev-client's floating debug button is on screen.
+# Wait for either possible landing screen (regex alternation) so the
+# optional taps below aren't racing that gap and silently no-op'ing.
+- extendedWaitUntil:
+    visible: ".*(პროფილი|დაწყება).*"
+    timeout: 25000
+
+# If a previous run (or a manual session) left an active login, log out
+# first so this flow always starts from a clean, logged-out Welcome screen.
+# Independently-optional taps: on an already-logged-out Welcome screen none
+# of them find anything and all three no-op harmlessly.
+- tapOn:
+    text: ".*პროფილი.*"
+    optional: true
+- tapOn:
+    text: ".*გასვლა.*"
+    optional: true
+- tapOn:
+    id: "logout-confirm-button"
+    optional: true
+
+# --- Register a brand-new Customer account ---------------------------------
+- evalScript: ${output.email = 'e2e.customer.' + Date.now() + '@example.com'}
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*მომხმარებელი.*"
+
+- tapOn:
+    id: "register-first-name"
+- inputText: "TestUser"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.email}"
+- tapOn: ".*ჭავჭავაძის.*"
+- inputText: "Test address 1"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+# The confirm-password field sits below the keyboard's fold at this point
+# (confirmed via a failed run) — hide it first so the field is reachable.
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+
+# Google Password Manager sometimes offers to save the new credentials —
+# not part of the app, dismiss it if it shows up.
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+# --- CustomerSetup (no photo — nothing required, just finish) --------------
+- assertVisible: ".*პროფილის დასრულება.*"
+# Anchored exact match here on purpose — ".*დასრულება.*" also matches the
+# screen's own "პროფილის დასრულება" header text (confirmed via a failed
+# run: the tap landed on the non-interactive header, not the button, and
+# the flow silently never left this screen).
+- tapOn: "^დასრულება$"
+
+# --- Home --------------------------------------------------------------
+- assertVisible: ".*სერვისები.*"
+
+# --- Post a job ----------------------------------------------------------
+- tapOn: ".*განცხადებები.*"
+- tapOn:
+    id: "post-job-fab"
+- assertVisible: ".*მოთხოვნის გამოქვეყნება.*"
+- tapOn: ".*აირჩიე კატეგორია.*"
+- tapOn: ".*სანტექნიკა.*"
+- tapOn:
+    id: "post-job-description"
+- inputText: "Maestro E2E ტესტის მოთხოვნაა — გაჟონვის შეკეთება სამზარეულოში."
+- hideKeyboard
+# Same header-vs-button ambiguity as CustomerSetup above — this screen's
+# own title is "მოთხოვნის გამოქვეყნება", a superstring of the button.
+- tapOn: "^გამოქვეყნება$"
+- assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
+- tapOn: ".*მთავარზე დაბრუნება.*"
+
+# --- Verify it shows up in "ჩემი განცხადებები" ------------------------------
+- tapOn: ".*განცხადებები.*"
+- assertVisible: ".*სანტექნიკა.*"
+
+# --- Edit profile ----------------------------------------------------------
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*პროფილის რედაქტირება.*"
+- tapOn:
+    id: "customer-edit-last-name"
+- eraseText
+- inputText: "Edited"
+- hideKeyboard
+- tapOn: ".*ცვლილებების შენახვა.*"
+- assertVisible: ".*TestUser Edited.*"
+
+# --- Logout ------------------------------------------------------------
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"

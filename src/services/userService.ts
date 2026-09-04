@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { specialtyIdToCategoryId } from '../data/specialties';
 import type { CustomerProfile, UserRecord } from '../types/user';
 import type { Provider, ProviderProfile, VerificationStatus } from '../types/provider';
 
@@ -55,6 +56,11 @@ type ProviderProfileRow = {
   // (owner-ს არასდროს არ შეუძლია საკუთარი თავი გაავერიფიციროს), ამიტომ
   // ეს მნიშვნელობა ყოველთვის სანდოა, საიდანაც არ უნდა წამოვიდეს.
   verification_status: VerificationStatus;
+  // #75 — Provider Home-ის toggle-ით რეალურად ინახება, `select('*')`-ით
+  // ისედაც ყოველთვის მოდიოდა, უბრალოდ ეს ტიპი მას აქამდე არ ასახავდა და
+  // fromProviderProfileRowToPublicProvider ამის ნაცვლად `online: false`-ს
+  // წერდა უპირობოდ (Profile-fix pass, task 3 — root cause #2).
+  is_available: boolean;
 };
 
 // Second hardening pass, item 8 (supabase/migrations/0051) —
@@ -119,10 +125,25 @@ function fromProviderProfileRowToPublicProvider(row: ProviderProfileRow, stats?:
   const name = `${firstName} ${lastName}`.trim();
   const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   const sqmValues = Object.values(row.sqm_prices);
+  // Profile-fix pass, task 3/4 — root cause #1: `row.specialty[0].id` is a
+  // SPECIALTIES id (e.g. 'plumber', src/data/specialties.ts), but every
+  // consumer of `Provider.category` (SPECIALTY_LABEL lookups for display,
+  // CustomerHomeScreen's category-chip filtering, CustomerCategoryScreen's
+  // `p.category === route.params.id`, CategoryIcon) expects a CATEGORIES
+  // id (e.g. 'plumbing', src/data/categories.ts). Writing the raw
+  // specialty id here — with no alias applied — meant `SPECIALTY_LABEL[
+  // p.category]` failed to resolve for exactly the 4 specialties whose id
+  // differs from its category (plumber/electrician/painter/drywall), and
+  // every display fell back to the raw internal id itself ("plumber"
+  // instead of "სანტექნიკოსი"). Category-based filtering silently failed
+  // the same way. specialtyIdToCategoryId() is the SAME alias
+  // CategoryIcon.tsx already used for icon lookup — now the single source
+  // for this too, so `category` itself is always in the right id-space.
+  const specialtyId = row.specialty[0]?.id ?? '';
   return {
     id: row.id,
     name,
-    category: row.specialty[0]?.id ?? '',
+    category: specialtyIdToCategoryId(specialtyId) ?? specialtyId,
     years: row.experience ? (EXPERIENCE_YEARS[row.experience] ?? 0) : 0,
     rating: stats?.avg_rating ?? 0,
     reviews: stats?.review_count ?? 0,
@@ -132,7 +153,11 @@ function fromProviderProfileRowToPublicProvider(row: ProviderProfileRow, stats?:
     jobs: stats?.completed_jobs ?? 0,
     verified: row.verification_status === 'verified',
     verificationStatus: row.verification_status,
-    online: false,
+    // Profile-fix pass, task 3 — root cause #2: this was hardcoded `false`
+    // regardless of the Provider's actual, real `provider_profiles.
+    // is_available` value (#75) — every public-facing Provider always
+    // showed as "დაკავებული" (busy), even a genuinely available one.
+    online: row.is_available,
     initials,
     color: '#2563EB',
     bio: row.about,
@@ -159,11 +184,19 @@ const DEFAULT_PROVIDER_PROFILE: ProviderProfile = {
   areas: ['ვაკე', 'საბურთალო', 'ვერა'],
   experience: '10plus',
   about: 'ვარ სანტექნიკოსი 15 წლიანი გამოცდილებით. ვასრულებ ყველა სახის სანტექნიკის სამუშაოს სწრაფად და ხარისხიანად.',
-  certificates: [{ id: 1, bg: '#DBEAFE' }],
+  // Profile-fix pass, task 2 — these ids were previously 1 (certificates)
+  // and 1/2/3 (portfolio), overlapping across the two arrays. Not the
+  // actual visual bug (React scopes list-reconciliation keys per parent,
+  // not globally, so this specific overlap could not by itself hide
+  // portfolio from certificates), but a genuine data-hygiene defect —
+  // `MediaItem.id` should never collide anywhere in this model. Given
+  // distinct ranges here, and `nextMediaItem()` (MediaUploadGrid.tsx) now
+  // guarantees every id it generates afterward is globally unique too.
+  certificates: [{ id: 101, bg: '#DBEAFE' }],
   portfolio: [
-    { id: 1, bg: '#D1FAE5' },
-    { id: 2, bg: '#FEF3C7' },
-    { id: 3, bg: '#FCE7F3' },
+    { id: 201, bg: '#D1FAE5' },
+    { id: 202, bg: '#FEF3C7' },
+    { id: 203, bg: '#FCE7F3' },
   ],
   sqmPrices: {},
   verificationStatus: 'unverified',
@@ -292,8 +325,21 @@ export const userService: UserService = {
     return fromProviderProfileRow(data as ProviderProfileRow, verificationRequest);
   },
   async upsertProviderProfileRecord(uid, record) {
-    const { error } = await supabase.from('provider_profiles').upsert({
-      id: uid,
+    // Audit fix (found via Maestro E2E testing) — `.upsert()` compiles to
+    // `INSERT ... ON CONFLICT (id) DO UPDATE`, and confirmed via a direct
+    // REST test against the live project: Postgres rejects that specific
+    // form with "permission denied for table provider_profiles" under the
+    // column-scoped UPDATE grant this table has (0026) — even though a
+    // plain `.update()` on the exact same row/columns succeeds immediately
+    // before/after. `ON CONFLICT DO UPDATE`'s conflict-resolution path
+    // apparently needs broader-than-column UPDATE privilege that a plain
+    // UPDATE statement does not, so upsert can never work here without
+    // reopening the table-level grant `verification_status` is
+    // deliberately locked behind. Try UPDATE first (matches the far more
+    // common "editing an existing profile" case); INSERT only if it
+    // touched zero rows (first-time ProviderSetupScreen save) — both are
+    // plain statements, confirmed to respect the column-scoped grant.
+    const payload = {
       first_name: record.firstName,
       last_name: record.lastName,
       specialty: record.specialty,
@@ -304,8 +350,17 @@ export const userService: UserService = {
       certificates: record.certificates,
       portfolio: record.portfolio,
       sqm_prices: record.sqmPrices,
-    });
-    if (error) throw error;
+    };
+    const { data: updated, error: updateError } = await supabase
+      .from('provider_profiles')
+      .update(payload)
+      .eq('id', uid)
+      .select('id');
+    if (updateError) throw updateError;
+    if (!updated || updated.length === 0) {
+      const { error: insertError } = await supabase.from('provider_profiles').insert({ id: uid, ...payload });
+      if (insertError) throw insertError;
+    }
   },
   async listRealProviders() {
     // Security audit — `provider_stats` VIEW ჩანაცვლდა `get_provider_stats()`

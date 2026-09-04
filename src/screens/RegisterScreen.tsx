@@ -145,7 +145,15 @@ export function RegisterScreen({ navigation, route }: Props) {
               <ArrowLeft size={18} color={colors.foreground} />
             </Pressable>
             <ProgressBar step={0} total={role === 'provider' ? 3 : 2} />
-            <View style={styles.backButton} />
+            {/* Nav-fix pass, task 6 — this used to reuse `styles.backButton`
+                (same visible circular muted-gray shape as the real button
+                on the left) purely to balance the ProgressBar's centering,
+                even though it had no icon and no onPress — a dead
+                icon-looking shape with no action. Still needed for layout
+                balance (`header` is `justifyContent: 'space-between'`), so
+                kept as a same-sized spacer, just invisible instead of
+                styled to look like a button. */}
+            <View style={styles.headerSpacer} />
           </View>
 
           <Text style={styles.title}>ანგარიშის შექმნა</Text>
@@ -161,6 +169,7 @@ export function RegisterScreen({ navigation, route }: Props) {
             <View style={styles.nameRow}>
               <View style={{ flex: 1 }}>
                 <TextField
+                  testID="register-first-name"
                   label="სახელი"
                   value={firstName}
                   onChangeText={setFirstName}
@@ -171,6 +180,7 @@ export function RegisterScreen({ navigation, route }: Props) {
               </View>
               <View style={{ flex: 1 }}>
                 <TextField
+                  testID="register-last-name"
                   label="გვარი"
                   value={lastName}
                   onChangeText={setLastName}
@@ -181,6 +191,7 @@ export function RegisterScreen({ navigation, route }: Props) {
               </View>
             </View>
             <TextField
+              testID="register-email"
               label="ელ. ფოსტა"
               value={email}
               onChangeText={setEmail}
@@ -202,6 +213,7 @@ export function RegisterScreen({ navigation, route }: Props) {
               />
             )}
             <TextField
+              testID="register-password"
               label="პაროლი"
               value={pass}
               onChangeText={setPass}
@@ -213,6 +225,7 @@ export function RegisterScreen({ navigation, route }: Props) {
               autoCapitalize="none"
             />
             <TextField
+              testID="register-confirm-password"
               label="გაიმეორე პაროლი"
               value={confirm}
               onChangeText={setConfirm}
@@ -225,6 +238,7 @@ export function RegisterScreen({ navigation, route }: Props) {
 
             <View style={styles.termsRow}>
               <Pressable
+                testID="register-terms-checkbox"
                 style={[styles.checkbox, agreed && styles.checkboxChecked]}
                 onPress={() => setAgreed((a) => !a)}
               >
@@ -288,6 +302,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.muted,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Task 6 — invisible layout-balance spacer (same width as backButton,
+  // no visible shape) — matches GoogleCompleteScreen.tsx/CustomerSetupScreen.tsx/
+  // ProviderSetupScreen.tsx's existing headerSpacer pattern.
+  headerSpacer: {
+    width: 36,
   },
   title: {
     ...typography.h1,

@@ -59,6 +59,28 @@ const MAX_PHOTOS = 3;
 const DESCRIPTION_MAX = 500;
 const DESCRIPTION_MIN = 20;
 
+// Audit fix — `create_job`/`update_job_draft`/`set_job_photos`/
+// `finalize_job_publish` (supabase/migrations/0050/0059/0062/0063) all
+// raise specific, actionable Postgres exceptions, but the catch block
+// used to discard them entirely and always show the exact same generic
+// banner. Maps the known, permanent ones (retrying with the same input
+// would just fail again) to clear Georgian text; anything else (a
+// transient network/RPC failure) falls back to the original generic
+// message, same as before.
+function getPublishErrorMessage(err: unknown): string {
+  const message = (err as { message?: string } | null)?.message ?? '';
+  if (message.includes('category is no longer available')) {
+    return 'არჩეული კატეგორია აღარ არის ხელმისაწვდომი — აირჩიე სხვა კატეგორია და სცადე თავიდან.';
+  }
+  if (message.includes('Description must be')) {
+    return 'აღწერა უნდა იყოს 20–500 სიმბოლოს ფარგლებში — შეასწორე და სცადე თავიდან.';
+  }
+  if (message.includes('exact address is required')) {
+    return 'მისამართი სავალდებულოა — შეავსე ველი და სცადე თავიდან.';
+  }
+  return 'მოთხოვნის გამოქვეყნება ვერ მოხერხდა';
+}
+
 // C2 — Post a Job ფორმა (product-spec.md; დიზაინის რეფერენსის PostJob-ის
 // მიხედვით, ფოტოს ლიმიტის override-ით 5-დან 3-მდე)
 export function PostJobScreen({ navigation }: Props) {
@@ -82,7 +104,12 @@ export function PostJobScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [published, setPublished] = useState(false);
   const [submitTouched, setSubmitTouched] = useState(false);
-  const [publishError, setPublishError] = useState(false);
+  // Audit fix — was `boolean`: the banner always showed the exact same
+  // generic text no matter what actually failed (network drop vs. a
+  // permanent server-side validation rejection, e.g. the chosen category
+  // was deactivated mid-flow) — retrying a permanent failure with the
+  // same input just fails again, with no indication of what to change.
+  const [publishError, setPublishError] = useState('');
   const [createdJob, setCreatedJob] = useState<CustomerJob | null>(null);
   // Third hardening pass, priority 2 — the created draft job, kept across
   // a failed retry. create_job() now creates a status='draft' row (never
@@ -139,7 +166,7 @@ export function PostJobScreen({ navigation }: Props) {
   const handlePublish = async () => {
     setSubmitTouched(true);
     if (!canSubmit || loading) return;
-    setPublishError(false);
+    setPublishError('');
     setLoading(true);
     const uid = authService.getCurrentUser()?.uid;
     try {
@@ -226,8 +253,8 @@ export function PostJobScreen({ navigation }: Props) {
       const publishedJob = await jobService.finalizeJobPublish(job.id);
       setCreatedJob(publishedJob);
       setPublished(true);
-    } catch {
-      setPublishError(true);
+    } catch (err) {
+      setPublishError(getPublishErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -295,7 +322,13 @@ export function PostJobScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <BackHeader title="მოთხოვნის გამოქვეყნება" onBack={() => navigation.goBack()} />
+      {/* Audit fix — publish (create/update draft → upload photos →
+          finalize) is a multi-step async chain with no cancellation; navigating
+          away mid-flight let the chain keep running against an unmounted
+          screen and could leave a job published with the user never
+          seeing the success screen. Back is inert (not hidden — a full
+          hide/show flicker for a few seconds would be worse) while `loading`. */}
+      <BackHeader title="მოთხოვნის გამოქვეყნება" onBack={() => !loading && navigation.goBack()} />
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled">
         <View style={styles.field}>
@@ -320,6 +353,7 @@ export function PostJobScreen({ navigation }: Props) {
         <View style={styles.field}>
           <FieldLabel text="სამუშაოს აღწერა" required />
           <TextInput
+            testID="post-job-description"
             value={description}
             onChangeText={(v) => setDescription(v.slice(0, DESCRIPTION_MAX))}
             placeholder="დეტალურად აღწერე რა პრობლემაა და რა სამუშაოს შესრულება გჭირდება..."
@@ -415,7 +449,7 @@ export function PostJobScreen({ navigation }: Props) {
 
       <View style={styles.footer}>
         {publishError && (
-          <InlineBanner type="error" msg="მოთხოვნის გამოქვეყნება ვერ მოხერხდა" action="თავიდან ცდა" onAction={handlePublish} />
+          <InlineBanner type="error" msg={publishError} action="თავიდან ცდა" onAction={handlePublish} />
         )}
         <Button
           label={canSubmit ? 'გამოქვეყნება' : 'შეავსე სავალდებულო ველები'}

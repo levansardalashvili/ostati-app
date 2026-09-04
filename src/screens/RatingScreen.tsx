@@ -141,7 +141,7 @@ export function RatingScreen({ navigation, route }: Props) {
           <Text style={styles.cardTitleCenter}>შეაფასე სამუშაო</Text>
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((s) => (
-              <Pressable key={s} onPress={() => setStars(s)} hitSlop={4}>
+              <Pressable key={s} testID={`rating-star-${s}`} onPress={() => setStars(s)} hitSlop={4}>
                 <Star size={38} color="#FBBF24" fill={stars >= s ? '#FBBF24' : 'transparent'} />
               </Pressable>
             ))}

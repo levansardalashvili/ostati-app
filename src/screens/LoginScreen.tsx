@@ -128,6 +128,7 @@ export function LoginScreen({ navigation }: Props) {
 
           <View style={styles.fields}>
             <TextField
+              testID="login-email"
               label="ელ. ფოსტა"
               value={email}
               onChangeText={(v) => {
@@ -143,6 +144,7 @@ export function LoginScreen({ navigation }: Props) {
             />
             <View>
               <TextField
+                testID="login-password"
                 label="პაროლი"
                 value={pass}
                 onChangeText={setPass}
@@ -163,6 +165,7 @@ export function LoginScreen({ navigation }: Props) {
 
           <View style={styles.actions}>
             <Button
+              testID="login-submit-button"
               label="შესვლა"
               loadingLabel="შესვლა..."
               onPress={handleLogin}
