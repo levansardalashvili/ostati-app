@@ -1,0 +1,170 @@
+appId: com.ostati.app
+---
+# Favorite Providers (❤️) — Customer finds a real Provider via Home's
+# search, favorites them from their public profile, verifies they appear
+# in "შენახული ოსტატები" (SavedProvidersScreen), then unfavorites from
+# that screen's own heart button (a different `toggleFavorite` call site
+# than the profile screen's) and verifies the empty state.
+
+- launchApp
+- extendedWaitUntil:
+    notVisible: "Loading from"
+    timeout: 20000
+# Optional dev-client "developer menu" onboarding tip — shown once per
+# fresh PROCESS START (an in-memory flag, not persisted — `launchApp`
+# restarts the process each time, so this reappears on every single run,
+# not just after `pm clear`/reinstall). It does NOT auto-dismiss; it must
+# be tapped, or it sits there blocking everything underneath forever.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 6000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+# Maestro's accessibility-injected tap on "Continue" consistently lands
+# on the dev-client's floating gear bubble instead (confirmed reproducible
+# even on a factory-wiped emulator + fresh install — a raw `adb shell
+# input tap` at the same coordinates never has this problem, only
+# Maestro's own gesture-dispatch tap does), opening the Tools menu instead
+# of dismissing the tip. Detect and back out of it if it happened.
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: ".*(პროფილი|დაწყება).*"
+    timeout: 25000
+
+- tapOn:
+    text: ".*პროფილი.*"
+    optional: true
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: ".*გასვლა.*"
+    optional: true
+- tapOn:
+    id: "logout-confirm-button"
+    optional: true
+
+# --- Phase 1: Provider registers (just needs a real provider_profiles row)
+- evalScript: ${output.providerEmail = 'e2e.fav.provider.' + Date.now() + '@example.com'}
+- evalScript: ${output.customerEmail = 'e2e.fav.customer.' + Date.now() + '@example.com'}
+- evalScript: ${output.providerFirstName = 'FavProviderE2E' + Date.now()}
+
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*ოსტატი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "${output.providerFirstName}"
+- tapOn:
+    id: "register-last-name"
+- inputText: "Test"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.providerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- tapOn: ".*აირჩიე სპეციალობა.*"
+- tapOn: ".*სანტექნიკოსი.*"
+- tapOn: "^არჩევა$"
+- tapOn: ".*აირჩიე არეალი.*"
+- assertVisible: ".*სამუშაო არეალი.*"
+- tapOn: ".*ყველას მონიშვნა.*"
+- tapOn: "^შენახვა$"
+- tapOn: "^პროფილის შექმნა$"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 2: Customer registers, finds the provider, favorites them ---
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*მომხმარებელი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "FavCustomer"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.customerEmail}"
+- tapOn: ".*ჭავჭავაძის.*"
+- inputText: "Test address 1"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*პროფილის დასრულება.*"
+- tapOn: "^დასრულება$"
+- assertVisible: ".*სერვისები.*"
+
+- tapOn: ".*მოძებნე ოსტატი.*"
+- inputText: "${output.providerFirstName}"
+- hideKeyboard
+# Match the full "FirstName Test" name text on the card, not just the
+# first name alone — a plain `.*firstName.*` would also match the search
+# input's own current value (it reports its text in the a11y tree too).
+- tapOn:
+    text: ".*${output.providerFirstName} Test.*"
+- assertVisible: ".*ოსტატის პროფილი.*"
+- tapOn:
+    id: "favorite-toggle"
+
+- back
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*შენახული ოსტატები.*"
+- assertVisible: ".*${output.providerFirstName}.*"
+- tapOn:
+    id: "unfavorite-toggle"
+- assertVisible: ".*შენახული ოსტატები არ გაქვს.*"
+
+- back
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"

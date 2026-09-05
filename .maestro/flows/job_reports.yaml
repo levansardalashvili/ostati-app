@@ -1,13 +1,11 @@
 appId: com.ostati.app
 ---
-# Cross-role job lifecycle — Customer posts a job, a Provider expresses
-# interest, Customer selects that Provider, both exchange a chat message,
-# Provider marks the work done, Customer confirms + rates.
-#
-# Single continuous flow (not split into two files) because `output.*`
-# variables (customer/provider emails, the unique job marker) only persist
-# within one Maestro flow-file execution — the two accounts must be
-# switched between (login/logout) several times within this one run.
+# Job Reports (#81/#84) — the general moderation "პრობლემის შეტყობინება"
+# sheet, shared between Customer's and Provider's Job Detail "..." menus.
+# Deliberately separate from the completion-dispute flow ("პრობლემა
+# მაქვს") — this one never touches job status, just writes to
+# `job_reports` via `create_job_report()`. Covers both role entry points
+# and both the fixed-reason and "other + required free text" paths.
 
 - launchApp
 - extendedWaitUntil:
@@ -54,16 +52,16 @@ appId: com.ostati.app
     id: "logout-confirm-button"
     optional: true
 
-# --- Phase 1: Customer registers and posts a job -----------------------
-- evalScript: ${output.customerEmail = 'e2e.cross.customer.' + Date.now() + '@example.com'}
-- evalScript: ${output.providerEmail = 'e2e.cross.provider.' + Date.now() + '@example.com'}
-- evalScript: ${output.jobMarker = 'CrossRoleE2E' + Date.now()}
+# --- Phase 1: Customer registers, posts a job -------------------------
+- evalScript: ${output.customerEmail = 'e2e.report.customer.' + Date.now() + '@example.com'}
+- evalScript: ${output.providerEmail = 'e2e.report.provider.' + Date.now() + '@example.com'}
+- evalScript: ${output.jobMarker = 'ReportJobE2E' + Date.now()}
 
 - tapOn: ".*დაწყება.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
-- inputText: "CrossCustomer"
+- inputText: "ReportCustomer"
 - tapOn:
     id: "register-last-name"
 - inputText: "E2E"
@@ -96,18 +94,23 @@ appId: com.ostati.app
 - assertVisible: ".*სერვისები.*"
 
 - tapOn: ".*განცხადებები.*"
+# `tapOn: id: "post-job-fab"` resolves to this button's CENTER, which sits
+# almost fully under the dev-client's persistent floating gear bubble —
+# confirmed deterministic, retrying the same center-tap never helps.
+# Tapping the fab's top edge (just above the bubble's bounds) reliably
+# lands on the real button instead.
 - tapOn:
     point: "91%, 7%"
-- assertVisible: ".*მოთხოვნის გამოქვეყნება.*"
 - tapOn: ".*აირჩიე კატეგორია.*"
 - tapOn: ".*სანტექნიკა.*"
 - tapOn:
     id: "post-job-description"
-- inputText: "${output.jobMarker} - kitchen faucet leak needs urgent repair, please help fix this soon"
+- inputText: "${output.jobMarker} - bathroom faucet leaking, needs a plumber this week"
 - hideKeyboard
 - tapOn: "^გამოქვეყნება$"
 - assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
 - tapOn: ".*მთავარზე დაბრუნება.*"
+- assertVisible: ".*სერვისები.*"
 
 - tapOn: ".*პროფილი.*"
 - tapOn: ".*გასვლა.*"
@@ -115,12 +118,12 @@ appId: com.ostati.app
     id: "logout-confirm-button"
 - assertVisible: ".*დაწყება.*"
 
-# --- Phase 2: Provider registers, sets up, expresses interest ----------
+# --- Phase 2: Provider registers, expresses interest -------------------
 - tapOn: ".*დაწყება.*"
 - tapOn: ".*ოსტატი.*"
 - tapOn:
     id: "register-first-name"
-- inputText: "CrossProvider"
+- inputText: "ReportProvider"
 - tapOn:
     id: "register-last-name"
 - inputText: "E2E"
@@ -156,12 +159,15 @@ appId: com.ostati.app
 - tapOn: "^შენახვა$"
 - tapOn: "^პროფილის შექმნა$"
 - assertVisible: ".*ახალი მოთხოვნები.*"
+- extendedWaitUntil:
+    visible: ".*${output.jobMarker}.*"
+    timeout: 15000
 
 - tapOn:
     text: ".*დაინტ. ვარ.*"
     below: ".*${output.jobMarker}.*"
 - tapOn: ".*ჩაწერეთ თანხა.*"
-- inputText: "150"
+- inputText: "100"
 - hideKeyboard
 - tapOn:
     id: "offer-price-submit"
@@ -176,7 +182,7 @@ appId: com.ostati.app
     id: "logout-confirm-button"
 - assertVisible: ".*დაწყება.*"
 
-# --- Phase 3: Customer logs back in, selects the Provider, sends a chat message
+# --- Phase 3: Customer logs back in, selects the Provider (job active) -
 - tapOn: ".*შესვლა.*"
 - tapOn:
     id: "login-email"
@@ -191,6 +197,9 @@ appId: com.ostati.app
 - assertVisible: ".*სერვისები.*"
 
 - tapOn: ".*განცხადებები.*"
+- extendedWaitUntil:
+    visible: ".*${output.jobMarker}.*"
+    timeout: 15000
 - tapOn:
     text: ".*${output.jobMarker}.*"
 - assertVisible: ".*დაინტერესებული.*"
@@ -198,23 +207,18 @@ appId: com.ostati.app
 - assertVisible: ".*ოსტატის არჩევა.*"
 - tapOn: "^დადასტურება$"
 
-- tapOn: ".*მიწერა.*"
+# --- Phase 4: Customer submits a moderation report on this job ---------
+# Same fab/bubble collision as "post-job-fab" — this icon-only "..."
+# button sits in the same top-right corner. Tap its top edge instead.
 - tapOn:
-    id: "chat-message-input"
-- inputText: "გამარჯობა, როდის შეგიძლიათ მოსვლა?"
-# Dismiss the keyboard by tapping a blank coordinate (NOT `hideKeyboard`,
-# which on Android falls back to a raw back-press when the keyboard has
-# already auto-closed by this point — that back-press then escapes the
-# screen entirely instead of just closing a keyboard that isn't there,
-# eating one of the screen-navigation `back`s below). A coordinate tap
-# on blank message-list background only blurs the input, never navigates.
-- tapOn:
-    point: "50%, 25%"
-- tapOn:
-    id: "chat-send-button"
-- assertVisible: ".*გამარჯობა, როდის შეგიძლიათ მოსვლა.*"
+    point: "92%, 7%"
+- tapOn: ".*პრობლემის შეტყობინება.*"
+- assertVisible: ".*ეს რეპორტი მოდერაციას გადაეცემა.*"
+- tapOn: ".*ოსტატი არ გამოცხადდა.*"
+- tapOn: "^რეპორტის გაგზავნა$"
+- assertVisible: ".*რეპორტი მიღებულია.*"
+- tapOn: "^დახურვა$"
 
-- back
 - back
 - tapOn: ".*პროფილი.*"
 - tapOn: ".*გასვლა.*"
@@ -222,7 +226,7 @@ appId: com.ostati.app
     id: "logout-confirm-button"
 - assertVisible: ".*დაწყება.*"
 
-# --- Phase 4: Provider logs back in, replies, marks work done ----------
+# --- Phase 5: Provider logs back in, submits its own report ("other") --
 - tapOn: ".*შესვლა.*"
 - tapOn:
     id: "login-email"
@@ -238,66 +242,30 @@ appId: com.ostati.app
 
 - tapOn: ".*სამუშაოები.*"
 - tapOn: "^დადასტურებული$"
-- tapOn: ".*CrossCustomer.*"
+- extendedWaitUntil:
+    visible: ".*ReportCustomer.*"
+    timeout: 15000
+- tapOn: ".*ReportCustomer.*"
 
-- tapOn: ".*ჩატი.*"
-- assertVisible: ".*გამარჯობა, როდის შეგიძლიათ მოსვლა.*"
+# Same fab/bubble collision as "post-job-fab" — this icon-only "..."
+# button sits in the same top-right corner. Tap its top edge instead.
 - tapOn:
-    id: "chat-message-input"
-- inputText: "დიახ, ხვალ დილით შემიძლია."
-- tapOn:
-    point: "50%, 25%"
-- tapOn:
-    id: "chat-send-button"
-- assertVisible: ".*დიახ, ხვალ დილით შემიძლია.*"
-- back
-
-- tapOn: "^სამუშაო დავასრულე$"
-- assertVisible: ".*ელოდება მომხმარებლის დადასტურებას.*"
+    point: "92%, 7%"
+- tapOn: ".*პრობლემის შეტყობინება.*"
+- assertVisible: ".*ეს რეპორტი მოდერაციას გადაეცემა.*"
+- tapOn: "^სხვა$"
+- tapOn: ".*დაწერე დეტალები.*"
+- inputText: "E2E test report details"
+- hideKeyboard
+- tapOn: "^რეპორტის გაგზავნა$"
+- assertVisible: ".*რეპორტი მიღებულია.*"
+- tapOn: "^დახურვა$"
 
 - back
 - tapOn: ".*პროფილი.*"
 - scrollUntilVisible:
     element: ".*გასვლა.*"
     direction: DOWN
-- tapOn: ".*გასვლა.*"
-- tapOn:
-    id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
-
-# --- Phase 5: Customer logs back in, confirms completion, rates --------
-- tapOn: ".*შესვლა.*"
-- tapOn:
-    id: "login-email"
-- inputText: "${output.customerEmail}"
-- hideKeyboard
-- tapOn:
-    id: "login-password"
-- inputText: "TestPass123"
-- hideKeyboard
-- tapOn:
-    id: "login-submit-button"
-- assertVisible: ".*სერვისები.*"
-
-- tapOn: ".*განცხადებები.*"
-- tapOn: "^დადასტურებული$"
-- tapOn:
-    text: ".*${output.jobMarker}.*"
-
-- assertVisible: ".*ოსტატმა სამუშაო დასრულებულად მონიშნა.*"
-- tapOn: "^დადასტურება$"
-- assertVisible: ".*ოსტატის შეფასება.*"
-- tapOn: ".*ოსტატის შეფასება.*"
-
-- assertVisible: ".*შეაფასე.*"
-- tapOn:
-    id: "rating-star-5"
-- tapOn: ".*შეფასების გაგზავნა.*"
-- assertVisible: ".*მადლობა შეფასებისთვის.*"
-- tapOn: ".*მთავარზე დაბრუნება.*"
-
-- assertVisible: ".*სერვისები.*"
-- tapOn: ".*პროფილი.*"
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"

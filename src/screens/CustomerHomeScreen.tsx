@@ -217,7 +217,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
               {profile.firstName} {profile.lastName.charAt(0)}. 👋
             </Text>
           </View>
-          <Pressable style={styles.bellButton} onPress={handleNotifications}>
+          <Pressable testID="notification-bell" style={styles.bellButton} onPress={handleNotifications}>
             <Bell size={19} color={colors.foreground} strokeWidth={1.8} />
             {unreadNotifCount > 0 && <View style={styles.bellDot} />}
           </Pressable>

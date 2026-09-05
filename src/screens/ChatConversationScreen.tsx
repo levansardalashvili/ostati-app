@@ -486,7 +486,7 @@ if (
             no home-indicator/gesture-bar (older phones), where a small
             fixed floor is still wanted for visual breathing room. */}
         <View style={[styles.composer, { paddingBottom: insets.bottom > 0 ? insets.bottom + spacing.xs : spacing.sm + 2 }]}>
-          <Pressable style={styles.attachButton} onPress={() => setAttachSheetOpen(true)}>
+          <Pressable testID="chat-attach-button" style={styles.attachButton} onPress={() => setAttachSheetOpen(true)}>
             <Camera size={17} color={colors.mutedForeground} />
           </Pressable>
           {/* Second hardening pass, item 5 — offer-ს job_id სჭირდება
@@ -500,7 +500,11 @@ if (
               'disputed' variant-ებზეც), ფასის გაგზავნა კი ყოველთვის
               ჩუმად ვარდებოდა. */}
           {role === 'provider' && jobId && jobStatus === 'pending' && (
-            <Pressable style={styles.attachButton} onPress={() => setOfferSheetOpen(true)}>
+            <Pressable
+              testID="chat-offer-open"
+              style={styles.attachButton}
+              onPress={() => setOfferSheetOpen(true)}
+            >
               <Wallet size={17} color={colors.mutedForeground} />
             </Pressable>
           )}

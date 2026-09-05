@@ -28,6 +28,29 @@ appId: com.ostati.app
 - extendedWaitUntil:
     notVisible: "Loading from"
     timeout: 20000
+# Optional dev-client "developer menu" onboarding tip — shown once per
+# fresh PROCESS START (an in-memory flag, not persisted — `launchApp`
+# restarts the process each time, so this reappears on every single run,
+# not just after `pm clear`/reinstall). It does NOT auto-dismiss; it must
+# be tapped, or it sits there blocking everything underneath forever.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 6000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+# Maestro's accessibility-injected tap on "Continue" consistently lands
+# on the dev-client's floating gear bubble instead (confirmed reproducible
+# even on a factory-wiped emulator + fresh install — a raw `adb shell
+# input tap` at the same coordinates never has this problem, only
+# Maestro's own gesture-dispatch tap does), opening the Tools menu instead
+# of dismissing the tip. Detect and back out of it if it happened.
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - back
 # The "Loading from ..." banner only covers the JS *bundle download* —
 # this app's own RootNavigator then gates its first real render behind an
 # async Supabase session-restore ("booting" state, so an already-logged-in
@@ -107,7 +130,7 @@ appId: com.ostati.app
 # --- Post a job ----------------------------------------------------------
 - tapOn: ".*განცხადებები.*"
 - tapOn:
-    id: "post-job-fab"
+    point: "91%, 7%"
 - assertVisible: ".*მოთხოვნის გამოქვეყნება.*"
 - tapOn: ".*აირჩიე კატეგორია.*"
 - tapOn: ".*სანტექნიკა.*"

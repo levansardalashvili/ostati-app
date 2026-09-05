@@ -359,7 +359,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
         onBack={() => navigation.goBack()}
         right={
           jobLoading ? undefined : (
-            <Pressable style={styles.iconButton} onPress={() => setMenuOpen(true)}>
+            <Pressable testID="job-detail-menu-button" style={styles.iconButton} onPress={() => setMenuOpen(true)}>
               <MoreVertical size={18} color={colors.foreground} />
             </Pressable>
           )

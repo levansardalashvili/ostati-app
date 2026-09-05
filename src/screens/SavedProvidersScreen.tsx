@@ -137,7 +137,7 @@ export function SavedProvidersScreen({ navigation }: Props) {
                       </View>
                     </View>
                   </View>
-                  <Pressable style={styles.heartButton} onPress={() => toggleFavorite(p.id)}>
+                  <Pressable testID="unfavorite-toggle" style={styles.heartButton} onPress={() => toggleFavorite(p.id)}>
                     <Heart size={17} color={colors.destructive} fill={colors.destructive} />
                   </Pressable>
                 </Pressable>

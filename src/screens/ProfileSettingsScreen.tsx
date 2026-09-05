@@ -69,6 +69,7 @@ export function ProfileSettingsScreen({ navigation }: Props) {
           <Text style={styles.fieldLabel}>მიმდინარე პაროლი</Text>
           <View style={styles.inputWrap}>
             <TextInput
+              testID="settings-old-password"
               value={oldPw}
               onChangeText={setOldPw}
               placeholder="••••••••"
@@ -85,6 +86,7 @@ export function ProfileSettingsScreen({ navigation }: Props) {
           <Text style={styles.fieldLabel}>ახალი პაროლი</Text>
           <View style={styles.inputWrap}>
             <TextInput
+              testID="settings-new-password"
               value={newPw}
               onChangeText={setNewPw}
               placeholder="••••••••"

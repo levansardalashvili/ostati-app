@@ -119,7 +119,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
         <Text style={styles.headerTitle}>ოსტატის პროფილი</Text>
         <View style={styles.headerActions}>
           {!loading && !isSelfPreview && (
-            <Pressable style={styles.iconButton} onPress={() => toggleFavorite(p.id)}>
+            <Pressable testID="favorite-toggle" style={styles.iconButton} onPress={() => toggleFavorite(p.id)}>
               <Heart size={17} color={favorite ? colors.destructive : colors.mutedForeground} fill={favorite ? colors.destructive : 'transparent'} />
             </Pressable>
           )}

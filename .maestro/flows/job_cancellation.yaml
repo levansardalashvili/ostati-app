@@ -1,13 +1,10 @@
 appId: com.ostati.app
 ---
-# Cross-role job lifecycle — Customer posts a job, a Provider expresses
-# interest, Customer selects that Provider, both exchange a chat message,
-# Provider marks the work done, Customer confirms + rates.
-#
-# Single continuous flow (not split into two files) because `output.*`
-# variables (customer/provider emails, the unique job marker) only persist
-# within one Maestro flow-file execution — the two accounts must be
-# switched between (login/logout) several times within this one run.
+# Job cancellation — covers both RPC paths: (A) Customer cancels a still-
+# 'pending' job directly, no reason required (`cancel_job`); (B) Provider
+# cancels an already-'active' (selected) job with a mandatory fixed reason
+# code (`provider_cancel_job`, supabase/migrations/0036) — a code path
+# that had no E2E coverage at all before this flow.
 
 - launchApp
 - extendedWaitUntil:
@@ -54,16 +51,17 @@ appId: com.ostati.app
     id: "logout-confirm-button"
     optional: true
 
-# --- Phase 1: Customer registers and posts a job -----------------------
-- evalScript: ${output.customerEmail = 'e2e.cross.customer.' + Date.now() + '@example.com'}
-- evalScript: ${output.providerEmail = 'e2e.cross.provider.' + Date.now() + '@example.com'}
-- evalScript: ${output.jobMarker = 'CrossRoleE2E' + Date.now()}
+# --- Phase 1: Customer registers, posts Job A, cancels it (pending) ----
+- evalScript: ${output.customerEmail = 'e2e.cancel.customer.' + Date.now() + '@example.com'}
+- evalScript: ${output.providerEmail = 'e2e.cancel.provider.' + Date.now() + '@example.com'}
+- evalScript: ${output.jobAMarker = 'CancelJobA' + Date.now()}
+- evalScript: ${output.jobBMarker = 'CancelJobB' + Date.now()}
 
 - tapOn: ".*დაწყება.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
-- inputText: "CrossCustomer"
+- inputText: "CancelCustomer"
 - tapOn:
     id: "register-last-name"
 - inputText: "E2E"
@@ -98,16 +96,64 @@ appId: com.ostati.app
 - tapOn: ".*განცხადებები.*"
 - tapOn:
     point: "91%, 7%"
-- assertVisible: ".*მოთხოვნის გამოქვეყნება.*"
 - tapOn: ".*აირჩიე კატეგორია.*"
 - tapOn: ".*სანტექნიკა.*"
 - tapOn:
     id: "post-job-description"
-- inputText: "${output.jobMarker} - kitchen faucet leak needs urgent repair, please help fix this soon"
+- inputText: "${output.jobAMarker} - leaking pipe under the kitchen sink needs a quick fix"
 - hideKeyboard
 - tapOn: "^გამოქვეყნება$"
 - assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
 - tapOn: ".*მთავარზე დაბრუნება.*"
+# "მთავარზე დაბრუნება" does a hard navigation.reset() to Home. Home's own
+# content being visible isn't enough — the tab bar itself can still be
+# mid-transition and not yet responsive to taps (confirmed: a `tapOn` on
+# a tab bar item right after this assertVisible silently landed nowhere,
+# staying on Home, in an earlier run) — `waitForAnimationToEnd` settles
+# the actual transition, not just content visibility.
+- assertVisible: ".*სერვისები.*"
+- waitForAnimationToEnd
+
+- tapOn: ".*განცხადებები.*"
+# This tab refetches on every focus (useFocusEffect) — the skeleton can
+# still be showing when a plain `tapOn` would otherwise time out.
+- extendedWaitUntil:
+    visible: ".*${output.jobAMarker}.*"
+    timeout: 15000
+- tapOn:
+    text: ".*${output.jobAMarker}.*"
+# Same fab/bubble collision as "post-job-fab" — this icon-only "..."
+# button sits in the same top-right corner. Tap its top edge instead.
+- tapOn:
+    point: "92%, 7%"
+- tapOn: "^გაუქმება$"
+- assertVisible: ".*მოთხოვნის გაუქმება.*"
+- tapOn: "^გაუქმება$"
+- assertVisible: ".*გაუქმდა.*"
+
+# --- Phase 2: Customer posts Job B (for the Provider-cancel path) ------
+# Job detail was opened directly from the MyJobsTab (no chat hop in
+# between, unlike other flows), so one `back` already lands on the tab.
+- back
+- tapOn:
+    point: "91%, 7%"
+- tapOn: ".*აირჩიე კატეგორია.*"
+- tapOn: ".*ელექტროობა.*"
+- tapOn:
+    id: "post-job-description"
+- inputText: "${output.jobBMarker} - kitchen light switch not working, needs an electrician"
+- hideKeyboard
+- tapOn: "^გამოქვეყნება$"
+- assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
+- tapOn: ".*მთავარზე დაბრუნება.*"
+# "მთავარზე დაბრუნება" does a hard navigation.reset() to Home. Home's own
+# content being visible isn't enough — the tab bar itself can still be
+# mid-transition and not yet responsive to taps (confirmed: a `tapOn` on
+# a tab bar item right after this assertVisible silently landed nowhere,
+# staying on Home, in an earlier run) — `waitForAnimationToEnd` settles
+# the actual transition, not just content visibility.
+- assertVisible: ".*სერვისები.*"
+- waitForAnimationToEnd
 
 - tapOn: ".*პროფილი.*"
 - tapOn: ".*გასვლა.*"
@@ -115,12 +161,12 @@ appId: com.ostati.app
     id: "logout-confirm-button"
 - assertVisible: ".*დაწყება.*"
 
-# --- Phase 2: Provider registers, sets up, expresses interest ----------
+# --- Phase 3: Provider registers, expresses interest on Job B ----------
 - tapOn: ".*დაწყება.*"
 - tapOn: ".*ოსტატი.*"
 - tapOn:
     id: "register-first-name"
-- inputText: "CrossProvider"
+- inputText: "CancelProvider"
 - tapOn:
     id: "register-last-name"
 - inputText: "E2E"
@@ -148,7 +194,7 @@ appId: com.ostati.app
 
 - assertVisible: ".*შექმენი ოსტატის პროფილი.*"
 - tapOn: ".*აირჩიე სპეციალობა.*"
-- tapOn: ".*სანტექნიკოსი.*"
+- tapOn: ".*ელექტრიკოსი.*"
 - tapOn: "^არჩევა$"
 - tapOn: ".*აირჩიე არეალი.*"
 - assertVisible: ".*სამუშაო არეალი.*"
@@ -156,12 +202,15 @@ appId: com.ostati.app
 - tapOn: "^შენახვა$"
 - tapOn: "^პროფილის შექმნა$"
 - assertVisible: ".*ახალი მოთხოვნები.*"
+- extendedWaitUntil:
+    visible: ".*${output.jobBMarker}.*"
+    timeout: 15000
 
 - tapOn:
     text: ".*დაინტ. ვარ.*"
-    below: ".*${output.jobMarker}.*"
+    below: ".*${output.jobBMarker}.*"
 - tapOn: ".*ჩაწერეთ თანხა.*"
-- inputText: "150"
+- inputText: "120"
 - hideKeyboard
 - tapOn:
     id: "offer-price-submit"
@@ -176,7 +225,7 @@ appId: com.ostati.app
     id: "logout-confirm-button"
 - assertVisible: ".*დაწყება.*"
 
-# --- Phase 3: Customer logs back in, selects the Provider, sends a chat message
+# --- Phase 4: Customer logs back in, selects the Provider for Job B ----
 - tapOn: ".*შესვლა.*"
 - tapOn:
     id: "login-email"
@@ -191,30 +240,16 @@ appId: com.ostati.app
 - assertVisible: ".*სერვისები.*"
 
 - tapOn: ".*განცხადებები.*"
+- extendedWaitUntil:
+    visible: ".*${output.jobBMarker}.*"
+    timeout: 15000
 - tapOn:
-    text: ".*${output.jobMarker}.*"
+    text: ".*${output.jobBMarker}.*"
 - assertVisible: ".*დაინტერესებული.*"
 - tapOn: "^არჩევა$"
 - assertVisible: ".*ოსტატის არჩევა.*"
 - tapOn: "^დადასტურება$"
 
-- tapOn: ".*მიწერა.*"
-- tapOn:
-    id: "chat-message-input"
-- inputText: "გამარჯობა, როდის შეგიძლიათ მოსვლა?"
-# Dismiss the keyboard by tapping a blank coordinate (NOT `hideKeyboard`,
-# which on Android falls back to a raw back-press when the keyboard has
-# already auto-closed by this point — that back-press then escapes the
-# screen entirely instead of just closing a keyboard that isn't there,
-# eating one of the screen-navigation `back`s below). A coordinate tap
-# on blank message-list background only blurs the input, never navigates.
-- tapOn:
-    point: "50%, 25%"
-- tapOn:
-    id: "chat-send-button"
-- assertVisible: ".*გამარჯობა, როდის შეგიძლიათ მოსვლა.*"
-
-- back
 - back
 - tapOn: ".*პროფილი.*"
 - tapOn: ".*გასვლა.*"
@@ -222,7 +257,7 @@ appId: com.ostati.app
     id: "logout-confirm-button"
 - assertVisible: ".*დაწყება.*"
 
-# --- Phase 4: Provider logs back in, replies, marks work done ----------
+# --- Phase 5: Provider logs back in, cancels the now-active Job B ------
 - tapOn: ".*შესვლა.*"
 - tapOn:
     id: "login-email"
@@ -238,22 +273,22 @@ appId: com.ostati.app
 
 - tapOn: ".*სამუშაოები.*"
 - tapOn: "^დადასტურებული$"
-- tapOn: ".*CrossCustomer.*"
+- extendedWaitUntil:
+    visible: ".*CancelCustomer.*"
+    timeout: 15000
+- tapOn: ".*CancelCustomer.*"
 
-- tapOn: ".*ჩატი.*"
-- assertVisible: ".*გამარჯობა, როდის შეგიძლიათ მოსვლა.*"
+# Same fab/bubble collision as "post-job-fab" — this icon-only "..."
+# button sits in the same top-right corner. Tap its top edge instead.
 - tapOn:
-    id: "chat-message-input"
-- inputText: "დიახ, ხვალ დილით შემიძლია."
+    point: "92%, 7%"
 - tapOn:
-    point: "50%, 25%"
+    id: "provider-cancel-menu-row"
+- assertVisible: ".*მომხმარებელს ეცნობება გაუქმების შესახებ.*"
+- tapOn: ".*დროის კონფლიქტი.*"
 - tapOn:
-    id: "chat-send-button"
-- assertVisible: ".*დიახ, ხვალ დილით შემიძლია.*"
-- back
-
-- tapOn: "^სამუშაო დავასრულე$"
-- assertVisible: ".*ელოდება მომხმარებლის დადასტურებას.*"
+    id: "provider-cancel-submit"
+- assertVisible: ".*შენ გააუქმე ეს სამუშაო.*"
 
 - back
 - tapOn: ".*პროფილი.*"
@@ -265,40 +300,12 @@ appId: com.ostati.app
     id: "logout-confirm-button"
 - assertVisible: ".*დაწყება.*"
 
-# --- Phase 5: Customer logs back in, confirms completion, rates --------
-- tapOn: ".*შესვლა.*"
-- tapOn:
-    id: "login-email"
-- inputText: "${output.customerEmail}"
-- hideKeyboard
-- tapOn:
-    id: "login-password"
-- inputText: "TestPass123"
-- hideKeyboard
-- tapOn:
-    id: "login-submit-button"
-- assertVisible: ".*სერვისები.*"
-
-- tapOn: ".*განცხადებები.*"
-- tapOn: "^დადასტურებული$"
-- tapOn:
-    text: ".*${output.jobMarker}.*"
-
-- assertVisible: ".*ოსტატმა სამუშაო დასრულებულად მონიშნა.*"
-- tapOn: "^დადასტურება$"
-- assertVisible: ".*ოსტატის შეფასება.*"
-- tapOn: ".*ოსტატის შეფასება.*"
-
-- assertVisible: ".*შეაფასე.*"
-- tapOn:
-    id: "rating-star-5"
-- tapOn: ".*შეფასების გაგზავნა.*"
-- assertVisible: ".*მადლობა შეფასებისთვის.*"
-- tapOn: ".*მთავარზე დაბრუნება.*"
-
-- assertVisible: ".*სერვისები.*"
-- tapOn: ".*პროფილი.*"
-- tapOn: ".*გასვლა.*"
-- tapOn:
-    id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+# NOTE: there is deliberately no "Phase 6" verifying Job B shows as
+# cancelled on the Customer's own "განცხადებები" list — CustomerJobsScreen
+# has exactly 3 tabs (pending/active-adjacent/completed, see the `items`
+# filter in CustomerJobsScreen.tsx) and 'cancelled' is not included in any
+# of them, so a cancelled job simply disappears from that screen entirely.
+# This mirrors the already-documented, deliberate limitation for
+# ProviderMyJobsScreen (CLAUDE.md decision #88) — discovered here to apply
+# symmetrically to the Customer's own list too. Not fixed by this flow:
+# expanding a tab filter is a product-scope call, not a testing task.

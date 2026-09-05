@@ -238,6 +238,13 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     try {
       await jobService.providerCancelJob(job.customerJobId, cancelReasonCode!, cancelDetails.trim() || undefined);
       setStatus(job.customerJobId, 'cancelled');
+      // Audit fix (found via Maestro E2E testing) — `job` is local state,
+      // fetched once at mount, before this cancellation happened. Without
+      // this, `job.cancellationActor` below stays at whatever it was on
+      // load (never 'provider'), so the banner always fell back to
+      // "მომხმარებელმა... გააუქმა" even when the Provider is the one who
+      // just cancelled it through this exact action.
+      setJob((j) => ({ ...j, cancellationActor: 'provider' }));
       setCancelSheetOpen(false);
       setCancelReasonCode(null);
       setCancelDetails('');
@@ -277,7 +284,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         onBack={() => navigation.goBack()}
         right={
           jobLoading ? undefined : (
-            <Pressable style={styles.iconButton} onPress={handleMore}>
+            <Pressable testID="job-detail-menu-button" style={styles.iconButton} onPress={handleMore}>
               <MoreVertical size={16} color={colors.foreground} />
             </Pressable>
           )
@@ -545,6 +552,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         </Pressable>
         {variant === 'active' && (
           <Pressable
+            testID="provider-cancel-menu-row"
             style={styles.menuRow}
             onPress={() => {
               setActionMenuOpen(false);
@@ -587,7 +595,15 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
             style={styles.problemTextarea}
           />
         )}
-        <Button label="სამუშაოს გაუქმება" loadingLabel="უქმდება..." variant="destructive" onPress={confirmCancel} disabled={!canSubmitCancel} loading={cancelling} />
+        <Button
+          testID="provider-cancel-submit"
+          label="სამუშაოს გაუქმება"
+          loadingLabel="უქმდება..."
+          variant="destructive"
+          onPress={confirmCancel}
+          disabled={!canSubmitCancel}
+          loading={cancelling}
+        />
         <Pressable style={styles.sheetCancelLink} onPress={closeCancelSheet}>
           <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
         </Pressable>
