@@ -1,0 +1,239 @@
+appId: com.ostati.app
+---
+# Provider profile "extras" — four previously-untested pieces of the
+# Provider profile, all covered in one continuous flow since they share
+# the same account and mostly the same screens:
+#   1. Multi-select specialty + a custom "სხვა" entry (decision #8) —
+#      `SpecialtyPickerField` lets a Provider pick several built-in
+#      specialties plus free-text custom ones; no flow had ever selected
+#      more than one, or used "სხვა" at all.
+#   2. `SqmPriceField` (decision #15, "ფასი კვ.მ-ზე") — only shown for
+#      specialties with `pricePerSqm: true` (e.g. "მღებავი"); never
+#      exercised since every other flow picks a non-sqm specialty
+#      ("სანტექნიკოსი"/"ელექტრიკოსი").
+#   3. `ProviderEditProfileScreen`'s OWN embedded area picker (decision
+#      #31) — a second, independent entry point to the same
+#      RegionAreaPicker as the standalone `ProviderServiceAreasScreen`
+#      (already covered by provider_service_areas.yaml), never itself
+#      exercised.
+#   4. `ProviderEditProfileScreen`'s "ჩემ შესახებ" textarea + certificates/
+#      portfolio uploads — now provably automatable (chat_image_upload.yaml,
+#      provider_verification_submit.yaml already proved the gallery
+#      picker is reliable), but never wired into a flow before.
+#
+# The cleanest single assertion for #4's persistence: once photo + about
+# (>=20 chars) + portfolio (>=1) are all set, `computeCompleteness()`
+# reaches 100%, and ProviderProfileScreen's own "პროფილის სისრულე" card
+# (only rendered `completeness.percent < 100`) disappears entirely — so
+# instead of trying to assert on media thumbnails directly, this flow
+# just confirms that card is gone after saving + a fresh login.
+
+- launchApp
+- extendedWaitUntil:
+    notVisible: "Loading from"
+    timeout: 20000
+# Optional dev-client "developer menu" onboarding tip — shown once per
+# fresh PROCESS START (an in-memory flag, not persisted — `launchApp`
+# restarts the process each time, so this reappears on every single run).
+# It does NOT auto-dismiss; it must be tapped, or it sits there blocking
+# everything underneath forever.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 6000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+# Maestro's accessibility-injected tap on "Continue" consistently lands
+# on the dev-client's floating gear bubble instead — detect and back out
+# of the Tools menu if it happened (see .maestro/README.md for the full
+# root-cause writeup).
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: ".*(პროფილი|დაწყება).*"
+    timeout: 25000
+
+# Leftover-session cleanup, in case a previous run crashed mid-flow.
+- tapOn:
+    text: ".*პროფილი.*"
+    optional: true
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: ".*გასვლა.*"
+    optional: true
+- tapOn:
+    id: "logout-confirm-button"
+    optional: true
+
+# Requires a test image already pushed to the emulator's gallery before
+# running:
+#   adb push assets/icon.png //sdcard/Pictures/e2e_test_photo.png
+#   adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Pictures/e2e_test_photo.png
+
+# --- Phase 1: Register a Provider ----------------------------------------
+- evalScript: ${output.email = 'e2e.extras.' + Date.now() + '@example.com'}
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*ოსტატი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "ExtrasProvider"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.email}"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+# --- Phase 2: ProviderSetupScreen — multi-select specialty + custom
+# "სხვა" entry + sqm price + profile photo + area. ------------------------
+- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- tapOn: ".*აირჩიე სპეციალობა.*"
+- tapOn: ".*სანტექნიკოსი.*"
+- tapOn: ".*მღებავი.*"
+- tapOn: ".*სხვა.*"
+- tapOn: ".*მიუთითე შენი პროფესია.*"
+- inputText: "დურგალი"
+- hideKeyboard
+- tapOn: ".*დამატება.*"
+- assertVisible: ".*დურგალი.*"
+- tapOn: "^არჩევა$"
+- assertVisible: ".*დურგალი.*"
+
+- assertVisible: ".*ფასი კვ.მ-ზე.*"
+- tapOn: ".*ჩაწერეთ თანხა.*"
+- inputText: "45"
+- hideKeyboard
+
+- tapOn: ".*გალერეიდან არჩევა.*"
+- extendedWaitUntil:
+    visible: "Recent"
+    timeout: 10000
+- tapOn:
+    point: "16%, 34%"
+
+- tapOn: ".*აირჩიე არეალი.*"
+- assertVisible: ".*სამუშაო არეალი.*"
+- tapOn: ".*ყველას მონიშვნა.*"
+- tapOn: "^შენახვა$"
+- tapOn: "^პროფილის შექმნა$"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+# --- Phase 3: verify the public profile shows all 3 specialties + the
+# real sqm price (not a hardcoded/mock display). --------------------------
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*ნახე ჩემი პროფილი.*"
+    direction: DOWN
+- tapOn: ".*ნახე ჩემი პროფილი.*"
+- assertVisible: ".*სანტექნიკოსი.*"
+- assertVisible: ".*მღებავი.*"
+- assertVisible: ".*დურგალი.*"
+- assertVisible: ".*ფასი კვ.მ-ზე: 45.*"
+- back
+
+# --- Phase 4: ProviderEditProfileScreen — its OWN area picker entry
+# point, "ჩემ შესახებ", certificates, portfolio. ---------------------------
+- tapOn: ".*პროფილის რედაქტირება.*"
+- tapOn: ".*ვაკე.*"
+- assertVisible: ".*სამუშაო არეალი.*"
+- tapOn: ".*აჭარა.*"
+- tapOn: ".*ბათუმი.*"
+- tapOn: "^შენახვა$"
+- assertVisible: ".*ბათუმი.*"
+
+- tapOn: ".*მოგვიყევი შენ შესახებ.*"
+- inputText: "ვმუშაობ პასუხისმგებლობით და ხარისხიანად ყოველთვის."
+- hideKeyboard
+
+- tapOn:
+    id: "provider-edit-certificates-gallery"
+- extendedWaitUntil:
+    visible: "Recent"
+    timeout: 10000
+- tapOn:
+    point: "16%, 34%"
+# Launching a second native picker Activity immediately after the first
+# one's result just came back (app still settling: state update,
+# re-render, Activity-result transition) can silently swallow the next
+# tap — give it a beat to fully settle first.
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "provider-edit-portfolio-gallery"
+- extendedWaitUntil:
+    visible: "Recent"
+    timeout: 10000
+- tapOn:
+    point: "16%, 34%"
+
+- tapOn: ".*ცვლილებების შენახვა.*"
+- assertVisible: ".*პროფილის რედაქტირება.*"
+
+# --- Phase 5: log out (clears all in-memory Context) and back in — every
+# piece above must be the REAL, persisted state from Supabase, not
+# leftover in-memory Context. The completeness card disappearing (photo +
+# about + portfolio all satisfied, #44) proves the media/about round-trip;
+# the area field showing "ბათუმი" proves the edit-screen's own picker
+# round-trip. --------------------------------------------------------------
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.email}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+- tapOn: ".*პროფილი.*"
+- assertNotVisible: ".*პროფილის სისრულე.*"
+- tapOn: ".*პროფილის რედაქტირება.*"
+- assertVisible: ".*ბათუმი.*"
+
+# --- Cleanup: logout -------------------------------------------------------
+# Back to ProviderProfileScreen first (BackHeader) — "გასვლა" doesn't
+# exist on ProviderEditProfileScreen itself.
+- back
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"

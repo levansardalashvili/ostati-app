@@ -9,6 +9,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { ProviderFeedJobCard, ProviderFeedJobCardSkeleton } from '../components/ProviderFeedJobCard';
+import { PopBadge } from '../components/PopBadge';
 import { StatusPill } from '../components/StatusPill';
 import { Switch } from '../components/Switch';
 import { colors, radius, spacing, typography } from '../theme';
@@ -204,7 +205,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
             />
             <Pressable style={styles.bellButton} onPress={handleNotifications}>
               <Bell size={19} color={colors.foreground} strokeWidth={1.8} />
-              {unreadNotifCount > 0 && <View style={styles.bellDot} />}
+              {unreadNotifCount > 0 && <PopBadge style={styles.bellDot} />}
             </Pressable>
           </View>
         </View>

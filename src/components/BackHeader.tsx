@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
+import { usePressScale } from '../utils/usePressScale';
 
 type Props = {
   title: string;
@@ -15,12 +16,16 @@ type Props = {
 // ქვედონეების ეკრანებზე. showBack={false} — მაგ. სავალდებულო ეკრანებზე
 // (RatingScreen), სადაც უკან დაბრუნება დაბლოკილია.
 export function BackHeader({ title, onBack, right, showBack = true }: Props) {
+  const { scale, onPressIn, onPressOut } = usePressScale(0.9);
+
   return (
     <View style={styles.container}>
       {showBack ? (
-        <Pressable style={styles.iconButton} onPress={onBack}>
-          <ArrowLeft size={18} color={colors.foreground} />
-        </Pressable>
+        <Animated.View style={{ transform: [{ scale }] }}>
+          <Pressable style={styles.iconButton} onPress={onBack} onPressIn={onPressIn} onPressOut={onPressOut}>
+            <ArrowLeft size={18} color={colors.foreground} />
+          </Pressable>
+        </Animated.View>
       ) : (
         <View style={styles.iconButton} />
       )}

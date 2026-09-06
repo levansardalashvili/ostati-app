@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Animated,
   GestureResponderEvent,
   Pressable,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme';
+import { usePressScale } from '../utils/usePressScale';
 
 export type ButtonVariant =
   | 'primary'
@@ -45,38 +47,42 @@ export function Button({
   testID,
 }: Props) {
   const isDisabled = disabled || loading;
+  const { scale, onPressIn: handlePressIn, onPressOut: handlePressOut } = usePressScale();
 
   return (
-    <Pressable
-      testID={testID}
-      onPress={onPress}
-      disabled={isDisabled}
-      style={({ pressed }) => [
-        styles.base,
-        fullWidth && styles.fullWidth,
-        variantStyles[variant],
-        isDisabled && styles.disabled,
-        pressed && !isDisabled && styles.pressed,
-        style,
-      ]}
-    >
-      {loading ? (
-        <>
-          <ActivityIndicator
-            size="small"
-            color={textColorFor(variant)}
-            style={styles.spinner}
-          />
+    <Animated.View style={[fullWidth && styles.fullWidth, { transform: [{ scale }] }]}>
+      <Pressable
+        testID={testID}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={isDisabled}
+        style={({ pressed }) => [
+          styles.base,
+          variantStyles[variant],
+          isDisabled && styles.disabled,
+          pressed && !isDisabled && styles.pressed,
+          style,
+        ]}
+      >
+        {loading ? (
+          <>
+            <ActivityIndicator
+              size="small"
+              color={textColorFor(variant)}
+              style={styles.spinner}
+            />
+            <Text style={[styles.label, { color: textColorFor(variant) }]}>
+              {loadingLabel ?? label}
+            </Text>
+          </>
+        ) : (
           <Text style={[styles.label, { color: textColorFor(variant) }]}>
-            {loadingLabel ?? label}
+            {label}
           </Text>
-        </>
-      ) : (
-        <Text style={[styles.label, { color: textColorFor(variant) }]}>
-          {label}
-        </Text>
-      )}
-    </Pressable>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 

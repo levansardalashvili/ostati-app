@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FileText, MessageCircle, Plus } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -13,8 +13,9 @@ import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
 import { useJobStatus } from '../state/JobStatusContext';
-import type { CustomerJob } from '../types/job';
+import type { CustomerJob, JobStatus } from '../types/job';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
+import { usePressScale } from '../utils/usePressScale';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<CustomerTabParamList, 'MyJobsTab'>,
@@ -150,46 +151,73 @@ export function CustomerJobsScreen({ navigation }: Props) {
       ) : (
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
           {items.map((j) => (
-            <Pressable
+            <JobCard
               key={j.id}
-              style={styles.card}
+              job={j}
+              status={getStatus(j.id) ?? j.status}
               onPress={() => navigation.navigate('CustomerJobDetail', { jobId: j.id, job: j })}
-            >
-              <View style={styles.cardTop}>
-                <View style={styles.cardTopLeft}>
-                  <CategoryIcon categoryId={j.category} />
-                  <View>
-                    <Text style={styles.jobTitle}>{j.title}</Text>
-                    <Text style={styles.jobDate}>{j.date}</Text>
-                  </View>
-                </View>
-                <StatusPill status={getStatus(j.id) ?? j.status} />
-              </View>
-              <Text style={styles.jobDesc} numberOfLines={2}>
-                {j.desc}
-              </Text>
-              <View style={styles.cardFooter}>
-                <View style={styles.footerLeft}>
-                  {j.provider && <Text style={styles.providerName}>{j.provider}</Text>}
-                </View>
-                {j.provider && j.providerId && (
-                  <Pressable
-                    style={styles.chatButton}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      openChat(j);
-                    }}
-                  >
-                    <MessageCircle size={13} color={colors.primary} />
-                    <Text style={styles.chatButtonText}>ჩატი</Text>
-                  </Pressable>
-                )}
-              </View>
-            </Pressable>
+              onChat={() => openChat(j)}
+            />
           ))}
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function JobCard({
+  job: j,
+  status,
+  onPress,
+  onChat,
+}: {
+  job: CustomerJob;
+  status: JobStatus;
+  onPress: () => void;
+  onChat: () => void;
+}) {
+  const card = usePressScale();
+  const chat = usePressScale();
+
+  return (
+    <Animated.View style={{ transform: [{ scale: card.scale }] }}>
+      <Pressable style={styles.card} onPress={onPress} onPressIn={card.onPressIn} onPressOut={card.onPressOut}>
+        <View style={styles.cardTop}>
+          <View style={styles.cardTopLeft}>
+            <CategoryIcon categoryId={j.category} />
+            <View>
+              <Text style={styles.jobTitle}>{j.title}</Text>
+              <Text style={styles.jobDate}>{j.date}</Text>
+            </View>
+          </View>
+          <StatusPill status={status} />
+        </View>
+        <Text style={styles.jobDesc} numberOfLines={2}>
+          {j.desc}
+        </Text>
+        <View style={styles.cardFooter}>
+          <View style={styles.footerLeft}>
+            {j.provider && <Text style={styles.providerName}>{j.provider}</Text>}
+          </View>
+          {j.provider && j.providerId && (
+            <Animated.View style={{ transform: [{ scale: chat.scale }] }}>
+              <Pressable
+                style={styles.chatButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onChat();
+                }}
+                onPressIn={chat.onPressIn}
+                onPressOut={chat.onPressOut}
+              >
+                <MessageCircle size={13} color={colors.primary} />
+                <Text style={styles.chatButtonText}>ჩატი</Text>
+              </Pressable>
+            </Animated.View>
+          )}
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 

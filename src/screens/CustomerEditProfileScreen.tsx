@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -64,43 +64,49 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader title="პროფილის რედაქტირება" onBack={() => navigation.goBack()} />
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-        <View style={styles.avatarRow}>
-          <View style={styles.avatarWrap}>
-            <Avatar initials={`${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`} color={colors.primary} size={88} />
-            <Pressable style={styles.cameraBadge}>
-              <Camera size={14} color={colors.primaryForeground} />
-            </Pressable>
+      {/* Android's native window-resize silently no-ops under edge-to-edge
+          rendering (Expo SDK 52+ default) — without this, the address
+          field + save footer below it would be hidden behind the
+          keyboard, same bug as ChatConversationScreen's composer. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+          <View style={styles.avatarRow}>
+            <View style={styles.avatarWrap}>
+              <Avatar initials={`${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`} color={colors.primary} size={88} />
+              <Pressable style={styles.cameraBadge}>
+                <Camera size={14} color={colors.primaryForeground} />
+              </Pressable>
+            </View>
           </View>
-        </View>
 
-        <View style={{ gap: spacing.md }}>
-          <View style={styles.nameRow}>
-            <View style={{ flex: 1 }}>
-              <TextField testID="customer-edit-first-name" label="სახელი" value={firstName} onChangeText={setFirstName} error={firstNameErr} />
+          <View style={{ gap: spacing.md }}>
+            <View style={styles.nameRow}>
+              <View style={{ flex: 1 }}>
+                <TextField testID="customer-edit-first-name" label="სახელი" value={firstName} onChangeText={setFirstName} error={firstNameErr} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <TextField testID="customer-edit-last-name" label="გვარი" value={lastName} onChangeText={setLastName} error={lastNameErr} />
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <TextField testID="customer-edit-last-name" label="გვარი" value={lastName} onChangeText={setLastName} error={lastNameErr} />
+            <TextField label="მისამართი" value={address} onChangeText={setAddress} placeholder="ქ., არეალი" />
+            <View>
+              <Text style={styles.infoLabel}>ანგარიშის ინფორმაცია</Text>
+              <View style={styles.infoCard}>
+                <Text style={styles.infoCardLabel}>ელ. ფოსტა</Text>
+                <Text style={styles.infoCardValue}>{profile.email}</Text>
+              </View>
+              <Text style={styles.infoNote}>ელ. ფოსტის შეცვლისთვის დაგვიკავშირდით.</Text>
             </View>
           </View>
-          <TextField label="მისამართი" value={address} onChangeText={setAddress} placeholder="ქ., არეალი" />
-          <View>
-            <Text style={styles.infoLabel}>ანგარიშის ინფორმაცია</Text>
-            <View style={styles.infoCard}>
-              <Text style={styles.infoCardLabel}>ელ. ფოსტა</Text>
-              <Text style={styles.infoCardValue}>{profile.email}</Text>
-            </View>
-            <Text style={styles.infoNote}>ელ. ფოსტის შეცვლისთვის დაგვიკავშირდით.</Text>
-          </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
 
-      <View style={styles.footer}>
-        {saveError && (
-          <InlineBanner type="error" msg="ცვლილებების შენახვა ვერ მოხერხდა" action="თავიდან ცდა" onAction={handleSave} />
-        )}
-        <Button label="ცვლილებების შენახვა" onPress={handleSave} disabled={!canSave} loading={isSaving} loadingLabel="ინახება..." />
-      </View>
+        <View style={styles.footer}>
+          {saveError && (
+            <InlineBanner type="error" msg="ცვლილებების შენახვა ვერ მოხერხდა" action="თავიდან ცდა" onAction={handleSave} />
+          )}
+          <Button label="ცვლილებების შენახვა" onPress={handleSave} disabled={!canSave} loading={isSaving} loadingLabel="ინახება..." />
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

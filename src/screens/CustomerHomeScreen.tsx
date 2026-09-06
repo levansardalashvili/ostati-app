@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,13 +9,15 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, ChevronRight, LayoutGrid, Search, X } from 'lucide-react-native';
+import { Bell, ChevronRight, LayoutGrid, Search, X, type LucideIcon } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useFocusEffect, type CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { CategoryIcon, getCategoryIcon } from '../components/CategoryIcon';
 import { ProviderCard, ProviderCardSkeleton } from '../components/ProviderCard';
+import { PopBadge } from '../components/PopBadge';
+import { usePressScale } from '../utils/usePressScale';
 import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
@@ -201,6 +204,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
     return notificationService.subscribeToUnreadCount(uid, setUnreadNotifCount);
   }, []);
   const currentJobCategory = currentJob ? CATEGORIES.find((c) => c.id === currentJob.category) : null;
+  const currentJobPress = usePressScale();
   const handleOpenCurrentJob = () => {
     if (!currentJob) return;
     navigation.navigate('CustomerJobDetail', { jobId: currentJob.id });
@@ -219,7 +223,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
           </View>
           <Pressable testID="notification-bell" style={styles.bellButton} onPress={handleNotifications}>
             <Bell size={19} color={colors.foreground} strokeWidth={1.8} />
-            {unreadNotifCount > 0 && <View style={styles.bellDot} />}
+            {unreadNotifCount > 0 && <PopBadge style={styles.bellDot} />}
           </Pressable>
         </View>
 
@@ -246,20 +250,27 @@ export function CustomerHomeScreen({ navigation }: Props) {
         {currentJob && currentJobCategory && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>მიმდინარე სამუშაო</Text>
-            <Pressable style={styles.currentJobCard} onPress={handleOpenCurrentJob}>
-              <CategoryIcon categoryId={currentJobCategory.id} size={44} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.currentJobCategory}>{currentJobCategory.label}</Text>
-                <Text style={styles.currentJobProvider} numberOfLines={1}>
-                  {currentJob.provider}
-                </Text>
-                <Text style={styles.currentJobDate}>{currentJob.date}</Text>
-              </View>
-              <View style={styles.currentJobRight}>
-                <StatusPill status={currentJob.status} />
-                <ChevronRight size={16} color={colors.mutedForeground} />
-              </View>
-            </Pressable>
+            <Animated.View style={{ transform: [{ scale: currentJobPress.scale }] }}>
+              <Pressable
+                style={styles.currentJobCard}
+                onPress={handleOpenCurrentJob}
+                onPressIn={currentJobPress.onPressIn}
+                onPressOut={currentJobPress.onPressOut}
+              >
+                <CategoryIcon categoryId={currentJobCategory.id} size={44} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.currentJobCategory}>{currentJobCategory.label}</Text>
+                  <Text style={styles.currentJobProvider} numberOfLines={1}>
+                    {currentJob.provider}
+                  </Text>
+                  <Text style={styles.currentJobDate}>{currentJob.date}</Text>
+                </View>
+                <View style={styles.currentJobRight}>
+                  <StatusPill status={currentJob.status} />
+                  <ChevronRight size={16} color={colors.mutedForeground} />
+                </View>
+              </Pressable>
+            </Animated.View>
           </View>
         )}
 
@@ -273,32 +284,25 @@ export function CustomerHomeScreen({ navigation }: Props) {
             )}
           </View>
           <View style={styles.serviceGrid}>
-            {topCategories.map((c) => {
-              const selected = selCats.has(c.id);
-              const ServiceIcon = getCategoryIcon(c.id);
-              return (
-                <Pressable
-                  key={c.id}
-                  style={[styles.serviceCard, selected && styles.serviceCardSelected]}
-                  onPress={() => toggleCat(c.id)}
-                >
-                  <View style={[styles.serviceIconWrap, { backgroundColor: c.bg }]}>
-                    <ServiceIcon size={20} color={c.dot} strokeWidth={2} />
-                  </View>
-                  <Text style={styles.serviceLabel} numberOfLines={2}>
-                    {c.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            <Pressable style={styles.serviceCard} onPress={handleAllServices}>
-              <View style={[styles.serviceIconWrap, { backgroundColor: colors.secondary }]}>
-                <LayoutGrid size={20} color={colors.secondaryForeground} />
-              </View>
-              <Text style={styles.serviceLabel} numberOfLines={2}>
-                ყველა სერვისი
-              </Text>
-            </Pressable>
+            {topCategories.map((c) => (
+              <ServiceTile
+                key={c.id}
+                selected={selCats.has(c.id)}
+                bg={c.bg}
+                dot={c.dot}
+                label={c.label}
+                Icon={getCategoryIcon(c.id)}
+                onPress={() => toggleCat(c.id)}
+              />
+            ))}
+            <ServiceTile
+              selected={false}
+              bg={colors.secondary}
+              dot={colors.secondaryForeground}
+              label="ყველა სერვისი"
+              Icon={LayoutGrid}
+              onPress={handleAllServices}
+            />
           </View>
         </View>
 
@@ -350,6 +354,42 @@ export function CustomerHomeScreen({ navigation }: Props) {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function ServiceTile({
+  selected,
+  bg,
+  dot,
+  label,
+  Icon,
+  onPress,
+}: {
+  selected: boolean;
+  bg: string;
+  dot: string;
+  label: string;
+  Icon: LucideIcon;
+  onPress: () => void;
+}) {
+  const { scale, onPressIn, onPressOut } = usePressScale();
+
+  return (
+    <Animated.View style={{ width: '47%', transform: [{ scale }] }}>
+      <Pressable
+        style={[styles.serviceCard, { width: '100%' }, selected && styles.serviceCardSelected]}
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+      >
+        <View style={[styles.serviceIconWrap, { backgroundColor: bg }]}>
+          <Icon size={20} color={dot} strokeWidth={2} />
+        </View>
+        <Text style={styles.serviceLabel} numberOfLines={2}>
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 

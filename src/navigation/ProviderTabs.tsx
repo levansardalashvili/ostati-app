@@ -6,6 +6,7 @@ import { ProviderHomeScreen } from '../screens/ProviderHomeScreen';
 import { ProviderMyJobsScreen } from '../screens/ProviderMyJobsScreen';
 import { ChatsListScreen } from '../screens/ChatsListScreen';
 import { ProviderProfileScreen } from '../screens/ProviderProfileScreen';
+import { PopBadge } from '../components/PopBadge';
 import { colors, radius, typography } from '../theme';
 import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
@@ -65,7 +66,7 @@ export function ProviderTabs() {
           tabBarIcon: ({ color, focused }) => (
             <View>
               <MessageCircle size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
-              {unreadChats > 0 && !focused && <View style={badgeStyle} />}
+              {unreadChats > 0 && !focused && <PopBadge style={badgeStyle} />}
             </View>
           ),
         }}

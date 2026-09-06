@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import {
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -167,6 +169,12 @@ export function ProviderSetupScreen({ navigation }: Props) {
         <Text style={styles.subtitle}>მომხმარებლები უკეთ გიპოვებენ.</Text>
       </View>
 
+      {/* Android's native window-resize silently no-ops under edge-to-edge
+          rendering (Expo SDK 52+ default) — without this, the "ჩემ
+          შესახებ" textarea + submit footer below it would be hidden
+          behind the keyboard, same bug as ChatConversationScreen's
+          composer. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.photoSection}>
           <View style={styles.avatarWrap}>
@@ -288,6 +296,7 @@ export function ProviderSetupScreen({ navigation }: Props) {
           loading={loading}
         />
       </View>
+      </KeyboardAvoidingView>
 
       <MediaPreviewModal
         item={previewCert}

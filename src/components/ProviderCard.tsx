@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MapPin, MessageCircle, Star } from 'lucide-react-native';
 import { Avatar } from './Avatar';
 import { Skeleton } from './Skeleton';
@@ -8,6 +8,7 @@ import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL, CATEGORIES } from '../data/categories';
 import type { Provider } from '../types/provider';
 import { isNewProvider } from '../utils/providerRank';
+import { usePressScale } from '../utils/usePressScale';
 
 // გატანილია CustomerHomeScreen-იდან (Task: "ტოპ ოსტატები" + სრული სია
 // screen-ი ერთსა და იმავე ბარათს იზიარებენ, Provider-ის fetching/
@@ -24,10 +25,18 @@ export function ProviderCard({
 }) {
   const specialty = SPECIALTY_LABEL[provider.category] ?? CATEGORIES.find((c) => c.id === provider.category)?.label ?? '';
   const district = provider.location.replace(', თბილისი', '');
+  const body = usePressScale();
+  const message = usePressScale();
 
   return (
     <View style={styles.providerCard}>
-      <Pressable style={styles.providerCardBody} onPress={onOpenProfile}>
+      <Animated.View style={{ transform: [{ scale: body.scale }] }}>
+      <Pressable
+        style={styles.providerCardBody}
+        onPress={onOpenProfile}
+        onPressIn={body.onPressIn}
+        onPressOut={body.onPressOut}
+      >
         <Avatar initials={provider.initials} color={provider.color} size={54} online={provider.online} uri={provider.photoUrl} />
         <View style={styles.providerInfo}>
           <View style={styles.providerNameRow}>
@@ -69,15 +78,23 @@ export function ProviderCard({
           </View>
         </View>
       </Pressable>
+      </Animated.View>
 
       <View style={styles.providerActionRow}>
         <Text style={styles.priceText} numberOfLines={1}>
           {provider.price}
         </Text>
-        <Pressable style={styles.messageButton} onPress={onMessage}>
-          <MessageCircle size={14} color={colors.primaryForeground} />
-          <Text style={styles.messageButtonText}>მიწერა</Text>
-        </Pressable>
+        <Animated.View style={{ transform: [{ scale: message.scale }] }}>
+          <Pressable
+            style={styles.messageButton}
+            onPress={onMessage}
+            onPressIn={message.onPressIn}
+            onPressOut={message.onPressOut}
+          >
+            <MessageCircle size={14} color={colors.primaryForeground} />
+            <Text style={styles.messageButtonText}>მიწერა</Text>
+          </Pressable>
+        </Animated.View>
       </View>
     </View>
   );

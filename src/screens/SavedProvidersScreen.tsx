@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AlertCircle, Heart, MapPin, MessageCircle, Star } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -13,6 +13,7 @@ import { userService } from '../services/userService';
 import { useFavoriteProviders } from '../state/FavoriteProvidersContext';
 import type { Provider } from '../types/provider';
 import { isNewProvider } from '../utils/providerRank';
+import { usePressScale } from '../utils/usePressScale';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SavedProviders'>;
@@ -100,63 +101,99 @@ export function SavedProvidersScreen({ navigation }: Props) {
         </View>
       ) : (
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          {saved.map((p) => {
-            const specialty = SPECIALTY_LABEL[p.category] ?? p.category;
-            return (
-              <View key={p.id} style={styles.card}>
-                <Pressable style={styles.cardBody} onPress={() => openProfile(p.id)}>
-                  <Avatar initials={p.initials} color={p.color} size={54} online={p.online} uri={p.photoUrl} />
-                  <View style={styles.info}>
-                    <View style={styles.nameRow}>
-                      <Text style={styles.name} numberOfLines={1}>
-                        {p.name}
-                      </Text>
-                      {p.verified && <VerifiedBadge size={15} />}
-                    </View>
-                    <Text style={styles.meta}>
-                      {specialty} • {p.years} წ. გამოცდ.
-                    </Text>
-                    <View style={styles.statsRow}>
-                      {isNewProvider(p) ? (
-                        <View style={styles.newProviderBadge}>
-                          <Text style={styles.newProviderBadgeText}>ახალი ოსტატი</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.ratingRow}>
-                          <Star size={12} color="#FBBF24" fill="#FBBF24" />
-                          <Text style={styles.ratingText}>{p.rating}</Text>
-                          <Text style={styles.reviewsText}>({p.reviews} შეფ.)</Text>
-                        </View>
-                      )}
-                      <Text style={styles.dotSeparator}>•</Text>
-                      <View style={styles.locationRow}>
-                        <MapPin size={11} color={colors.mutedForeground} />
-                        <Text style={styles.locationText} numberOfLines={1}>
-                          {p.location}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <Pressable testID="unfavorite-toggle" style={styles.heartButton} onPress={() => toggleFavorite(p.id)}>
-                    <Heart size={17} color={colors.destructive} fill={colors.destructive} />
-                  </Pressable>
-                </Pressable>
-
-                <View style={styles.actionRow}>
-                  <Text style={styles.priceText} numberOfLines={1}>
-                    {p.price}
-                  </Text>
-                  <Pressable style={styles.messageButton} onPress={() => openChat(p)}>
-                    <MessageCircle size={14} color={colors.primaryForeground} />
-                    <Text style={styles.messageButtonText}>მიწერა</Text>
-                  </Pressable>
-                </View>
-              </View>
-            );
-          })}
+          {saved.map((p) => (
+            <SavedProviderCard
+              key={p.id}
+              provider={p}
+              onOpenProfile={() => openProfile(p.id)}
+              onToggleFavorite={() => toggleFavorite(p.id)}
+              onMessage={() => openChat(p)}
+            />
+          ))}
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function SavedProviderCard({
+  provider: p,
+  onOpenProfile,
+  onToggleFavorite,
+  onMessage,
+}: {
+  provider: Provider;
+  onOpenProfile: () => void;
+  onToggleFavorite: () => void;
+  onMessage: () => void;
+}) {
+  const specialty = SPECIALTY_LABEL[p.category] ?? p.category;
+  const body = usePressScale();
+  const heart = usePressScale(0.85);
+  const message = usePressScale();
+
+  return (
+    <View style={styles.card}>
+      <Animated.View style={{ transform: [{ scale: body.scale }] }}>
+        <Pressable style={styles.cardBody} onPress={onOpenProfile} onPressIn={body.onPressIn} onPressOut={body.onPressOut}>
+          <Avatar initials={p.initials} color={p.color} size={54} online={p.online} uri={p.photoUrl} />
+          <View style={styles.info}>
+            <View style={styles.nameRow}>
+              <Text style={styles.name} numberOfLines={1}>
+                {p.name}
+              </Text>
+              {p.verified && <VerifiedBadge size={15} />}
+            </View>
+            <Text style={styles.meta}>
+              {specialty} • {p.years} წ. გამოცდ.
+            </Text>
+            <View style={styles.statsRow}>
+              {isNewProvider(p) ? (
+                <View style={styles.newProviderBadge}>
+                  <Text style={styles.newProviderBadgeText}>ახალი ოსტატი</Text>
+                </View>
+              ) : (
+                <View style={styles.ratingRow}>
+                  <Star size={12} color="#FBBF24" fill="#FBBF24" />
+                  <Text style={styles.ratingText}>{p.rating}</Text>
+                  <Text style={styles.reviewsText}>({p.reviews} შეფ.)</Text>
+                </View>
+              )}
+              <Text style={styles.dotSeparator}>•</Text>
+              <View style={styles.locationRow}>
+                <MapPin size={11} color={colors.mutedForeground} />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {p.location}
+                </Text>
+              </View>
+            </View>
+          </View>
+          <Animated.View style={{ transform: [{ scale: heart.scale }] }}>
+            <Pressable
+              testID="unfavorite-toggle"
+              style={styles.heartButton}
+              onPress={onToggleFavorite}
+              onPressIn={heart.onPressIn}
+              onPressOut={heart.onPressOut}
+            >
+              <Heart size={17} color={colors.destructive} fill={colors.destructive} />
+            </Pressable>
+          </Animated.View>
+        </Pressable>
+      </Animated.View>
+
+      <View style={styles.actionRow}>
+        <Text style={styles.priceText} numberOfLines={1}>
+          {p.price}
+        </Text>
+        <Animated.View style={{ transform: [{ scale: message.scale }] }}>
+          <Pressable style={styles.messageButton} onPress={onMessage} onPressIn={message.onPressIn} onPressOut={message.onPressOut}>
+            <MessageCircle size={14} color={colors.primaryForeground} />
+            <Text style={styles.messageButtonText}>მიწერა</Text>
+          </Pressable>
+        </Animated.View>
+      </View>
+    </View>
   );
 }
 

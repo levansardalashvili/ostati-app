@@ -1,10 +1,12 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Camera, Check, Clock, MapPin, MessageCircle, ThumbsUp } from 'lucide-react-native';
 import { CategoryIcon } from './CategoryIcon';
+import { Skeleton } from './Skeleton';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
 import type { FeedJob } from '../types/job';
+import { usePressScale } from '../utils/usePressScale';
 
 type Props = {
   job: FeedJob;
@@ -19,6 +21,8 @@ type Props = {
 // ProviderJobFeedScreen-ს ("ყველას ნახვა") შორის).
 export function ProviderFeedJobCard({ job, sent, onDetail, onInterested, onChat }: Props) {
   const category = CATEGORIES.find((c) => c.id === job.category) ?? CATEGORIES[0];
+  const detail = usePressScale();
+  const action = usePressScale();
 
   return (
     <View style={styles.jobCard}>
@@ -67,20 +71,39 @@ export function ProviderFeedJobCard({ job, sent, onDetail, onInterested, onChat 
       <View style={styles.jobActionRow}>
         <Text style={styles.interestedCount}>{job.interested + (sent ? 1 : 0)} დაინტ.</Text>
         <View style={styles.jobActionButtons}>
-          <Pressable style={styles.detailButton} onPress={onDetail}>
-            <Text style={styles.detailButtonText}>დეტ. ნახვა</Text>
-          </Pressable>
-          {sent ? (
-            <Pressable style={styles.chatButton} onPress={onChat}>
-              <MessageCircle size={13} color={colors.primaryForeground} />
-              <Text style={styles.chatButtonText}>ჩატის გახსნა</Text>
+          <Animated.View style={{ transform: [{ scale: detail.scale }] }}>
+            <Pressable
+              style={styles.detailButton}
+              onPress={onDetail}
+              onPressIn={detail.onPressIn}
+              onPressOut={detail.onPressOut}
+            >
+              <Text style={styles.detailButtonText}>დეტ. ნახვა</Text>
             </Pressable>
-          ) : (
-            <Pressable style={styles.chatButton} onPress={onInterested}>
-              <ThumbsUp size={13} color={colors.primaryForeground} />
-              <Text style={styles.chatButtonText}>დაინტ. ვარ</Text>
-            </Pressable>
-          )}
+          </Animated.View>
+          <Animated.View style={{ transform: [{ scale: action.scale }] }}>
+            {sent ? (
+              <Pressable
+                style={styles.chatButton}
+                onPress={onChat}
+                onPressIn={action.onPressIn}
+                onPressOut={action.onPressOut}
+              >
+                <MessageCircle size={13} color={colors.primaryForeground} />
+                <Text style={styles.chatButtonText}>ჩატის გახსნა</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                style={styles.chatButton}
+                onPress={onInterested}
+                onPressIn={action.onPressIn}
+                onPressOut={action.onPressOut}
+              >
+                <ThumbsUp size={13} color={colors.primaryForeground} />
+                <Text style={styles.chatButtonText}>დაინტ. ვარ</Text>
+              </Pressable>
+            )}
+          </Animated.View>
         </View>
       </View>
 
@@ -98,14 +121,14 @@ export function ProviderFeedJobCardSkeleton() {
   return (
     <View style={[styles.jobCard, { padding: spacing.md, gap: spacing.sm }]}>
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
-        <View style={{ width: 38, height: 38, borderRadius: radius.md, backgroundColor: colors.muted }} />
+        <Skeleton width={38} height={38} borderRadius={radius.md} />
         <View style={{ flex: 1, gap: spacing.xs }}>
-          <View style={{ width: '80%', height: 16, borderRadius: 4, backgroundColor: colors.muted }} />
-          <View style={{ width: '50%', height: 12, borderRadius: 4, backgroundColor: colors.muted }} />
+          <Skeleton width="80%" height={16} />
+          <Skeleton width="50%" height={12} />
         </View>
       </View>
-      <View style={{ width: '100%', height: 12, borderRadius: 4, backgroundColor: colors.muted }} />
-      <View style={{ width: '60%', height: 12, borderRadius: 4, backgroundColor: colors.muted }} />
+      <Skeleton width="100%" height={12} />
+      <Skeleton width="60%" height={12} />
     </View>
   );
 }

@@ -1,0 +1,318 @@
+appId: com.ostati.app
+---
+# Job dispute path — the one branch of the job-lifecycle state machine
+# (#47) that had zero E2E coverage: instead of confirming completion,
+# Customer taps "პრობლემა მაქვს" on the completion-confirm card, picks a
+# reason, and the job moves to `disputed` (not `completed`) via
+# `customer_report_problem()` (supabase/migrations/0022). Both sides'
+# `disputed`-variant UI get checked — CustomerJobDetailScreen's own
+# banner/chat-link, and ProviderJobDetailScreen's "მომხმარებელმა პრობლემა
+# აღნიშნა" banner. This is deliberately separate from `job_reports.yaml`
+# (#81/#84's general moderation "პრობლემის შეტყობინება" sheet) — that one
+# never touches job status at all; this one is the job's own completion-
+# dispute branch.
+#
+# Phases 1-4 (post a job, express interest, select the Provider, exchange
+# a chat message, Provider marks work done) are identical to
+# `cross_role_job_lifecycle.yaml` up through "Provider marks work done" —
+# only Phase 5 onward diverges (dispute instead of confirm+rate).
+
+- launchApp
+- extendedWaitUntil:
+    notVisible: "Loading from"
+    timeout: 20000
+# Optional dev-client "developer menu" onboarding tip — shown once per
+# fresh PROCESS START (an in-memory flag, not persisted — `launchApp`
+# restarts the process each time, so this reappears on every single run,
+# not just after `pm clear`/reinstall). It does NOT auto-dismiss; it must
+# be tapped, or it sits there blocking everything underneath forever.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 6000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+# Maestro's accessibility-injected tap on "Continue" consistently lands
+# on the dev-client's floating gear bubble instead (confirmed reproducible
+# even on a factory-wiped emulator + fresh install — a raw `adb shell
+# input tap` at the same coordinates never has this problem, only
+# Maestro's own gesture-dispatch tap does), opening the Tools menu instead
+# of dismissing the tip. Detect and back out of it if it happened.
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: ".*(პროფილი|დაწყება).*"
+    timeout: 25000
+
+- tapOn:
+    text: ".*პროფილი.*"
+    optional: true
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: ".*გასვლა.*"
+    optional: true
+- tapOn:
+    id: "logout-confirm-button"
+    optional: true
+
+# --- Phase 1: Customer registers and posts a job -----------------------
+- evalScript: ${output.customerEmail = 'e2e.dispute.customer.' + Date.now() + '@example.com'}
+- evalScript: ${output.providerEmail = 'e2e.dispute.provider.' + Date.now() + '@example.com'}
+- evalScript: ${output.jobMarker = 'DisputeE2E' + Date.now()}
+
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*მომხმარებელი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "DisputeCustomer"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.customerEmail}"
+- tapOn: ".*ჭავჭავაძის.*"
+- inputText: "Test address 1"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*პროფილის დასრულება.*"
+- tapOn: "^დასრულება$"
+- assertVisible: ".*სერვისები.*"
+
+- tapOn: ".*განცხადებები.*"
+- tapOn:
+    point: "91%, 7%"
+- assertVisible: ".*მოთხოვნის გამოქვეყნება.*"
+- tapOn: ".*აირჩიე კატეგორია.*"
+- tapOn: ".*სანტექნიკა.*"
+- tapOn:
+    id: "post-job-description"
+- inputText: "${output.jobMarker} - leaking pipe under the sink, needs a plumber"
+- hideKeyboard
+- tapOn: "^გამოქვეყნება$"
+- assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
+- tapOn: ".*მთავარზე დაბრუნება.*"
+
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 2: Provider registers, expresses interest ---------------------
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*ოსტატი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "DisputeProvider"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.providerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- tapOn: ".*აირჩიე სპეციალობა.*"
+- tapOn: ".*სანტექნიკოსი.*"
+- tapOn: "^არჩევა$"
+- tapOn: ".*აირჩიე არეალი.*"
+- assertVisible: ".*სამუშაო არეალი.*"
+- tapOn: ".*ყველას მონიშვნა.*"
+- tapOn: "^შენახვა$"
+- tapOn: "^პროფილის შექმნა$"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+- tapOn:
+    text: ".*დაინტ. ვარ.*"
+    below: ".*${output.jobMarker}.*"
+- tapOn: ".*ჩაწერეთ თანხა.*"
+- inputText: "150"
+- hideKeyboard
+- tapOn:
+    id: "offer-price-submit"
+- assertVisible: ".*შეთავაზდა:.*"
+- back
+
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 3: Customer selects the Provider ------------------------------
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.customerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*სერვისები.*"
+
+- tapOn: ".*განცხადებები.*"
+- tapOn:
+    text: ".*${output.jobMarker}.*"
+- assertVisible: ".*დაინტერესებული.*"
+- tapOn: "^არჩევა$"
+- assertVisible: ".*ოსტატის არჩევა.*"
+- tapOn: "^დადასტურება$"
+
+- back
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 4: Provider marks work done -----------------------------------
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.providerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+- tapOn: ".*სამუშაოები.*"
+- tapOn: "^დადასტურებული$"
+- tapOn: ".*DisputeCustomer.*"
+- tapOn: "^სამუშაო დავასრულე$"
+- assertVisible: ".*ელოდება მომხმარებლის დადასტურებას.*"
+
+- back
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 5: Customer reports a problem instead of confirming — job goes
+# to 'disputed', NOT 'completed'. -----------------------------------------
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.customerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*სერვისები.*"
+
+- tapOn: ".*განცხადებები.*"
+- tapOn: "^დადასტურებული$"
+- tapOn:
+    text: ".*${output.jobMarker}.*"
+- assertVisible: ".*ოსტატმა სამუშაო დასრულებულად მონიშნა.*"
+- tapOn: ".*პრობლემა მაქვს.*"
+- assertVisible: ".*რა პრობლემა გაქვს?.*"
+- tapOn: ".*სამუშაოს ხარისხი დაბალია.*"
+- tapOn: "^გაგზავნა$"
+
+# Job is now 'disputed' — the completion-confirm card must be gone,
+# replaced by the dispute section (not the rating-prompt "completed"
+# path).
+- assertVisible: ".*მოთხოვნა ჯერ არ არის დასრულებული.*"
+- assertNotVisible: ".*ოსტატმა სამუშაო დასრულებულად მონიშნა.*"
+- assertNotVisible: ".*ოსტატის შეფასება.*"
+
+# CustomerJobDetailScreen is a root-stack screen (pushed from MyJobsTab) —
+# `back` first, to reach the tab bar underneath, before tapping the
+# "პროფილი" tab. Without it, ".*პროფილი.*" matches something else on this
+# screen instead (e.g. a link toward the Provider's own public profile).
+- back
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 6: Provider sees the dispute banner ---------------------------
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.providerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+- tapOn: ".*სამუშაოები.*"
+- tapOn: "^დადასტურებული$"
+- tapOn: ".*DisputeCustomer.*"
+- assertVisible: ".*მომხმარებელმა პრობლემა აღნიშნა.*"
+- back
+
+# --- Cleanup: logout -------------------------------------------------------
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"

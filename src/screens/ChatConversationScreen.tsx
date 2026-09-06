@@ -338,7 +338,16 @@ if (
         </View>
       )}
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* `behavior: undefined` on Android used to rely entirely on the
+          native window resize (`android.softwareKeyboardLayoutMode:
+          "resize"`, app.json) to push the composer up when the keyboard
+          opens — but Android's edge-to-edge rendering (on by default since
+          Expo SDK 52+) makes that native resize silently no-op, so the
+          composer (and whatever the user is typing) ended up completely
+          hidden behind the keyboard instead of just covered. `'height'`
+          shrinks this view by the keyboard's height directly in JS,
+          independent of that broken native behavior. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           ref={scrollRef}
           style={styles.messages}
@@ -756,8 +765,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   offerCardWrap: {
+    // `minWidth` wins over `maxWidth` in RN's layout when they conflict —
+    // kept comfortably below `maxWidth: '85%'`'s narrowest realistic value
+    // (85% of a 320pt-wide screen, minus this screen's own horizontal
+    // padding) so the 85% cap always actually applies, on any device.
     maxWidth: '85%',
-    minWidth: 220,
+    minWidth: 200,
   },
   offerCard: {
     backgroundColor: colors.card,
@@ -982,8 +995,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   previewImage: {
-    width: 320,
-    height: 240,
+    width: '85%',
+    maxWidth: 320,
+    aspectRatio: 4 / 3,
     borderRadius: radius.lg,
   },
   previewClose: {

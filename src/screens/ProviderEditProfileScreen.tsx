@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Award, Camera, ChevronRight, Image as ImageIcon, MapPin } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -182,7 +182,12 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader title="პროფილის რედაქტირება" onBack={() => navigation.goBack()} />
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      {/* Android's native window-resize silently no-ops under edge-to-edge
+          rendering (Expo SDK 52+ default) — without this, the "ჩემ
+          შესახებ" textarea + save footer below it would be hidden behind
+          the keyboard, same bug as ChatConversationScreen's composer. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         <View style={styles.avatarRow}>
           <View style={styles.avatarWrap}>
             <Avatar
@@ -260,6 +265,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
           <View>
             <Text style={styles.fieldLabel}>სერთიფიკატები</Text>
             <MediaUploadGrid
+              testID="provider-edit-certificates"
               items={certificates}
               icon={Award}
               onAddCamera={() => pickMedia('camera', setCertificates)}
@@ -272,6 +278,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
           <View>
             <Text style={styles.fieldLabel}>ნამუშევრების ფოტოები</Text>
             <MediaUploadGrid
+              testID="provider-edit-portfolio"
               items={portfolio}
               icon={ImageIcon}
               onAddCamera={() => pickMedia('camera', setPortfolio)}
@@ -281,14 +288,15 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
             />
           </View>
         </View>
-      </ScrollView>
+        </ScrollView>
 
-      <View style={styles.footer}>
-        {saveError && (
-          <InlineBanner type="error" msg="ცვლილებების შენახვა ვერ მოხერხდა" action="თავიდან ცდა" onAction={handleSave} />
-        )}
-        <Button label="ცვლილებების შენახვა" onPress={handleSave} disabled={!canSave} loading={isSaving} loadingLabel="ინახება..." />
-      </View>
+        <View style={styles.footer}>
+          {saveError && (
+            <InlineBanner type="error" msg="ცვლილებების შენახვა ვერ მოხერხდა" action="თავიდან ცდა" onAction={handleSave} />
+          )}
+          <Button label="ცვლილებების შენახვა" onPress={handleSave} disabled={!canSave} loading={isSaving} loadingLabel="ინახება..." />
+        </View>
+      </KeyboardAvoidingView>
 
       <MediaPreviewModal
         item={previewCert}

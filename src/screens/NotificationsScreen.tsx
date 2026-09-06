@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Bell, Settings } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -11,6 +11,7 @@ import { notificationService } from '../services/notificationService';
 import type { NotificationEntry } from '../types/notification';
 import { navigateToNotificationTarget } from '../utils/notificationNavigation';
 import type { RootStackParamList } from '../navigation/types';
+import { usePressScale } from '../utils/usePressScale';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Notifications'>;
 
@@ -110,33 +111,7 @@ export function NotificationsScreen({ navigation, route }: Props) {
       ) : (
         <ScrollView style={styles.body}>
           {items.map((item) => (
-            <Pressable
-              key={item.id}
-              style={[styles.row, !item.read && styles.rowUnread]}
-              onPress={() => handleTap(item)}
-            >
-              <View style={[styles.iconWrap, { backgroundColor: item.iconBg }]}>
-                {item.iconType === 'avatar' ? (
-                  <Text style={styles.iconInitials}>{item.iconInitials}</Text>
-                ) : (
-                  <Text style={styles.iconEmoji}>{item.iconEmoji}</Text>
-                )}
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <View style={styles.rowTop}>
-                  <Text style={[styles.title, !item.read && styles.titleUnread]} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <View style={styles.rowTopRight}>
-                    <Text style={styles.time}>{item.time}</Text>
-                    {!item.read && <View style={styles.unreadDot} />}
-                  </View>
-                </View>
-                <Text style={styles.text} numberOfLines={2}>
-                  {item.text}
-                </Text>
-              </View>
-            </Pressable>
+            <NotifRow key={item.id} item={item} onPress={() => handleTap(item)} />
           ))}
           <View style={styles.footer}>
             <Text style={styles.footerText}>სულ {items.length} შეტყობინება</Text>
@@ -144,6 +119,43 @@ export function NotificationsScreen({ navigation, route }: Props) {
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function NotifRow({ item, onPress }: { item: NotificationEntry; onPress: () => void }) {
+  const { scale, onPressIn, onPressOut } = usePressScale(0.98);
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        style={[styles.row, !item.read && styles.rowUnread]}
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+      >
+        <View style={[styles.iconWrap, { backgroundColor: item.iconBg }]}>
+          {item.iconType === 'avatar' ? (
+            <Text style={styles.iconInitials}>{item.iconInitials}</Text>
+          ) : (
+            <Text style={styles.iconEmoji}>{item.iconEmoji}</Text>
+          )}
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={styles.rowTop}>
+            <Text style={[styles.title, !item.read && styles.titleUnread]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <View style={styles.rowTopRight}>
+              <Text style={styles.time}>{item.time}</Text>
+              {!item.read && <View style={styles.unreadDot} />}
+            </View>
+          </View>
+          <Text style={styles.text} numberOfLines={2}>
+            {item.text}
+          </Text>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 

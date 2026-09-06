@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MessageCircle, Search } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -13,6 +13,7 @@ import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
 import type { ChatEntry } from '../types/chat';
 import type { CustomerTabParamList, Role, RootStackParamList } from '../navigation/types';
+import { usePressScale } from '../utils/usePressScale';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<CustomerTabParamList, 'Chats'>,
@@ -104,44 +105,52 @@ export function ChatsListScreen({ navigation, role }: Props) {
         </View>
       ) : (
         <ScrollView style={styles.body}>
-          {filtered.map((c) => {
-            const JobCategoryIcon = getCategoryIcon(c.jobCategory ?? '');
-            return (
-              <Pressable key={c.id} style={styles.row} onPress={() => openChat(c)}>
-                <Avatar initials={c.initials} color={c.color} size={50} online={c.online} />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <View style={styles.rowTop}>
-                    <Text style={[styles.name, c.unread > 0 && styles.nameUnread]} numberOfLines={1}>
-                      {c.name}
-                    </Text>
-                    <Text style={[styles.time, c.unread > 0 && styles.timeUnread]}>{c.time}</Text>
-                  </View>
-                  <View style={styles.rowMiddle}>
-                    <Text style={[styles.lastMessage, c.unread > 0 && styles.lastMessageUnread]} numberOfLines={1}>
-                      {c.last}
-                    </Text>
-                    {c.unread > 0 && (
-                      <View style={styles.unreadBadge}>
-                        <Text style={styles.unreadBadgeText}>{c.unread}</Text>
-                      </View>
-                    )}
-                  </View>
-                  {c.jobTitle && (
-                    <View style={styles.jobLineRow}>
-                      <JobCategoryIcon size={12} color={colors.mutedForeground} strokeWidth={2} />
-                      <Text style={styles.jobLine} numberOfLines={1}>
-                        {c.jobTitle}
-                        {c.jobDistrict ? ` · ${c.jobDistrict}` : ''}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </Pressable>
-            );
-          })}
+          {filtered.map((c) => (
+            <ChatRow key={c.id} chat={c} onPress={() => openChat(c)} />
+          ))}
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function ChatRow({ chat: c, onPress }: { chat: ChatEntry; onPress: () => void }) {
+  const { scale, onPressIn, onPressOut } = usePressScale(0.98);
+  const JobCategoryIcon = getCategoryIcon(c.jobCategory ?? '');
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable style={styles.row} onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
+        <Avatar initials={c.initials} color={c.color} size={50} online={c.online} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={styles.rowTop}>
+            <Text style={[styles.name, c.unread > 0 && styles.nameUnread]} numberOfLines={1}>
+              {c.name}
+            </Text>
+            <Text style={[styles.time, c.unread > 0 && styles.timeUnread]}>{c.time}</Text>
+          </View>
+          <View style={styles.rowMiddle}>
+            <Text style={[styles.lastMessage, c.unread > 0 && styles.lastMessageUnread]} numberOfLines={1}>
+              {c.last}
+            </Text>
+            {c.unread > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>{c.unread}</Text>
+              </View>
+            )}
+          </View>
+          {c.jobTitle && (
+            <View style={styles.jobLineRow}>
+              <JobCategoryIcon size={12} color={colors.mutedForeground} strokeWidth={2} />
+              <Text style={styles.jobLine} numberOfLines={1}>
+                {c.jobTitle}
+                {c.jobDistrict ? ` · ${c.jobDistrict}` : ''}
+              </Text>
+            </View>
+          )}
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 

@@ -1,0 +1,228 @@
+appId: com.ostati.app
+---
+# Keyboard-covers-typed-text regression guard. Real bug, found by the user
+# and confirmed live on-device: `KeyboardAvoidingView`'s Android `behavior`
+# was `undefined` (a no-op) app-wide, relying entirely on
+# `android.softwareKeyboardLayoutMode: "resize"` (app.json) — which
+# silently does nothing under Android's edge-to-edge rendering (default
+# since Expo SDK 52+). Composers/inputs near the bottom of a screen ended
+# up COMPLETELY hidden behind the keyboard, not just partially covered.
+# Fixed across 11 files (`behavior: 'height'` on Android, BottomSheet.tsx
+# gained a central KeyboardAvoidingView wrap covering every sheet with a
+# TextInput). This flow exercises the two fix classes where the bug was
+# actually reproducible and testable:
+#   1. OfferPriceSheet (BottomSheet-hosted, `autoFocus`) — the central
+#      BottomSheet.tsx fix, which also covers ReportJobSheet, the
+#      password-change sheet, and both job-cancellation sheets. A
+#      BottomSheet doesn't scroll, so its input has nowhere to go but
+#      behind the keyboard without this fix.
+#   2. ChatConversationScreen — the exact screen/bug the user reported.
+#      Its composer is a fixed sibling BELOW the message ScrollView, not
+#      part of it, so — same as a BottomSheet — nothing but the
+#      KeyboardAvoidingView's own resize could keep it visible.
+# Each assertion below would have FAILED before the fix (the asserted
+# element would be off-screen, hidden behind the keyboard) and passes now.
+#
+# RegisterScreen/LoginScreen were deliberately NOT included as their own
+# assertion, despite also getting the same `behavior` fix: their submit
+# button lives INSIDE the scrolling form content (RegisterScreen.tsx —
+# the `<ScrollView>` wraps everything through the submit button), so
+# ScrollView's own built-in scroll-to-focused-input behavior already kept
+# the field being typed into visible regardless of KeyboardAvoidingView's
+# behavior — confirmed by first writing an assertion here expecting the
+# submit button to stay visible while typing the last field, and finding
+# it legitimately requires a scroll (same as before the fix), which
+# isn't the bug. The `behavior: 'height'` change there is still correct
+# (keeps it consistent with every other screen, and avoids the two
+# mechanisms fighting each other in edge cases) but isn't independently
+# regression-testable the same way.
+
+- launchApp
+- extendedWaitUntil:
+    notVisible: "Loading from"
+    timeout: 20000
+# Optional dev-client "developer menu" onboarding tip — shown once per
+# fresh PROCESS START (an in-memory flag, not persisted — `launchApp`
+# restarts the process each time, so this reappears on every single run).
+# It does NOT auto-dismiss; it must be tapped, or it sits there blocking
+# everything underneath forever.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 6000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+# Maestro's accessibility-injected tap on "Continue" consistently lands on
+# the dev-client's floating gear bubble instead — detect and back out of
+# the Tools menu if it happened (see .maestro/README.md for the full
+# root-cause writeup).
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: ".*(პროფილი|დაწყება).*"
+    timeout: 25000
+
+# Leftover-session cleanup, in case a previous run crashed mid-flow.
+- tapOn:
+    text: ".*პროფილი.*"
+    optional: true
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: ".*გასვლა.*"
+    optional: true
+- tapOn:
+    id: "logout-confirm-button"
+    optional: true
+
+# --- Phase 1: register a Provider (just account setup — no keyboard
+# assertion here, see the note above). -------------------------------------
+- evalScript: ${output.providerEmail = 'e2e.kbvis.provider.' + Date.now() + '@example.com'}
+- evalScript: ${output.customerEmail = 'e2e.kbvis.customer.' + Date.now() + '@example.com'}
+
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*ოსტატი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "KbVisProvider"
+- tapOn:
+    id: "register-last-name"
+- inputText: "Test"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.providerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- tapOn: ".*აირჩიე სპეციალობა.*"
+- tapOn: ".*სანტექნიკოსი.*"
+- tapOn: "^არჩევა$"
+- tapOn: ".*აირჩიე არეალი.*"
+- assertVisible: ".*სამუშაო არეალი.*"
+- tapOn: ".*ყველას მონიშვნა.*"
+- tapOn: "^შენახვა$"
+- tapOn: "^პროფილის შექმნა$"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+# --- Phase 2: OfferPriceSheet (BottomSheet-hosted, autoFocus) — the
+# central BottomSheet.tsx fix. The sheet opens with the keyboard already
+# showing (autoFocus); both the typed price and the submit button must
+# stay visible above it. -----------------------------------------------
+- tapOn:
+    text: ".*დაინტ. ვარ.*"
+    index: 0
+- assertVisible: ".*ჩაწერეთ თანხა.*"
+- tapOn: ".*ჩაწერეთ თანხა.*"
+- inputText: "555"
+- assertVisible: ".*555.*"
+- assertVisible:
+    id: "offer-price-submit"
+- hideKeyboard
+- tapOn:
+    id: "offer-price-submit"
+- assertVisible: ".*შეთავაზდა:.*"
+- back
+
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 3: ChatConversationScreen composer — the exact screen/bug the
+# user originally reported. -----------------------------------------------
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*მომხმარებელი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "KbVisCustomer"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.customerEmail}"
+- tapOn: ".*ჭავჭავაძის.*"
+- inputText: "Test address 1"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*პროფილის დასრულება.*"
+- tapOn: "^დასრულება$"
+- assertVisible: ".*სერვისები.*"
+
+- tapOn: ".*მოძებნე ოსტატი.*"
+- inputText: "KbVisProvider"
+- hideKeyboard
+- tapOn:
+    text: ".*KbVisProvider Test.*"
+- assertVisible: ".*ოსტატის პროფილი.*"
+- tapOn: ".*მიწერა.*"
+
+- tapOn:
+    id: "chat-message-input"
+- inputText: "KbVisMsg unique marker"
+# Keyboard is open here — before this fix, the ENTIRE composer (this
+# text, the attach button, the send button) was invisible, pushed off
+# the bottom of the screen. Both the typed text and the send button must
+# now be visible above the keyboard.
+- assertVisible: ".*KbVisMsg unique marker.*"
+- assertVisible:
+    id: "chat-send-button"
+- hideKeyboard
+- tapOn:
+    id: "chat-send-button"
+- assertVisible: ".*KbVisMsg unique marker.*"
+
+# --- Cleanup: logout -------------------------------------------------------
+# Two backs, not one — chat was opened from the Provider's public profile
+# (a root-stack screen), so the first `back` only returns there; the
+# second is what actually reaches the tab bar underneath.
+- back
+- back
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"

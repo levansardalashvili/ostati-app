@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Briefcase, Clock, MapPin, User } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -14,8 +14,9 @@ import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
 import { quoteService } from '../services/quoteService';
 import { useJobStatus } from '../state/JobStatusContext';
-import type { FeedJob } from '../types/job';
+import type { FeedJob, JobStatus } from '../types/job';
 import type { ProviderTabParamList, RootStackParamList } from '../navigation/types';
+import { usePressScale } from '../utils/usePressScale';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<ProviderTabParamList, 'MyJobsTab'>,
@@ -143,42 +144,53 @@ export function ProviderMyJobsScreen({ navigation }: Props) {
           {items.map((j) => {
             const liveStatus = j.customerJobId ? (getStatus(j.customerJobId) ?? j.status) : j.status;
             return (
-              <Pressable
+              <JobCard
                 key={j.id}
-                style={styles.card}
+                job={j}
+                status={liveStatus}
                 onPress={() =>
                   navigation.navigate('ProviderJobDetail', { id: j.id, job: j, mode: tab === 'pending' ? 'browse' : 'selected' })
                 }
-              >
-                <View style={styles.cardTop}>
-                  <View style={styles.cardTopLeft}>
-                    <CategoryIcon categoryId={j.category} />
-                    <Text style={styles.jobTitle} numberOfLines={1}>
-                      {j.title}
-                    </Text>
-                  </View>
-                  {liveStatus && <StatusPill status={liveStatus} />}
-                </View>
-                <View style={{ gap: spacing.xs + 2 }}>
-                  <View style={styles.metaRow}>
-                    <User size={13} color={colors.mutedForeground} />
-                    <Text style={styles.metaText}>{j.customer}</Text>
-                  </View>
-                  <View style={styles.metaRow}>
-                    <MapPin size={13} color={colors.mutedForeground} />
-                    <Text style={styles.metaText}>{j.location}</Text>
-                  </View>
-                  <View style={styles.metaRow}>
-                    <Clock size={13} color={colors.mutedForeground} />
-                    <Text style={styles.metaText}>{j.date}</Text>
-                  </View>
-                </View>
-              </Pressable>
+              />
             );
           })}
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function JobCard({ job: j, status, onPress }: { job: FeedJob; status?: JobStatus; onPress: () => void }) {
+  const { scale, onPressIn, onPressOut } = usePressScale();
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable style={styles.card} onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
+        <View style={styles.cardTop}>
+          <View style={styles.cardTopLeft}>
+            <CategoryIcon categoryId={j.category} />
+            <Text style={styles.jobTitle} numberOfLines={1}>
+              {j.title}
+            </Text>
+          </View>
+          {status && <StatusPill status={status} />}
+        </View>
+        <View style={{ gap: spacing.xs + 2 }}>
+          <View style={styles.metaRow}>
+            <User size={13} color={colors.mutedForeground} />
+            <Text style={styles.metaText}>{j.customer}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <MapPin size={13} color={colors.mutedForeground} />
+            <Text style={styles.metaText}>{j.location}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Clock size={13} color={colors.mutedForeground} />
+            <Text style={styles.metaText}>{j.date}</Text>
+          </View>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 

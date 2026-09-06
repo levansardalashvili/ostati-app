@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
+import { usePressScale } from '../utils/usePressScale';
 
 type IconComponent = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -18,23 +19,27 @@ type Props = {
 // პროფილის მენიუს რიგი (დიზაინის რეფერენსის Customer/ProviderProfile-ის
 // მენიუს item-ების მიხედვით) — გამოიყენება E1/E2-ში.
 export function ProfileMenuRow({ icon: Icon, label, iconBg, iconColor, badge, badgeVariant = 'solid', onPress }: Props) {
+  const { scale, onPressIn, onPressOut } = usePressScale(0.98);
+
   return (
-    <Pressable style={styles.row} onPress={onPress}>
-      <View style={styles.left}>
-        <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
-          <Icon size={17} color={iconColor} />
-        </View>
-        <Text style={styles.label}>{label}</Text>
-      </View>
-      <View style={styles.right}>
-        {!!badge && (
-          <View style={[styles.badge, badgeVariant === 'tint' && styles.badgeTint]}>
-            <Text style={[styles.badgeText, badgeVariant === 'tint' && styles.badgeTextTint]}>{badge}</Text>
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable style={styles.row} onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
+        <View style={styles.left}>
+          <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
+            <Icon size={17} color={iconColor} />
           </View>
-        )}
-        <ChevronRight size={15} color={colors.mutedForeground} />
-      </View>
-    </Pressable>
+          <Text style={styles.label}>{label}</Text>
+        </View>
+        <View style={styles.right}>
+          {!!badge && (
+            <View style={[styles.badge, badgeVariant === 'tint' && styles.badgeTint]}>
+              <Text style={[styles.badgeText, badgeVariant === 'tint' && styles.badgeTextTint]}>{badge}</Text>
+            </View>
+          )}
+          <ChevronRight size={15} color={colors.mutedForeground} />
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 

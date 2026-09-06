@@ -1,6 +1,7 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme';
+import { usePressScale } from '../utils/usePressScale';
 
 type Props = {
   label: string;
@@ -15,27 +16,33 @@ type Props = {
 // მიხედვით) — გამოიყენება Provider Setup-ის სამუშაო რაიონებში და Customer/
 // Provider Home-ის ფილტრებში (product-spec.md, C1).
 export function Chip({ label, selected, onPress, variant = 'outline' }: Props) {
+  const { scale, onPressIn, onPressOut } = usePressScale(0.93);
+
   return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.chip,
-        variant === 'outline' && selected && styles.outlineSelected,
-        variant === 'filled' && styles.filled,
-        variant === 'filled' && selected && styles.filledSelected,
-      ]}
-    >
-      <Text
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
         style={[
-          styles.label,
-          variant === 'outline' && selected && styles.labelOutlineSelected,
-          variant === 'filled' && styles.labelFilled,
-          variant === 'filled' && selected && styles.labelFilledSelected,
+          styles.chip,
+          variant === 'outline' && selected && styles.outlineSelected,
+          variant === 'filled' && styles.filled,
+          variant === 'filled' && selected && styles.filledSelected,
         ]}
       >
-        {label}
-      </Text>
-    </Pressable>
+        <Text
+          style={[
+            styles.label,
+            variant === 'outline' && selected && styles.labelOutlineSelected,
+            variant === 'filled' && styles.labelFilled,
+            variant === 'filled' && selected && styles.labelFilledSelected,
+          ]}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 

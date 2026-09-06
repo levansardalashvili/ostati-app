@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCircle, Image as ImageIcon, Star } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -128,7 +128,13 @@ export function RatingScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader title="ოსტატის შეფასება" onBack={() => navigation.goBack()} showBack={false} />
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      {/* Android's native window-resize (`softwareKeyboardLayoutMode:
+          "resize"`, app.json) silently no-ops under edge-to-edge rendering
+          (default since Expo SDK 52+), so the review textarea + submit
+          footer below it would otherwise end up hidden behind the
+          keyboard — same bug as ChatConversationScreen's composer. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         <View style={styles.providerCard}>
           <Avatar initials={providerInitials} color={providerColor} size={48} />
           <View>
@@ -191,17 +197,18 @@ export function RatingScreen({ navigation, route }: Props) {
             onPreview={setPreviewPhoto}
           />
         </View>
-      </ScrollView>
+        </ScrollView>
 
-      <View style={styles.footer}>
-        <Button
-          label="შეფასების გაგზავნა"
-          loadingLabel="იგზავნება..."
-          onPress={handleSubmit}
-          disabled={stars === 0}
-          loading={submitting}
-        />
-      </View>
+        <View style={styles.footer}>
+          <Button
+            label="შეფასების გაგზავნა"
+            loadingLabel="იგზავნება..."
+            onPress={handleSubmit}
+            disabled={stars === 0}
+            loading={submitting}
+          />
+        </View>
+      </KeyboardAvoidingView>
 
       <MediaPreviewModal
         item={previewPhoto}

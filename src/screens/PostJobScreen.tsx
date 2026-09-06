@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -330,6 +332,12 @@ export function PostJobScreen({ navigation }: Props) {
           hide/show flicker for a few seconds would be worse) while `loading`. */}
       <BackHeader title="მოთხოვნის გამოქვეყნება" onBack={() => !loading && navigation.goBack()} />
 
+      {/* Android's native window-resize silently no-ops under edge-to-edge
+          rendering (Expo SDK 52+ default) — without this, the description/
+          address fields + publish footer below them would be hidden
+          behind the keyboard, same bug as ChatConversationScreen's
+          composer. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled">
         <View style={styles.field}>
           <FieldLabel text="კატეგორია" required />
@@ -459,6 +467,7 @@ export function PostJobScreen({ navigation }: Props) {
           loading={loading}
         />
       </View>
+      </KeyboardAvoidingView>
 
       <BottomSheet visible={categorySheetOpen} onClose={() => setCategorySheetOpen(false)}>
         <Text style={styles.sheetTitle}>კატეგორია</Text>

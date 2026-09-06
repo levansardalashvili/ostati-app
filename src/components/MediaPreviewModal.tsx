@@ -59,8 +59,9 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   card: {
-    width: 220,
-    height: 220,
+    width: '100%',
+    maxWidth: 220,
+    aspectRatio: 1,
     borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',

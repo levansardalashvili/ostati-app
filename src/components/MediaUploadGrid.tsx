@@ -1,8 +1,9 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Camera, Image as ImageIcon, X, type LucideIcon } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
 import { SecureStorageImage } from './SecureStorageImage';
+import { usePressScale } from '../utils/usePressScale';
 
 // `uri` — არასავალდებულო, ლოკალური ან Supabase Storage-ის საჯარო URL (#62) —
 // თუ არსებობს, რეალური სურათი რენდერდება ფერადი placeholder-ის ნაცვლად.
@@ -35,6 +36,11 @@ type Props = {
   icon: LucideIcon;
   addLabelPrimary?: string;
   addLabelSecondary?: string;
+  // E2E (Maestro) support — a screen can render more than one grid (e.g.
+  // ProviderEditProfileScreen's certificates AND portfolio sections both
+  // say "გადაღება"/"გალერეა"), which text-based selectors can't
+  // disambiguate.
+  testID?: string;
 };
 
 // ერთი გაზიარებული ბადე ატვირთული ფაილებისთვის (სერთიფიკატები/ნამუშევრები/
@@ -50,36 +56,73 @@ export function MediaUploadGrid({
   icon: Icon,
   addLabelPrimary = 'გადაღება',
   addLabelSecondary = 'გალერეა',
+  testID,
 }: Props) {
   return (
     <View style={styles.row}>
       {items.map((item) => (
-        <Pressable key={item.id} style={[styles.thumb, { backgroundColor: item.bg }]} onPress={() => onPreview(item)}>
-         {item.uri ? (
-  <SecureStorageImage
-    reference={item.uri}
-    style={styles.thumbImage}
-  />
-) : (
-  <Icon
-    size={20}
-    color="rgba(100,116,139,0.5)"
-  />
-)}
-          <Pressable style={styles.remove} onPress={() => onRemove(item.id)} hitSlop={8}>
-            <X size={10} color="#FFFFFF" strokeWidth={2.5} />
-          </Pressable>
-        </Pressable>
+        <MediaThumb key={item.id} item={item} Icon={Icon} onPreview={() => onPreview(item)} onRemove={() => onRemove(item.id)} />
       ))}
-      <Pressable style={styles.addButton} onPress={onAddCamera}>
-        <Camera size={18} color={colors.mutedForeground} />
-        <Text style={styles.addText}>{addLabelPrimary}</Text>
-      </Pressable>
-      <Pressable style={styles.addButton} onPress={onAddGallery}>
-        <ImageIcon size={18} color={colors.mutedForeground} />
-        <Text style={styles.addText}>{addLabelSecondary}</Text>
-      </Pressable>
+      <AddTile testID={testID && `${testID}-camera`} icon={Camera} label={addLabelPrimary} onPress={onAddCamera} />
+      <AddTile testID={testID && `${testID}-gallery`} icon={ImageIcon} label={addLabelSecondary} onPress={onAddGallery} />
     </View>
+  );
+}
+
+function MediaThumb({
+  item,
+  Icon,
+  onPreview,
+  onRemove,
+}: {
+  item: MediaItem;
+  Icon: LucideIcon;
+  onPreview: () => void;
+  onRemove: () => void;
+}) {
+  const { scale, onPressIn, onPressOut } = usePressScale();
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        style={[styles.thumb, { backgroundColor: item.bg }]}
+        onPress={onPreview}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+      >
+        {item.uri ? (
+          <SecureStorageImage reference={item.uri} style={styles.thumbImage} />
+        ) : (
+          <Icon size={20} color="rgba(100,116,139,0.5)" />
+        )}
+        <Pressable style={styles.remove} onPress={onRemove} hitSlop={8}>
+          <X size={10} color="#FFFFFF" strokeWidth={2.5} />
+        </Pressable>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function AddTile({
+  testID,
+  icon: Icon,
+  label,
+  onPress,
+}: {
+  testID?: string;
+  icon: LucideIcon;
+  label: string;
+  onPress: () => void;
+}) {
+  const { scale, onPressIn, onPressOut } = usePressScale();
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable testID={testID} style={styles.addButton} onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
+        <Icon size={18} color={colors.mutedForeground} />
+        <Text style={styles.addText}>{label}</Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
