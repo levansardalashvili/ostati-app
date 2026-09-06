@@ -83,7 +83,11 @@ export function NotificationsScreen({ navigation, route }: Props) {
               <Text style={styles.markAllText}>ყველა წაკითხ.</Text>
             </Pressable>
           )}
-          <Pressable style={styles.iconButtonSm} onPress={() => navigation.navigate('NotificationSettings', { role })}>
+          <Pressable
+            style={styles.iconButtonSm}
+            testID="notification-settings-button"
+            onPress={() => navigation.navigate('NotificationSettings', { role })}
+          >
             <Settings size={15} color={colors.mutedForeground} />
           </Pressable>
         </View>

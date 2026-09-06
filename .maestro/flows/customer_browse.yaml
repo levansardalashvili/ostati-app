@@ -1,0 +1,217 @@
+appId: com.ostati.app
+---
+# Customer browse — covers three CustomerHomeScreen entry points that had
+# zero E2E coverage: "ყველა სერვისი" → CustomerCategoriesScreen (15-category
+# grid, #10/#11) → CustomerCategoryScreen (providers filtered to that one
+# category — #11's own bugfix note: the original zip reference screen never
+# actually filtered), and "ტოპ ოსტატები შენს არეალში" → "ყველას ნახვა" →
+# CustomerProviderListScreen (full directory + search + category/district
+# filter chips, #21).
+#
+# A real Provider registers with specialty "ელექტრიკოსი" — `userService`'s
+# specialty→category alias (specialties.ts's `specialtyIdToCategoryId`)
+# maps this to the `electrical`/"ელექტროობა" CATEGORIES entry, so this
+# Provider must show up under that specific category everywhere below.
+
+- launchApp
+- extendedWaitUntil:
+    notVisible: "Loading from"
+    timeout: 20000
+# Optional dev-client "developer menu" onboarding tip — shown once per
+# fresh PROCESS START (an in-memory flag, not persisted — `launchApp`
+# restarts the process each time, so this reappears on every single run).
+# It does NOT auto-dismiss; it must be tapped, or it sits there blocking
+# everything underneath forever.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 6000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+# Maestro's accessibility-injected tap on "Continue" consistently lands on
+# the dev-client's floating gear bubble instead — detect and back out of
+# the Tools menu if it happened (see .maestro/README.md for the full
+# root-cause writeup).
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: ".*(პროფილი|დაწყება).*"
+    timeout: 25000
+
+# Leftover-session cleanup, in case a previous run crashed mid-flow.
+- tapOn:
+    text: ".*პროფილი.*"
+    optional: true
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: ".*გასვლა.*"
+    optional: true
+- tapOn:
+    id: "logout-confirm-button"
+    optional: true
+
+# --- Phase 1: Provider registers (just needs a real provider_profiles row,
+# under the "ელექტრიკოსი"/"ელექტროობა" specialty/category) -------------
+- evalScript: ${output.providerEmail = 'e2e.browse.provider.' + Date.now() + '@example.com'}
+- evalScript: ${output.customerEmail = 'e2e.browse.customer.' + Date.now() + '@example.com'}
+- evalScript: ${output.providerFirstName = 'BrowseProviderE2E' + Date.now()}
+
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*ოსტატი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "${output.providerFirstName}"
+- tapOn:
+    id: "register-last-name"
+- inputText: "Test"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.providerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- tapOn: ".*აირჩიე სპეციალობა.*"
+- tapOn: ".*ელექტრიკოსი.*"
+- tapOn: "^არჩევა$"
+- tapOn: ".*აირჩიე არეალი.*"
+- assertVisible: ".*სამუშაო არეალი.*"
+- tapOn: ".*ყველას მონიშვნა.*"
+- tapOn: "^შენახვა$"
+- tapOn: "^პროფილის შექმნა$"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 2: Customer registers -----------------------------------------
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*მომხმარებელი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "BrowseCustomer"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.customerEmail}"
+- tapOn: ".*ჭავჭავაძის.*"
+- inputText: "Test address 1"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*პროფილის დასრულება.*"
+- tapOn: "^დასრულება$"
+- assertVisible: ".*სერვისები.*"
+
+# --- Phase 3: "ყველა სერვისი" → CustomerCategoriesScreen → "ელექტროობა" →
+# CustomerCategoryScreen shows the real Provider, correctly filtered
+# (#11's own bugfix note — the original reference screen never filtered
+# at all). -----------------------------------------------------------------
+- tapOn: ".*ყველა სერვისი.*"
+- assertVisible: ".*ყველა სერვისი.*"
+- tapOn: ".*ელექტროობა.*"
+# Dev DB accumulates leftover "ელექტრიკოსი" test providers from every
+# previous E2E run (this suite never deletes its own test data) — this
+# freshly-registered one lands at the END of that (unsorted-by-search)
+# list, so a scroll is needed to actually see it, unlike screens with a
+# search box that can narrow to a single, immediately-visible match.
+- scrollUntilVisible:
+    element: ".*${output.providerFirstName} Test.*"
+    direction: DOWN
+    timeout: 15000
+- back
+- back
+- assertVisible: ".*სერვისები.*"
+
+# --- Phase 4: "ტოპ ოსტატები შენს არეალში" → "ყველას ნახვა" →
+# CustomerProviderListScreen — full directory, unfiltered, then narrowed
+# by search text and by category chip. -----------------------------------
+- scrollUntilVisible:
+    element: ".*ყველას ნახვა.*"
+    direction: DOWN
+- tapOn: ".*ყველას ნახვა.*"
+- assertVisible: ".*ყველა ოსტატი.*"
+# Skip a scroll-to-find here: this list is the ENTIRE directory (every
+# category, every previous E2E run's leftover providers) sorted by
+# ranking, and a freshly-registered/0-review Provider can rank arbitrarily
+# far down it — an unbounded scroll would be slow and flaky. The search
+# box immediately below narrows deterministically to just this Provider,
+# which is the meaningful assertion anyway.
+- tapOn: ".*მოძებნე ოსტატი.*"
+- inputText: "${output.providerFirstName}"
+- hideKeyboard
+- assertVisible: ".*${output.providerFirstName} Test.*"
+
+# Category chip filter — selecting the matching category keeps the
+# Provider visible (search text from above stays active too — both
+# conditions are AND'd, and this Provider satisfies both). The chip lives
+# in a horizontal scroller so it may not be on-screen without scrolling
+# right first.
+- scrollUntilVisible:
+    element: ".*ელექტროობა.*"
+    direction: RIGHT
+    optional: true
+- tapOn: ".*ელექტროობა.*"
+- assertVisible: ".*${output.providerFirstName} Test.*"
+- tapOn: ".*ელექტროობა.*"
+
+- back
+# Not "სერვისები" here — Home's own scroll position was left wherever the
+# earlier "ყველას ნახვა" scroll-to-find landed it, so that section header
+# may now be off-screen. The search bar sits in Home's fixed header, above
+# the scrollable content, so it's visible regardless of scroll position.
+- assertVisible: ".*მოძებნე ოსტატი.*"
+
+# --- Cleanup: logout -------------------------------------------------------
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"

@@ -165,7 +165,12 @@ appId: com.ostati.app
 - hideKeyboard
 - tapOn:
     id: "offer-price-submit"
-- assertVisible: ".*ინტერესი გაგზავნილია.*"
+# Product change: interest confirmation now shows on ProviderJobDetailScreen's
+# footer button ("შეთავაზდა: <price> ₾"), not the feed card's "sent" strip —
+# see provider_core_journey.yaml for the full explanation. `back` pops the
+# root-stack detail screen so the tab bar is reachable again.
+- assertVisible: ".*შეთავაზდა:.*"
+- back
 
 - tapOn: ".*პროფილი.*"
 - scrollUntilVisible:
@@ -298,6 +303,71 @@ appId: com.ostati.app
 
 - assertVisible: ".*სერვისები.*"
 - tapOn: ".*პროფილი.*"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 6: Provider logs back in and views its own now-completed job -
+# `ProviderMyJobsScreen`'s card always navigates with `mode: 'selected'`
+# (never 'completed' directly) — the screen itself resolves the real
+# `variant` from the job's actual, freshly-fetched status (#82), so this
+# still lands on the 'completed' variant (received-rating banner) because
+# the job really is `status='completed'` in the DB by now. This is a
+# freshly-registered Provider account with exactly one assigned job total
+# (this same flow's job), so no jobMarker text-matching is needed on
+# either list screen below — there's nothing else it could be.
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.providerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+- tapOn: ".*სამუშაოები.*"
+- tapOn: "^დასრულებული$"
+- tapOn:
+    text: ".*სანტექნიკა.*"
+    index: 0
+- assertVisible: ".*სამუშაო დასრულებულად დადასტურდა.*"
+- assertVisible: ".*5.0.*"
+- back
+
+# Also verify ProviderCompletedJobsScreen (Profile menu → "შესრულებული
+# სამუშაოები" — a separate, non-tappable read-only list, #69) shows the
+# same job with its real star rating (`reviewService.listReviewStarsByJob`).
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*შესრულებული სამუშაოები.*"
+    direction: DOWN
+    optional: true
+- tapOn: ".*შესრულებული სამუშაოები.*"
+- assertVisible: ".*სანტექნიკა.*"
+- back
+
+# Also verify ProviderReviewsScreen (Profile menu → "შეფასებები") shows
+# the real, aggregated review — avg "5.0" and a "1 შეფ." count, both
+# computed from the actual `reviews` row this same job just created
+# (Phase 5's 5-star rating), not a hardcoded/mock summary.
+- scrollUntilVisible:
+    element: ".*შეფასებები.*"
+    direction: DOWN
+    optional: true
+- tapOn: ".*შეფასებები.*"
+- assertVisible: ".*5.0.*"
+- assertVisible: ".*1 შეფ.*"
+- back
+
+# --- Cleanup: logout ------------------------------------------------------
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"

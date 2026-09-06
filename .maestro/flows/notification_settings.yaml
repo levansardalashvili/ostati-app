@@ -1,0 +1,189 @@
+appId: com.ostati.app
+---
+# NotificationSettingsScreen toggle persistence (Task 3, `notification_preferences`)
+# — the `notifications.yaml` flow already covers the notification LIST/badge,
+# but never opened Settings itself. This proves the toggles are real,
+# server-backed state (Supabase `notification_preferences.prefs` jsonb),
+# not just local component state: (1) every toggle defaults to ON with no
+# row in the DB yet ("missing key = enabled", never "disabled" — #73's
+# explicit rule), (2) turning ONE off and logging out+in (clearing all
+# in-memory state) shows it still off, while an untouched toggle stays on.
+#
+# `Switch` (src/components/Switch.tsx) is a bare custom Pressable with no
+# text of its own — added `accessibilityRole="switch"` +
+# `accessibilityState={{checked: value}}` (a real accessibility
+# improvement, not just a test hook) so Maestro's `checked:` selector
+# field can read its actual on/off state, and a stable `testID` per
+# toggle key (`notif-toggle-<key>`) so each row's switch can be targeted
+# individually.
+
+- launchApp
+- extendedWaitUntil:
+    notVisible: "Loading from"
+    timeout: 20000
+# Optional dev-client "developer menu" onboarding tip — shown once per
+# fresh PROCESS START (an in-memory flag, not persisted — `launchApp`
+# restarts the process each time, so this reappears on every single run).
+# It does NOT auto-dismiss; it must be tapped, or it sits there blocking
+# everything underneath forever.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 6000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+# Maestro's accessibility-injected tap on "Continue" consistently lands on
+# the dev-client's floating gear bubble instead — detect and back out of
+# the Tools menu if it happened (see .maestro/README.md for the full
+# root-cause writeup).
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: ".*(პროფილი|დაწყება).*"
+    timeout: 25000
+
+# Leftover-session cleanup, in case a previous run crashed mid-flow.
+- tapOn:
+    text: ".*პროფილი.*"
+    optional: true
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: ".*გასვლა.*"
+    optional: true
+- tapOn:
+    id: "logout-confirm-button"
+    optional: true
+
+# --- Phase 1: Register a Customer ----------------------------------------
+- evalScript: ${output.email = 'e2e.notifsettings.' + Date.now() + '@example.com'}
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*მომხმარებელი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "NotifSettings"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.email}"
+- tapOn: ".*ჭავჭავაძის.*"
+- inputText: "Test address 1"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*პროფილის დასრულება.*"
+- tapOn: "^დასრულება$"
+- assertVisible: ".*სერვისები.*"
+
+# --- Phase 2: Open Notifications → Settings, verify all-default-ON -------
+# Same dev-client floating-bubble collision as "post-job-fab"/
+# "job-detail-menu-button" (README) — the bell sits in the same top-right
+# corner, so `tapOn: id:` lands on the bubble instead. Tap its top edge.
+- tapOn:
+    point: "91%, 7%"
+# Same top-right dev-client bubble collision as the bell above — this
+# gear icon's bounds ([954,164][1038,248], measured via uiautomator dump)
+# overlap the bubble's own ([902,174][1039,311]) almost entirely except
+# for a thin sliver at the very top. Tap that sliver instead of the id.
+- tapOn:
+    point: "92%, 7%"
+- assertVisible: ".*ახალი ინტერესი ჩემს მოთხოვნაზე.*"
+- assertVisible:
+    id: "notif-toggle-new_interest"
+    checked: true
+- assertVisible:
+    id: "notif-toggle-new_chat_message"
+    checked: true
+- assertVisible:
+    id: "notif-toggle-job_status_change"
+    checked: true
+- assertVisible:
+    id: "notif-toggle-completion_reminder"
+    checked: true
+
+# --- Phase 3: Turn ONE toggle off, confirm it flips immediately ----------
+- tapOn:
+    id: "notif-toggle-new_chat_message"
+- assertVisible:
+    id: "notif-toggle-new_chat_message"
+    checked: false
+# Untouched toggles must be unaffected by the one write above.
+- assertVisible:
+    id: "notif-toggle-new_interest"
+    checked: true
+
+# --- Phase 4: Log out (clears all in-memory state) and back in — the
+# screen must load the REAL persisted prefs from Supabase, not defaults. -
+- back
+- back
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.email}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*სერვისები.*"
+
+# Same dev-client floating-bubble collision as "post-job-fab"/
+# "job-detail-menu-button" (README) — the bell sits in the same top-right
+# corner, so `tapOn: id:` lands on the bubble instead. Tap its top edge.
+- tapOn:
+    point: "91%, 7%"
+- tapOn:
+    point: "92%, 7%"
+- assertVisible:
+    id: "notif-toggle-new_chat_message"
+    checked: false
+- assertVisible:
+    id: "notif-toggle-new_interest"
+    checked: true
+- assertVisible:
+    id: "notif-toggle-job_status_change"
+    checked: true
+- assertVisible:
+    id: "notif-toggle-completion_reminder"
+    checked: true
+
+# --- Cleanup: logout -------------------------------------------------------
+- back
+- back
+- tapOn: ".*პროფილი.*"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"

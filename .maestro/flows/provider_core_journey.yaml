@@ -128,7 +128,15 @@ appId: com.ostati.app
 - hideKeyboard
 - tapOn:
     id: "offer-price-submit"
-- assertVisible: ".*ინტერესი გაგზავნილია.*"
+# Product change: "დაინტ. ვარ" now navigates to ProviderJobDetailScreen
+# (full job details) with the price sheet auto-opened there, instead of
+# opening the sheet directly from the feed card — the confirmation text
+# lives on that screen's footer button ("შეთავაზდა: <price> ₾"), not the
+# feed card's "sent" strip ("ინტერესი გაგზავნილია"). `back` returns to the
+# feed/tab underneath (ProviderJobDetail is a root-stack screen, so the
+# tab bar isn't reachable until we pop back).
+- assertVisible: ".*შეთავაზდა:.*"
+- back
 
 # --- Edit profile ----------------------------------------------------------
 - tapOn: ".*პროფილი.*"

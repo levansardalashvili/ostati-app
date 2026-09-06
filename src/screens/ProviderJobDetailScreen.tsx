@@ -67,7 +67,7 @@ const PROVIDER_CANCEL_REASONS: { code: string; label: string }[] = [
 // machine მუშაობს (JobStatusContext.tsx) — Provider-ს პირდაპირ დასრულება არ
 // შეუძლია, მხოლოდ "სამუშაო დავასრულე", რაც Customer-ის დადასტურებას ელოდება.
 export function ProviderJobDetailScreen({ navigation, route }: Props) {
-  const { id, mode = 'browse', job: passedJob } = route.params;
+  const { id, mode = 'browse', job: passedJob, autoOpenOffer } = route.params;
   const [job, setJob] = useState<FeedJob>(() => passedJob ?? EMPTY_JOB);
   const [jobLoading, setJobLoading] = useState(!passedJob);
   useEffect(() => {
@@ -93,7 +93,12 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   }, [passedJob, id]);
 
   const [expressed, setExpressed] = useState(false);
-  const [offerSheetOpen, setOfferSheetOpen] = useState(false);
+  // Feed-ის ბარათის "დაინტ. ვარ" ღილაკი (ProviderHomeScreen/
+  // ProviderJobFeedScreen) აღარ ხსნის ფასის sheet-ს ბარათიდანვე პირდაპირ —
+  // ნავიგირებს აქ, სრული აღწერის/ფოტოების ნახვის შემდეგ ფასის მოთხოვნისთვის
+  // (task-ის მოთხოვნა: Provider-მა ფასი უნდა შესთავაზოს მხოლოდ job-ის
+  // დეტალების ნახვის შემდეგ, არა ერთი შეხედვით feed-ის ბარათზე).
+  const [offerSheetOpen, setOfferSheetOpen] = useState(!!autoOpenOffer);
   const [offerPrice, setOfferPrice] = useState('');
   const { getStatus, setStatus } = useJobStatus();
 

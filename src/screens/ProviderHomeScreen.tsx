@@ -8,7 +8,6 @@ import { type CompositeScreenProps, useFocusEffect } from '@react-navigation/nat
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { CategoryIcon } from '../components/CategoryIcon';
-import { OfferPriceSheet } from '../components/OfferPriceSheet';
 import { ProviderFeedJobCard, ProviderFeedJobCardSkeleton } from '../components/ProviderFeedJobCard';
 import { StatusPill } from '../components/StatusPill';
 import { Switch } from '../components/Switch';
@@ -177,36 +176,14 @@ export function ProviderHomeScreen({ navigation }: Props) {
       jobStatus: job.status,
     });
   };
-  // #72: ფასი სავალდებულო, კონკრეტული რიცხვია — Job Feed-ის ბარათის
-  // "დაინტ. ვარ" ერთი-შეხებით ღილაკს ვეღარ შეუძლია პირდაპირ, ფასის
-  // გარეშე ინტერესის გაგზავნა, ამიტომ ჯერ ფასის prompt-ს ხსნის
-  // (OfferPriceSheet, ProviderJobDetailScreen-ის იგივე კომპონენტი).
-  const [offerJob, setOfferJob] = useState<FeedJob | null>(null);
-  const [offerPrice, setOfferPrice] = useState('');
-  const [sendingInterest, setSendingInterest] = useState(false);
-  const closeOfferSheet = () => {
-    setOfferJob(null);
-    setOfferPrice('');
-  };
-  const confirmInterest = async () => {
-    const priceNum = Number(offerPrice);
-    if (!offerJob || !offerPrice || priceNum <= 0 || sendingInterest) return;
-    const uid = authService.getCurrentUser()?.uid;
-    if (!uid) return;
-    setSendingInterest(true);
-    try {
-      await quoteService.expressInterest(offerJob.id, priceNum);
-      setInterests((prev) => {
-        const next = new Set(prev);
-        next.add(offerJob.id);
-        return next;
-      });
-      closeOfferSheet();
-    } catch {
-      Alert.alert('ვერ მოხერხდა', 'ინტერესის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
-    } finally {
-      setSendingInterest(false);
-    }
+  // Task — "დაინტ. ვარ" აღარ ხსნის ფასის sheet-ს ბარათიდანვე პირდაპირ
+  // (Provider სრული აღწერის/ფოტოების ნახვის გარეშე იძულებული იყო ფასი
+  // მაშინვე მიეთითებინა) — ნავიგირებს Detail-ზე, სადაც იგივე
+  // OfferPriceSheet ავტომატურად იხსნება (`autoOpenOffer`), მაგრამ სრული
+  // job-ის კონტექსტის გვერდით. `interests`-ის ლოკალური state ამ ეკრანზე
+  // useFocusEffect-ით ისედაც ახლდება ყოველ დაბრუნებაზე Detail-იდან.
+  const handleInterested = (job: FeedJob) => {
+    navigation.navigate('ProviderJobDetail', { id: job.id, job, autoOpenOffer: true });
   };
 
   return (
@@ -337,7 +314,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
                   job={job}
                   sent={interests.has(job.id)}
                   onDetail={() => handleJobDetail(job)}
-                  onInterested={() => setOfferJob(job)}
+                  onInterested={() => handleInterested(job)}
                   onChat={() => handleOpenChat(job)}
                 />
               ))}
@@ -349,15 +326,6 @@ export function ProviderHomeScreen({ navigation }: Props) {
           )}
         </View>
       </ScrollView>
-
-      <OfferPriceSheet
-        visible={!!offerJob}
-        price={offerPrice}
-        onChangePrice={setOfferPrice}
-        onSubmit={confirmInterest}
-        onClose={closeOfferSheet}
-        submitting={sendingInterest}
-      />
     </SafeAreaView>
   );
 }

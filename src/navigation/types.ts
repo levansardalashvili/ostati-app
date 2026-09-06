@@ -23,7 +23,7 @@ export type RootStackParamList = {
   // `job` — არასავალდებულო, უკვე წამოღებული FeedJob (real Supabase-ის
   // job_posts-იდან, #54 "ეტაპი B"). თუ არ არის გადაცემული, ეკრანი თავად
   // წამოიღებს (jobService.getFeedJobPostById, #71).
-  ProviderJobDetail: { id: string; mode?: 'browse' | 'selected' | 'completed'; job?: FeedJob };
+  ProviderJobDetail: { id: string; mode?: 'browse' | 'selected' | 'completed'; job?: FeedJob; autoOpenOffer?: boolean };
   ProviderJobFeed: undefined;
   PostJob: undefined;
   // `job` — არასავალდებულო, უკვე წამოღებული CustomerJob ობიექტი (real

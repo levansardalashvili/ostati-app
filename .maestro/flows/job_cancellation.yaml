@@ -214,7 +214,12 @@ appId: com.ostati.app
 - hideKeyboard
 - tapOn:
     id: "offer-price-submit"
-- assertVisible: ".*ინტერესი გაგზავნილია.*"
+# Product change: interest confirmation now shows on ProviderJobDetailScreen's
+# footer button ("შეთავაზდა: <price> ₾"), not the feed card's "sent" strip —
+# see provider_core_journey.yaml for the full explanation. `back` pops the
+# root-stack detail screen so the tab bar is reachable again.
+- assertVisible: ".*შეთავაზდა:.*"
+- back
 
 - tapOn: ".*პროფილი.*"
 - scrollUntilVisible:

@@ -6,6 +6,7 @@ type Props = {
   value: boolean;
   onValueChange: (value: boolean) => void;
   activeColor?: string;
+  testID?: string;
 };
 
 const WIDTH = 48;
@@ -15,7 +16,7 @@ const THUMB = 18;
 // მორგებული toggle switch (დიზაინის რეფერენსის availability toggle-ის
 // მიხედვით) — გამოიყენება Provider Home-ის ხელმისაწვდომობის toggle-სა და
 // Notification Settings-ის toggle-ებში.
-export function Switch({ value, onValueChange, activeColor = colors.success }: Props) {
+export function Switch({ value, onValueChange, activeColor = colors.success, testID }: Props) {
   const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
 
   React.useEffect(() => {
@@ -30,7 +31,10 @@ export function Switch({ value, onValueChange, activeColor = colors.success }: P
 
   return (
     <Pressable
+      testID={testID}
       onPress={() => onValueChange(!value)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
       style={[
         styles.track,
         { backgroundColor: value ? activeColor : colors.mutedForeground },

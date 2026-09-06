@@ -1,0 +1,173 @@
+appId: com.ostati.app
+---
+# Provider verification — the REAL, successful submit path (Task 3, #87).
+# `provider_verification.yaml` only ever covered the negative/eligibility-
+# gating case (a photo-less Provider, button correctly disabled) — it
+# explicitly said the actual `request_provider_verification()` RPC call
+# was out of scope because it needs a profile photo, which needs the
+# native OS picker. That limitation no longer holds: `chat_image_upload.yaml`
+# already proved Android's system Photo Picker (gallery) is fully
+# automatable, and `ProviderSetupScreen` (unlike ProviderEditProfileScreen,
+# whose avatar badge is camera-only) has its own explicit "გალერეიდან
+# არჩევა" button for the profile photo — so a fully-eligible Provider
+# (name + specialty + area + photo, `getVerificationEligibility()`'s exact
+# 4-factor check) can be built entirely at registration time.
+#
+# Requires a test image already pushed to the emulator's gallery before
+# running:
+#   adb push assets/icon.png //sdcard/Pictures/e2e_test_photo.png
+#   adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Pictures/e2e_test_photo.png
+
+- launchApp
+- extendedWaitUntil:
+    notVisible: "Loading from"
+    timeout: 20000
+# Optional dev-client "developer menu" onboarding tip — shown once per
+# fresh PROCESS START (an in-memory flag, not persisted — `launchApp`
+# restarts the process each time, so this reappears on every single run).
+# It does NOT auto-dismiss; it must be tapped, or it sits there blocking
+# everything underneath forever.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 6000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+# Maestro's accessibility-injected tap on "Continue" consistently lands on
+# the dev-client's floating gear bubble instead — detect and back out of
+# the Tools menu if it happened (see .maestro/README.md for the full
+# root-cause writeup).
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: ".*(პროფილი|დაწყება).*"
+    timeout: 25000
+
+# Leftover-session cleanup, in case a previous run crashed mid-flow.
+- tapOn:
+    text: ".*პროფილი.*"
+    optional: true
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: ".*გასვლა.*"
+    optional: true
+- tapOn:
+    id: "logout-confirm-button"
+    optional: true
+
+# --- Phase 1: Register a Provider with a profile photo set at setup time
+- evalScript: ${output.email = 'e2e.verify.' + Date.now() + '@example.com'}
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*ოსტატი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "VerifyProvider"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.email}"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- tapOn: ".*გალერეიდან არჩევა.*"
+# Android's system Photo Picker (no READ_MEDIA_IMAGES permission dialog)
+# opens directly. Tap the pushed test image, shown first under "Recent".
+- extendedWaitUntil:
+    visible: "Recent"
+    timeout: 10000
+- tapOn:
+    point: "16%, 34%"
+
+- tapOn: ".*აირჩიე სპეციალობა.*"
+- tapOn: ".*ელექტრიკოსი.*"
+- tapOn: "^არჩევა$"
+- tapOn: ".*აირჩიე არეალი.*"
+- assertVisible: ".*სამუშაო არეალი.*"
+- tapOn: ".*ყველას მონიშვნა.*"
+- tapOn: "^შენახვა$"
+- tapOn: "^პროფილის შექმნა$"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+# --- Phase 2: Submit the verification request — profile is now fully
+# eligible (name + specialty + area from setup, photo from the picker
+# above), so the "missing fields" box must NOT appear, and the request
+# button must be enabled. -------------------------------------------------
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*ვერიფიკაციის მოთხოვნა.*"
+    direction: DOWN
+- assertNotVisible: ".*დაასრულე პროფილი მოთხოვნამდე.*"
+- tapOn: ".*ვერიფიკაციის მოთხოვნა.*"
+- assertVisible: ".*ნამდვილად გსურს გაგზავნა?.*"
+- tapOn: ".*მოთხოვნის გაგზავნა.*"
+- assertVisible: ".*ვერიფიკაცია განხილვის პროცესშია.*"
+- assertVisible:
+    text: ".*განხილვის პროცესშია.*"
+    enabled: false
+
+# --- Phase 3: Log out (clears all in-memory Context) and back in — the
+# 'pending' status must be the REAL, persisted `verification_status` from
+# Supabase (`request_provider_verification()` RPC), not local-only state.
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.email}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*ვერიფიკაცია განხილვის პროცესშია.*"
+    direction: DOWN
+- assertVisible:
+    text: ".*განხილვის პროცესშია.*"
+    enabled: false
+
+# --- Cleanup: logout -------------------------------------------------------
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"

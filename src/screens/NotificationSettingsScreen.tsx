@@ -86,7 +86,12 @@ export function NotificationSettingsScreen({ navigation, route }: Props) {
           {toggles.map((t, i) => (
             <View key={t.key} style={[styles.row, i < toggles.length - 1 && styles.rowBorder]}>
               <Text style={styles.rowLabel}>{t.label}</Text>
-              <Switch value={enabled.has(t.key)} onValueChange={() => toggle(t.key)} activeColor={colors.primary} />
+              <Switch
+                value={enabled.has(t.key)}
+                onValueChange={() => toggle(t.key)}
+                activeColor={colors.primary}
+                testID={`notif-toggle-${t.key}`}
+              />
             </View>
           ))}
         </View>

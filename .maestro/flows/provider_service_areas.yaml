@@ -1,0 +1,191 @@
+appId: com.ostati.app
+---
+# ProviderServiceAreasScreen ("სამუშაო არეალი", Provider Profile menu) —
+# regression coverage for the real bug found and fixed in #85: this screen
+# used to be entirely fake — `selected`'s initial value was always the
+# hardcoded ['ვაკე','საბურთალო','ვერა'] (never read the Provider's real,
+# already-saved `provider_profiles.areas`), and `handleSave` never wrote
+# anything to Supabase — it just showed a fake "შენახულია!" toast and
+# navigated back, silently discarding the change forever. Fixed to read
+# from `useProviderProfile()` and save via `userService.upsertProviderProfileRecord`
+# (same path ProviderEditProfileScreen's areas field already used).
+#
+# This flow proves both directions with a REAL round-trip through Supabase,
+# not just in-memory Context state that would "pass" even if the write
+# never actually happened:
+#   1. The screen loads the Provider's real, previously-saved work area
+#      (set once at registration) — not the old hardcoded fake set.
+#   2. Changing the selection and saving actually persists — proven by
+#      logging out (clearing all in-memory Context) and back in, then
+#      re-opening the screen and seeing the NEW selection, not the old
+#      one and not the fake one.
+
+- launchApp
+- extendedWaitUntil:
+    notVisible: "Loading from"
+    timeout: 20000
+# Optional dev-client "developer menu" onboarding tip — shown once per
+# fresh PROCESS START (an in-memory flag, not persisted — `launchApp`
+# restarts the process each time, so this reappears on every single run).
+# It does NOT auto-dismiss; it must be tapped, or it sits there blocking
+# everything underneath forever.
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 6000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+# Maestro's accessibility-injected tap on "Continue" consistently lands on
+# the dev-client's floating gear bubble instead — detect and back out of
+# the Tools menu if it happened (see .maestro/README.md for the full
+# root-cause writeup).
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: ".*(პროფილი|დაწყება).*"
+    timeout: 25000
+
+# Leftover-session cleanup, in case a previous run crashed mid-flow.
+- tapOn:
+    text: ".*პროფილი.*"
+    optional: true
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: ".*გასვლა.*"
+    optional: true
+- tapOn:
+    id: "logout-confirm-button"
+    optional: true
+
+# --- Phase 1: Register a Provider, pick ONE distinctive work area
+# (ბათუმი, in აჭარა — a region/district that is nowhere near the old
+# hardcoded fake Tbilisi set, so a leftover-fake-data bug would be
+# impossible to miss). --------------------------------------------------
+- evalScript: ${output.email = 'e2e.areas.' + Date.now() + '@example.com'}
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*ოსტატი.*"
+
+- tapOn:
+    id: "register-first-name"
+- inputText: "AreaTest"
+- tapOn:
+    id: "register-last-name"
+- inputText: "Provider"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.email}"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-terms-checkbox"
+- tapOn: ".*რეგისტრაცია.*"
+
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- tapOn: ".*აირჩიე სპეციალობა.*"
+- tapOn: ".*ელექტრიკოსი.*"
+- tapOn: "^არჩევა$"
+
+- tapOn: ".*აირჩიე არეალი.*"
+- assertVisible: ".*სამუშაო არეალი.*"
+- tapOn: ".*აჭარა.*"
+- tapOn: ".*ბათუმი.*"
+- assertVisible: ".*არჩეულია 1 არეალი.*"
+- tapOn: "^შენახვა$"
+
+- tapOn: "^პროფილის შექმნა$"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+# --- Phase 2: Open "სამუშაო არეალი" from the profile menu — verify it
+# loaded the REAL saved area (ბათუმი/აჭარა), not the old hardcoded fake
+# ['ვაკე','საბურთალო','ვერა'] (which would show "3 არეალი შერჩეულია"
+# and a Tbilisi selection instead of "1"/Adjara). ------------------------
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*სამუშაო არეალი.*"
+    direction: DOWN
+    optional: true
+- tapOn: ".*სამუშაო არეალი.*"
+- assertVisible: ".*აირჩიე არეალები.*"
+- assertVisible: ".*1 არეალი შერჩეულია.*"
+- tapOn: ".*აჭარა.*"
+- assertVisible: ".*ბათუმი.*"
+
+# --- Phase 3: Change the selection — drop ბათუმი, add two Tbilisi
+# districts — and save. ---------------------------------------------------
+- tapOn: ".*ბათუმი.*"
+- tapOn: ".*ვაკე.*"
+- tapOn: ".*საბურთალო.*"
+- assertVisible: ".*2 არეალი შერჩეულია.*"
+- tapOn: "^შენახვა$"
+
+# handleSave() calls navigation.goBack() on success — back on
+# ProviderProfileScreen confirms the save didn't throw/hang.
+- assertVisible: ".*პროფილის რედაქტირება.*"
+
+# --- Phase 4: Log out (clears all in-memory Context) and back in — the
+# screen must now load ${output.email}'s NEW selection from Supabase
+# itself, not a leftover in-memory value. --------------------------------
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.email}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+- tapOn: ".*პროფილი.*"
+- scrollUntilVisible:
+    element: ".*სამუშაო არეალი.*"
+    direction: DOWN
+    optional: true
+- tapOn: ".*სამუშაო არეალი.*"
+- assertVisible: ".*2 არეალი შერჩეულია.*"
+# თბილისი is expanded by default on mount (RegionAreaAccordion's own
+# `defaultExpanded = ['tbilisi']`) — no tap needed, its districts (and
+# the "2" count badge next to its own label) are already visible.
+- assertVisible: ".*ვაკე.*"
+- assertVisible: ".*საბურთალო.*"
+
+# --- Cleanup: logout -----------------------------------------------------
+- back
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
