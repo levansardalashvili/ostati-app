@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, X } from 'lucide-react-native';
+import { Check, ChevronDown, MapPin, Search, X } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
+import { BottomSheet } from '../components/BottomSheet';
+import { getCategoryIcon } from '../components/CategoryIcon';
 import { Chip } from '../components/Chip';
 import { ProviderCard, ProviderCardSkeleton } from '../components/ProviderCard';
+import { StartJobChatSheet } from '../components/StartJobChatSheet';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
 import { TBILISI_AREAS as DISTRICTS } from '../data/districts';
@@ -29,8 +32,22 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CustomerProviderList'>;
 export function CustomerProviderListScreen({ navigation }: Props) {
   const { profile } = useCustomerProfile();
   const [search, setSearch] = useState('');
-  const [selCats, setSelCats] = useState<Set<string>>(new Set());
-  const [selDistrict, setSelDistrict] = useState<string | 'mine' | null>(null);
+  // Task — კატეგორიების ჩამონათვალი (chip-row, მრავალარჩევანი) ჩანაცვლდა
+  // ერთარჩევანიანი dropdown-ით (მომხმარებლის მოთხოვნით) — იგივე
+  // "ველი-ღილაკი + BottomSheet სია" პატერნი, რასაც PostJobScreen-ის
+  // საკუთარი კატეგორიის dropdown იყენებს (#23/#39).
+  const [selCategory, setSelCategory] = useState<string | null>(null);
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
+  // Task — ძველი, გრძელი თბილისის რაიონების chip-სია (`TBILISI_AREAS`)
+  // ჩანაცვლდა თავისუფალი ტექსტის ძებნით — Provider-ის `areas` მთელი
+  // საქართველოს მოიცავს (georgiaRegions.ts, #9), chip-სია კი ამის მხოლოდ
+  // მცირე ნაწილს (თბილისი) აჩვენებდა — "გორი"-ს ტიპის საქალაქო/რეგიონული
+  // არეალი საერთოდ ვერასდროს მოიძებნებოდა. "ყველა არეალი"/"ჩემი არეალი"
+  // chip-ები დარჩა (მომხმარებლის დაზუსტებით) — ორივე ახლა უბრალოდ ამ
+  // ერთი `areaSearch`-ის მოსახერხებელი პრესეტია (არა ცალკე, დამოუკიდებელი
+  // filter-მდგომარეობა): "ყველა არეალი" ასუფთავებს ძებნის ველს, "ჩემი
+  // არეალი" კი ავსებს მას მომხმარებლის საკუთარი, ამოხსნილი რაიონით.
+  const [areaSearch, setAreaSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [providers, setProviders] = useState<Provider[]>([]);
 
@@ -56,19 +73,12 @@ export function CustomerProviderListScreen({ navigation }: Props) {
     [profile.defaultAddress],
   );
 
-  const toggleCat = (id: string) =>
-    setSelCats((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-
   const filtered = useMemo(() => {
-    const effectiveDistrict = selDistrict === 'mine' ? myDistrict : selDistrict;
+    const areaQuery = areaSearch.trim().toLowerCase();
     return providers
       .filter((p) => {
-        if (selCats.size > 0 && !selCats.has(p.category)) return false;
-        if (effectiveDistrict && !p.areas.includes(effectiveDistrict)) return false;
+        if (selCategory && p.category !== selCategory) return false;
+        if (areaQuery && !p.areas.some((a) => a.toLowerCase().includes(areaQuery))) return false;
         if (search.trim()) {
           const q = search.toLowerCase();
           const spec = (SPECIALTY_LABEL[p.category] ?? '').toLowerCase();
@@ -77,24 +87,36 @@ export function CustomerProviderListScreen({ navigation }: Props) {
         return true;
       })
       .sort((a, b) => providerRankScore(b) - providerRankScore(a));
-  }, [providers, search, selCats, selDistrict, myDistrict]);
+  }, [providers, search, selCategory, areaSearch]);
 
   const clearFilters = () => {
-    setSelCats(new Set());
-    setSelDistrict(null);
+    setSelCategory(null);
+    setAreaSearch('');
     setSearch('');
   };
+
+  const selectedCategoryLabel = CATEGORIES.find((c) => c.id === selCategory)?.label ?? null;
+  const SelectedCategoryIcon = getCategoryIcon(selCategory ?? '');
 
   const handleOpenProvider = (id: string) => {
     navigation.navigate('ViewProviderProfile', { id });
   };
-  const handleOpenChat = (provider: Provider) => {
+  // "ცივი ჩატის → job-ის შექმნის" ხვრელის ფიქსი — StartJobChatSheet.tsx-ის
+  // თავზე სრული მიზეზი (ViewProviderProfileScreen-ის იგივე ცვლილება).
+  const [startChatProvider, setStartChatProvider] = useState<Provider | null>(null);
+  const handleOpenChat = (provider: Provider) => setStartChatProvider(provider);
+  const openChatWithJob = (jobId: string | null, draftMessage?: string) => {
+    if (!startChatProvider) return;
+    const provider = startChatProvider;
+    setStartChatProvider(null);
     navigation.navigate('ChatConversation', {
       chatId: provider.id,
       name: provider.name,
       initials: provider.initials,
       color: provider.color,
       role: 'customer',
+      jobId: jobId ?? undefined,
+      draftMessage,
     });
   };
 
@@ -121,31 +143,45 @@ export function CustomerProviderListScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.filtersSection}>
+        <View style={styles.categoryFieldWrap}>
+          <Pressable style={styles.categoryField} onPress={() => setCategorySheetOpen(true)}>
+            <SelectedCategoryIcon size={17} color={selCategory ? colors.primary : colors.mutedForeground} strokeWidth={2} />
+            <Text style={[styles.categoryFieldText, !selCategory && styles.categoryFieldPlaceholder]} numberOfLines={1}>
+              {selectedCategoryLabel ?? 'აირჩიე სერვისი'}
+            </Text>
+            <ChevronDown size={16} color={colors.mutedForeground} />
+          </Pressable>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {CATEGORIES.map((c) => (
-            <Chip key={c.id} variant="filled" label={c.label} selected={selCats.has(c.id)} onPress={() => toggleCat(c.id)} />
-          ))}
-        </ScrollView>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          <Chip variant="filled" label="ყველა არეალი" selected={!selDistrict} onPress={() => setSelDistrict(null)} />
+          <Chip variant="filled" label="ყველა არეალი" selected={!areaSearch.trim()} onPress={() => setAreaSearch('')} />
           {myDistrict && (
             <Chip
               variant="filled"
               label="ჩემი არეალი"
-              selected={selDistrict === 'mine'}
-              onPress={() => setSelDistrict(selDistrict === 'mine' ? null : 'mine')}
+              selected={areaSearch.trim().toLowerCase() === myDistrict.toLowerCase()}
+              onPress={() =>
+                setAreaSearch(areaSearch.trim().toLowerCase() === myDistrict.toLowerCase() ? '' : myDistrict)
+              }
             />
           )}
-          {DISTRICTS.map((d) => (
-            <Chip
-              key={d}
-              variant="filled"
-              label={d}
-              selected={selDistrict === d}
-              onPress={() => setSelDistrict(d === selDistrict ? null : d)}
-            />
-          ))}
         </ScrollView>
+        <View style={styles.areaSearchWrap}>
+          <View style={styles.searchBar}>
+            <MapPin size={16} color={colors.mutedForeground} />
+            <TextInput
+              value={areaSearch}
+              onChangeText={setAreaSearch}
+              placeholder="მოძებნეთ სასურველი არეალი"
+              placeholderTextColor={colors.mutedForeground}
+              style={styles.searchInput}
+            />
+            {areaSearch.length > 0 && (
+              <Pressable onPress={() => setAreaSearch('')}>
+                <X size={15} color={colors.mutedForeground} />
+              </Pressable>
+            )}
+          </View>
+        </View>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
@@ -188,6 +224,47 @@ export function CustomerProviderListScreen({ navigation }: Props) {
           </View>
         )}
       </ScrollView>
+
+      <BottomSheet visible={categorySheetOpen} onClose={() => setCategorySheetOpen(false)}>
+        <Text style={styles.sheetTitle}>სერვისი</Text>
+        <ScrollView style={styles.categorySheetList} showsVerticalScrollIndicator={false}>
+          <Pressable
+            style={styles.categorySheetRow}
+            onPress={() => {
+              setSelCategory(null);
+              setCategorySheetOpen(false);
+            }}
+          >
+            <Text style={[styles.categoryLabel, !selCategory && styles.categoryLabelSelected]}>ყველა სერვისი</Text>
+            {!selCategory && <Check size={16} color={colors.primary} strokeWidth={3} />}
+          </Pressable>
+          {CATEGORIES.map((c) => {
+            const on = selCategory === c.id;
+            const Icon = getCategoryIcon(c.id);
+            return (
+              <Pressable
+                key={c.id}
+                onPress={() => {
+                  setSelCategory(c.id);
+                  setCategorySheetOpen(false);
+                }}
+                style={styles.categorySheetRow}
+              >
+                <View style={styles.categoryIconWrap}>
+                  <Icon size={18} color={on ? colors.primary : colors.mutedForeground} strokeWidth={2} />
+                </View>
+                <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{c.label}</Text>
+                {on && <Check size={16} color={colors.primary} strokeWidth={3} />}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </BottomSheet>
+      <StartJobChatSheet
+        provider={startChatProvider}
+        onClose={() => setStartChatProvider(null)}
+        onReady={openChatWithJob}
+      />
     </SafeAreaView>
   );
 }
@@ -228,6 +305,66 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
+  },
+  areaSearchWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  categoryFieldWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  categoryField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 6,
+  },
+  categoryFieldText: {
+    ...typography.caption,
+    color: colors.foreground,
+    fontWeight: '600',
+    flex: 1,
+  },
+  categoryFieldPlaceholder: {
+    color: colors.mutedForeground,
+    fontWeight: '400',
+  },
+  sheetTitle: {
+    ...typography.h3,
+    color: colors.foreground,
+    marginBottom: spacing.sm + 2,
+  },
+  categorySheetList: {
+    maxHeight: 420,
+  },
+  categorySheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 4,
+    paddingVertical: spacing.sm + 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.muted,
+  },
+  categoryIconWrap: {
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryLabel: {
+    ...typography.caption,
+    color: colors.foreground,
+    fontWeight: '500',
+    flex: 1,
+  },
+  categoryLabelSelected: {
+    color: colors.primary,
+    fontWeight: '700',
   },
   body: {
     flex: 1,

@@ -158,8 +158,9 @@ appId: com.ostati.app
 - assertVisible: ".*ახალი მოთხოვნები.*"
 
 - tapOn:
-    text: ".*დაინტ. ვარ.*"
+    text: ".*დეტ\\. ნახვა.*"
     below: ".*${output.jobMarker}.*"
+- tapOn: ".*დაინტერესება.*"
 - tapOn: ".*ჩაწერეთ თანხა.*"
 - inputText: "150"
 - hideKeyboard

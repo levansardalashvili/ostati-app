@@ -215,6 +215,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       initials: provider.initials,
       color: provider.color,
       role: 'customer',
+      jobId: job.id,
     });
   };
   const handleOpenProfile = (provider: Provider) => {
@@ -330,6 +331,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     });
   };
   const [reportingProblem, setReportingProblem] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const submitProblem = async () => {
     if (!problemOption || (problemOption === 'სხვა' && !problemOther.trim()) || reportingProblem) return;
     const reason = problemOption === 'სხვა' ? problemOther.trim() : problemOption;
@@ -398,9 +400,11 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
           {job.photos && job.photos.length > 0 && (
             <View style={styles.photoRow}>
               {job.photos.map((uri) => (
-                <View key={uri} style={styles.photoThumb}>
+                // Task — თამბნეილს გადიდება/გახსნა ადრე არ ჰქონდა (Provider-ის
+                // მხარესაც იგივე ხარვეზი იყო, ორივეგან გასწორდა ერთდროულად).
+                <Pressable key={uri} style={styles.photoThumb} onPress={() => setPhotoPreview(uri)}>
                   <SecureStorageImage reference={uri} style={styles.photoThumbImage} />
-                </View>
+                </Pressable>
               ))}
             </View>
           )}
@@ -458,10 +462,14 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
             )}
             <View style={styles.completionActionsRow}>
               <Pressable style={styles.problemButton} onPress={() => setProblemSheetOpen(true)} disabled={confirming}>
-                <Text style={styles.problemButtonText}>პრობლემა მაქვს</Text>
+                <Text style={styles.problemButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  პრობლემა მაქვს
+                </Text>
               </Pressable>
               <Pressable style={[styles.completeButton, confirming && styles.completeButtonDisabled]} onPress={confirmCompletion} disabled={confirming}>
-                <Text style={styles.completeButtonText}>{confirming ? 'დადასტურდება...' : 'დადასტურება'}</Text>
+                <Text style={styles.completeButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {confirming ? 'დადასტურდება...' : 'დადასტურება'}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -789,6 +797,15 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
           style={{ marginTop: spacing.sm }}
         />
       </BottomSheet>
+
+      {photoPreview && (
+        <Pressable style={styles.previewOverlay} onPress={() => setPhotoPreview(null)}>
+          <SecureStorageImage reference={photoPreview} style={styles.previewImage} resizeMode="cover" />
+          <Pressable style={styles.previewClose} onPress={() => setPhotoPreview(null)}>
+            <X size={18} color="#FFFFFF" />
+          </Pressable>
+        </Pressable>
+      )}
     </SafeAreaView>
   );
 }
@@ -871,6 +888,33 @@ const styles = StyleSheet.create({
   photoThumbImage: {
     width: '100%',
     height: '100%',
+  },
+  previewOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.88)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewImage: {
+    width: '85%',
+    maxWidth: 320,
+    aspectRatio: 4 / 3,
+    borderRadius: radius.lg,
+  },
+  previewClose: {
+    position: 'absolute',
+    top: 60,
+    right: spacing.lg,
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   section: {
     backgroundColor: colors.card,

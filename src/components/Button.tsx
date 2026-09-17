@@ -72,12 +72,22 @@ export function Button({
               color={textColorFor(variant)}
               style={styles.spinner}
             />
-            <Text style={[styles.label, { color: textColorFor(variant) }]}>
+            <Text
+              style={[styles.label, { color: textColorFor(variant) }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {loadingLabel ?? label}
             </Text>
           </>
         ) : (
-          <Text style={[styles.label, { color: textColorFor(variant) }]}>
+          <Text
+            style={[styles.label, { color: textColorFor(variant) }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
             {label}
           </Text>
         )}

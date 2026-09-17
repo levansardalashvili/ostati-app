@@ -18,6 +18,8 @@ import {
   ArrowLeft,
   Camera,
   Check,
+  CheckCircle,
+  ChevronRight,
   Clock,
   Image as ImageIcon,
   MoreVertical,
@@ -30,13 +32,17 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
+import { CategoryIcon } from '../components/CategoryIcon';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
+import { jobService } from '../services/jobService';
 import { storageService } from '../services/storageService';
 import type { ChatMsg, MsgState } from '../types/chat';
+import type { JobStatus } from '../types/job';
 import type { RootStackParamList } from '../navigation/types';
 import { SecureStorageImage } from '../components/SecureStorageImage';
+import { useJobStatus } from '../state/JobStatusContext';
 
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChatConversation'>;
@@ -47,18 +53,214 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ChatConversation'>;
 // არსებობდა, აქედან გამომდინარე დიზაინი თავიდან შემუშავდა. Provider
 // აგზავნის შეთავაზებას ცალკე ბარათის სახით (არა თავისუფალი ტექსტით),
 // Customer ეთანხმება/უარყოფს პირდაპირ ბარათიდან — ორივე მოქმედება რეალურად
-// Supabase-ის `messages` ცხრილშია (#66/#73). დათანხმებული ფასი job-ის
-// ჩანაწერში (`job_posts.agreed_price`) ჯერ მხოლოდ Provider-ის არჩევის
-// მომენტში იწერება (`select_provider()` RPC, #72) — ჩატში დათანხმებული
-// ფასის ამ ველში ავტომატურად ასახვა ცალკე, დარჩენილი ეტაპია.
+// Supabase-ის `messages` ცხრილშია (#66/#73). "დათანხმებაზე" `respond_to_chat_offer()`
+// RPC ატომურად ასრულებს Provider-ის არჩევასაც (`job_posts.provider_id`/
+// `agreed_price`/`status='active'`) — იგივე `assign_job_provider()` ლოგიკა,
+// რასაც `select_provider()` იძახებს Job Detail-ის ეკრანზე — Customer-ს
+// აღარ სჭირდება იქ დაბრუნება იმავე Provider-ის ხელახლა ასარჩევად. ჯერ-ის
+// ბანერზე "სამუშაოს დეტალების ნახვა" (jobId-ის არსებობისას) იხსნის
+// შესაბამის Job Detail ეკრანს პირდაპირ ჩატიდან.
 export function ChatConversationScreen({ navigation, route }: Props) {
-  const { chatId, name, initials, color, role, jobId, jobStatus } = route.params;
+  const { chatId, name, initials, color, role, jobId, jobStatus, draftMessage } = route.params;
   // ყველა navigation call site (#71) რეალურ Supabase UUID-ს გადასცემს
   // chatId-ად (მეორე მხარის auth.users.id) — mock chat-ის კუნძული
   // მთლიანად წაშლილია, ეს ეკრანი აღარ საჭიროებს mock/real branching-ს.
   const myUid = authService.getCurrentUser()?.uid ?? null;
   const customerId = role === 'customer' ? myUid : chatId;
   const providerId = role === 'provider' ? myUid : chatId;
+  const { getStatus, setStatus } = useJobStatus();
+
+  // Task — `jobId` route param-ად მოდის მხოლოდ job-კონკრეტული შესვლის
+  // წერტილებიდან (Job Detail/Feed ეკრანები). `ChatsListScreen`-იდან
+  // გახსნისას საერთოდ არ არსებობს (conversations job-თან არ არის
+  // დაკავშირებული, #57) — ეს `useEffect` best-effort ავსებს ამ ხარვეზს
+  // `findLatestSharedJobId()`-ით, მხოლოდ header-ის "დეტ. ნახვა" ბმულისთვის
+  // (composer-ის Wallet-ღილაკის `jobId && jobStatus==='pending'` პირობას
+  // არ ეხება — ეს კვლავ მხოლოდ ცალსახა, route param-ად გადმოცემულ
+  // jobId/jobStatus-ზეა, არა ამ auto-resolved მნიშვნელობაზე).
+  const [autoJobId, setAutoJobId] = useState<string | null>(null);
+  useEffect(() => {
+    if (jobId || !customerId || !providerId) return;
+    let cancelled = false;
+    jobService
+      .findLatestSharedJobId(customerId, providerId)
+      .then((found) => {
+        if (!cancelled) setAutoJobId(found);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId, customerId, providerId]);
+  const linkJobId = jobId ?? autoJobId ?? undefined;
+
+  const handleOpenJobDetail = () => {
+    if (!linkJobId) return;
+    if (role === 'customer') {
+      navigation.navigate('CustomerJobDetail', { jobId: linkJobId });
+    } else {
+      navigation.navigate('ProviderJobDetail', { id: linkJobId });
+    }
+  };
+
+  // Task — job-ის დასრულების ნაკადი (Provider-ის "სამუშაო დავასრულე",
+  // Customer-ის "დადასტურება"/"პრობლემა მაქვს") ახლა ჩატშივეა
+  // ხელმისაწვდომი, "დეტ. ნახვა"-ზე გავლის გარეშე. `route.params.jobStatus`
+  // (მხოლოდ composer-ის Wallet-ღილაკისთვის, route-ის მომენტის snapshot-ია)
+  // ამ ბარათისთვის არასაკმარისია — ეს ერთხელ fetch-დება mount-ზე, ხოლო
+  // ამ ჩატშივე შესრულებული მოქმედებებისთვის (offer-ის დათანხმება,
+  // "სამუშაო დავასრულე") `JobStatusContext`-ის ლოკალური cache-ი (`getStatus`)
+  // მყისიერად override-ავს — ზუსტად იმ პრინციპით, რასაც Job Detail
+  // ეკრანებიც იყენებენ (`getStatus(id) ?? job.status`).
+  const [fetchedJobStatus, setFetchedJobStatus] = useState<JobStatus | null>(null);
+  // task: job-ის რეზიუმე ჩატშივე, სტრუქტურირებული ბარათის სახით (იგივე
+  // "ჩატი-ს დასაწყისში, ისტორიის ნაწილად" პრინციპი, რასაც ფასის
+  // შეთავაზების ბარათი უკვე იყენებს) — რომ Provider-მაც და Customer-მაც
+  // job-ის კონტექსტი ჩატის დასაწყისშივე დაინახონ, "დეტ. ნახვა"-ზე
+  // გადასვლის/ისტორიაში ზემოთ ატსქროლვის გარეშე.
+  //
+  // Audit fix (მეორე რაუნდი) — `location` პირველად სულ ამოვიღე, მაგრამ
+  // ეს არასწორი მიდგომა იყო: მოთხოვნა არასდროს ყოფილა "location არავის
+  // ეჩვენოს", არამედ **იგივე დამტკიცებული მასკირების წესის** დაცვა
+  // (#47/#97), რომელიც ეს ველი უკვე ჰქონდა. ის აქ ბრუნდება, მაგრამ
+  // **წყაროც უცვლელია** — `role==='provider'`-ისთვის `FeedJob.location`,
+  // რომელსაც `get_feed_job_by_id()` RPC (0052) **სერვერზევე** მასკირებს
+  // area_label-ზე, სანამ `jp.provider_id <> auth.uid()` (ანუ ეს
+  // კონკრეტული Provider ჯერ არ არჩეულა): `case when v_uid=jp.customer_id
+  // or v_uid=jp.provider_id then jp.address else area_label end`. ეს
+  // "არჩევა" ატომურადვე ხდება ფასის დადასტურებასთან ერთად
+  // (`select_provider()`/`respond_to_chat_offer()` ერთსა და იმავე
+  // ტრანზაქციაში წერს provider_id-საც და agreed_price-საც) — ანუ "ფასზე
+  // დადასტურებამდე მისამართი არ ჩანდეს" ზუსტად ის წესია, რასაც ეს RPC
+  // უკვე უზრუნველყოფს, client-ს არაფრის დამატება არ სჭირდება. Customer-ის
+  // მხარეს (`getJobPostById`/`CustomerJob.address`) კი ეს **საკუთარი**
+  // მისამართია (RLS owner-only) — ყოველთვის ნამდვილი, ჩვეულებრივი, ისევე
+  // როგორც PostJob/Job Detail ეკრანებზეც უცვლელად ჩანს.
+  const [jobSummary, setJobSummary] = useState<{ title: string; desc: string; location: string; category: string } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!linkJobId) {
+      setJobSummary(null);
+      return;
+    }
+    let cancelled = false;
+    const fetchStatus =
+      role === 'provider' ? jobService.getFeedJobPostById(linkJobId) : jobService.getJobPostById(linkJobId);
+    fetchStatus
+      .then((j) => {
+        if (cancelled || !j) return;
+        setFetchedJobStatus(j.status ?? null);
+        setJobSummary({
+          title: j.title,
+          desc: j.desc,
+          category: j.category,
+          location: 'location' in j ? j.location : j.address,
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [linkJobId, role]);
+  const liveJobStatus: JobStatus | undefined = linkJobId
+    ? (getStatus(linkJobId) ?? fetchedJobStatus ?? undefined)
+    : undefined;
+
+  const statusCardTitle = (() => {
+    if (!liveJobStatus || liveJobStatus === 'pending' || liveJobStatus === 'draft') return null;
+    if (role === 'provider') {
+      switch (liveJobStatus) {
+        case 'active':
+          return 'შენ აგირჩიეს ამ სამუშაოსთვის';
+        case 'awaiting_customer_confirmation':
+          return 'ელოდება მომხმარებლის დადასტურებას';
+        case 'disputed':
+          return 'მომხმარებელმა პრობლემა აღნიშნა';
+        case 'confirmed_awaiting_rating':
+        case 'completed':
+          return 'სამუშაო დასრულებულია';
+        case 'cancelled':
+          return 'სამუშაო გაუქმებულია';
+        default:
+          return null;
+      }
+    }
+    switch (liveJobStatus) {
+      case 'active':
+        return 'ოსტატი მუშაობს სამუშაოზე';
+      case 'awaiting_customer_confirmation':
+        return 'ოსტატმა სამუშაო დაასრულა';
+      case 'disputed':
+        return 'პრობლემა გაგზავნილია';
+      case 'confirmed_awaiting_rating':
+      case 'completed':
+        return 'სამუშაო დასრულებულია';
+      case 'cancelled':
+        return 'სამუშაო გაუქმებულია';
+      default:
+        return null;
+    }
+  })();
+
+  // Provider — "სამუშაო დავასრულე", ProviderJobDetailScreen-ის `markWorkDone`-ის
+  // იგივე RPC/error-handling (`SCHEDULED_TIME_NOT_REACHED`, #91).
+  const [markingWorkDone, setMarkingWorkDone] = useState(false);
+  const markWorkDoneFromChat = async () => {
+    if (!linkJobId || markingWorkDone) return;
+    setMarkingWorkDone(true);
+    try {
+      await jobService.providerRequestCompletion(linkJobId);
+      setStatus(linkJobId, 'awaiting_customer_confirmation');
+    } catch (err) {
+      const message = (err as { message?: string } | null)?.message ?? '';
+      if (message.includes('SCHEDULED_TIME_NOT_REACHED')) {
+        Alert.alert('ჯერ ადრეა', 'სამუშაოს დასრულება ვერ მოინიშნება დაგეგმილ თარიღ/დრომდე ადრე.');
+      } else {
+        Alert.alert('ვერ მოხერხდა', 'სამუშაოს დასრულების მონიშვნა ვერ მოხერხდა — სცადე თავიდან.');
+      }
+    } finally {
+      setMarkingWorkDone(false);
+    }
+  };
+
+  // Customer — "დადასტურება" პირდაპირ RatingScreen-ზე გადადის (შეფასება
+  // სავალდებულოა, #6/#47/#18-ის დაფიქსირებული წესი — ჩატში მისი სრული
+  // ჩაშენება scope-ს სცდება). `name`/`initials`/`color` route param-ები
+  // Customer-ის ჩატში უკვე Provider-ის საკუთარი ინფოა (`chatId===providerId`).
+  const goToRatingFromChat = () => {
+    if (!linkJobId) return;
+    navigation.navigate('RatingScreen', {
+      jobId: linkJobId,
+      providerName: name,
+      providerInitials: initials,
+      providerColor: color,
+    });
+  };
+
+  // Customer — "პრობლემა მაქვს", CustomerJobDetailScreen-ის problem-sheet-ის
+  // ზუსტი ანარეკლი (იგივე PROBLEM_OPTIONS/RPC), ჩატში ჩაშენებული.
+  const PROBLEM_OPTIONS = ['ოსტატი ჯერ არ მოსულა', 'სამუშაო ჯერ არ დასრულებულა', 'სამუშაოს ხარისხი დაბალია', 'სხვა'];
+  const [problemSheetOpen, setProblemSheetOpen] = useState(false);
+  const [problemOption, setProblemOption] = useState<string | null>(null);
+  const [problemOther, setProblemOther] = useState('');
+  const [reportingProblem, setReportingProblem] = useState(false);
+  const submitProblemFromChat = async () => {
+    if (!linkJobId || !problemOption || (problemOption === 'სხვა' && !problemOther.trim()) || reportingProblem) return;
+    const reason = problemOption === 'სხვა' ? problemOther.trim() : problemOption;
+    setReportingProblem(true);
+    try {
+      await jobService.customerReportProblem(linkJobId, reason);
+      setProblemSheetOpen(false);
+      setProblemOption(null);
+      setProblemOther('');
+      setStatus(linkJobId, 'disputed');
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'პრობლემის შეტყობინება ვერ გაიგზავნა — სცადე თავიდან.');
+    } finally {
+      setReportingProblem(false);
+    }
+  };
 
   // #73: sendReal*-ს აღარ სჭირდება participants — `messages`-ის INSERT
   // trigger (on_message_insert_notify) მონაწილეთა სახელებს/ინიციალებს
@@ -115,7 +317,20 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     });
   }, [customerId, providerId, myUid]);
 
-  const [msgText, setMsgText] = useState('');
+  // StartJobChatSheet.tsx-ის draftMessage — fallback მხოლოდ იმ
+  // შემთხვევისთვის, თუ პირველი შეტყობინების ავტომატური გაგზავნა
+  // ჩავარდა (ქსელი) — ჩვეულებრივ ცარიელია, რადგან სასურველ შემთხვევაში
+  // შეტყობინება ჩატის გახსნამდეც უკვე გაგზავნილია.
+  const [msgText, setMsgText] = useState(draftMessage ?? '');
+
+  // მომხმარებლის მოთხოვნა — Customer-ისთვის ცხადი გამაფრთხილებელი
+  // ნიშანი, რომ ახალი, job-ზე-დამყარებული მოთხოვნა ჯერ ერთმხრივია:
+  // საუბრის ნორმალურად გასაგრძელებლად Provider-მა ჯერ უნდა ნახოს/
+  // უპასუხოს. Job კვლავ 'pending'-ია (ჯერ არავინ არჩეულა) და Provider-ს
+  // ჯერ არცერთი შეტყობინება არ გაუგზავნია ამ საუბარში — წმინდა
+  // client-side derived flag-ია, ახალი RPC/სვეტი არ დასჭირდა.
+  const awaitingProviderResponse =
+    role === 'customer' && !!linkJobId && liveJobStatus === 'pending' && !messages.some((m) => m.from === 'other');
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [imgPreview, setImgPreview] = useState<string | null>(null);
   const [offerSheetOpen, setOfferSheetOpen] = useState(false);
@@ -158,7 +373,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
 
   const sendMsg = () => {
     const text = msgText.trim();
-    if (!text) return;
+    if (!text || awaitingProviderResponse) return;
     const id = `new-${Date.now()}`;
     setMessages((prev) => [...prev, { id, type: 'text', from: 'me', text, t: 'ახლა', state: 'sending' }]);
     setMsgText('');
@@ -202,12 +417,12 @@ export function ChatConversationScreen({ navigation, route }: Props) {
 
   const sendOffer = () => {
     const amount = parseInt(offerAmount, 10);
-    // Second hardening pass, item 5 — ყოველ offer-ს job_id სჭირდება
-    // (supabase/migrations/0049); route.params.jobId Provider-ის ყველა
-    // ლეგიტიმური შესვლის წერტილიდან ხელთაა (ProviderJobDetailScreen/
-    // ProviderHomeScreen/ProviderJobFeedScreen) — offer-ის კომპოზერი
-    // ღილაკიც ჩანს მხოლოდ, როცა jobId არსებობს (footer-ის JSX).
-    if (!amount || amount <= 0 || !jobId) return;
+    // Cold-DM reply fix — `linkJobId` (resolved: route param OR
+    // `findLatestSharedJobId()`), არა raw route.params.jobId, რომელიც
+    // Chats-ის სიიდან/შეტყობინებიდან შესვლისას (StartJobChatSheet-ის
+    // ახალი ჩატის ჩათვლით) ყოველთვის undefined იყო — იხ. offer-ის
+    // კომპოზერი ღილაკის იგივე ფიქსი ზემოთ.
+    if (!amount || amount <= 0 || !linkJobId) return;
     const id = `offer-${Date.now()}`;
     const comment = offerComment.trim() || undefined;
     setMessages((prev) => [
@@ -221,7 +436,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
         amount,
         comment,
         offerStatus: 'pending',
-        jobId,
+        jobId: linkJobId,
       },
     ]);
     setOfferSheetOpen(false);
@@ -229,7 +444,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     setOfferComment('');
     if (!customerId || !providerId || !myUid) return;
     chatService
-      .sendRealOffer(customerId, providerId, myUid, amount, comment, jobId)
+      .sendRealOffer(customerId, providerId, myUid, amount, comment, linkJobId)
       .then((real) => {
         setMessages((prev) => prev.map((m) => (m.id === id ? { ...real, state: 'sent' } : m)));
       })
@@ -293,21 +508,32 @@ if (
 
   const respondToOffer = (id: string, offerStatus: 'accepted' | 'declined') => {
     const previous = messages.find((m) => m.id === id)?.offerStatus;
+    const msgJobId = messages.find((m) => m.id === id)?.jobId;
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, offerStatus } : m)));
-    chatService.respondToRealOffer(id, offerStatus).catch(() => {
-      // Audit fix — `respond_to_chat_offer()` (0049/0066) legitimately
-      // rejects this (e.g. the job stopped being 'pending' between the
-      // offer being sent and this tap — the Customer selected a Provider
-      // through the normal "select" flow in the meantime). The optimistic
-      // update above must be rolled back here, or the UI permanently
-      // shows "accepted"/"declined" while the database still has
-      // 'pending' — until an unrelated refetch corrects it.
-      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, offerStatus: previous } : m)));
-      Alert.alert('ვერ მოხერხდა', 'ფასზე პასუხის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
-    });
-    // შენიშვნა: დათანხმებული ფასის job-ის ჩანაწერში (job_posts) შენახვა
-    // ცალკე, დარჩენილი ეტაპია — job_posts-ს ჯერ არ აქვს დათანხმებული
-    // ფასის ველი.
+    chatService
+      .respondToRealOffer(id, offerStatus)
+      .then(() => {
+        // Provider selection is now automatic on acceptance
+        // (supabase/migrations/0052, respond_to_chat_offer() ->
+        // assign_job_provider()) — the Customer no longer has to go back
+        // to the job-detail screen and pick the same Provider again.
+        // Sync the local cache so screens reading JobStatusContext (not
+        // yet re-fetched from Supabase) reflect this immediately too.
+        if (offerStatus === 'accepted' && msgJobId) {
+          setStatus(msgJobId, 'active');
+        }
+      })
+      .catch(() => {
+        // Audit fix — `respond_to_chat_offer()` (0049/0066) legitimately
+        // rejects this (e.g. the job stopped being 'pending' between the
+        // offer being sent and this tap — the Customer selected a Provider
+        // through the normal "select" flow in the meantime). The optimistic
+        // update above must be rolled back here, or the UI permanently
+        // shows "accepted"/"declined" while the database still has
+        // 'pending' — until an unrelated refetch corrects it.
+        setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, offerStatus: previous } : m)));
+        Alert.alert('ვერ მოხერხდა', 'ფასზე პასუხის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
+      });
   };
 
   return (
@@ -321,11 +547,35 @@ if (
           <Text style={styles.headerName} numberOfLines={1}>
             {name}
           </Text>
+          {/* Task — "დეტ. ნახვა" ლინკი ყოველთვის ჩანს, როცა ჩატს
+              job-კონტექსტი აქვს (`linkJobId` — route param-იდან, ან
+              best-effort ავტომატურად ამოხსნილი, იხ. ზემოთ), ფასის
+              სტატუსის დამოუკიდებლად — ცალკე, სტაბილური შესასვლელია
+              job-დეტალებზე (feed-ბარათის "დეტ. ნახვა" ღილაკის იგივე
+              ტერმინი, #98-შემდგომი). ქვედა ფასის-ბანერი (offerStatusText)
+              ამის დამოუკიდებლად, უცვლელად რჩება — მხოლოდ საინფორმაციო. */}
+          {linkJobId && (
+            <Pressable style={styles.headerJobLink} onPress={handleOpenJobDetail} hitSlop={6}>
+              <Text style={styles.headerJobLinkText} numberOfLines={1}>
+                დეტ. ნახვა
+              </Text>
+              <ChevronRight size={12} color={colors.primary} />
+            </Pressable>
+          )}
         </View>
         <Pressable style={styles.backButton}>
           <MoreVertical size={16} color={colors.foreground} />
         </Pressable>
       </View>
+
+      {awaitingProviderResponse && (
+        <View style={styles.awaitingBanner}>
+          <AlertCircle size={16} color={colors.warning} />
+          <Text style={styles.awaitingBannerText}>
+            თქვენი მოთხოვნა გაიგზავნა — საუბრის გასაგრძელებლად ოსტატმა ჯერ უნდა ნახოს და უპასუხოს.
+          </Text>
+        </View>
+      )}
 
       {offerStatusText && (
         <View style={styles.jobCard}>
@@ -335,6 +585,40 @@ if (
           <Text style={styles.jobOfferText} numberOfLines={1}>
             {offerStatusText}
           </Text>
+        </View>
+      )}
+
+      {/* Task — job-ის lifecycle-სტატუსი (offer-ის ფასის სტატუსისგან
+          დამოუკიდებელი) + შესაბამისი მოქმედება, პირდაპირ ჩატში. */}
+      {statusCardTitle && (
+        <View style={styles.statusCard}>
+          <View style={styles.statusCardHeaderRow}>
+            <CheckCircle size={16} color={colors.success} />
+            <Text style={styles.statusCardTitle}>{statusCardTitle}</Text>
+          </View>
+          {role === 'provider' && liveJobStatus === 'active' && (
+            <Button
+              label="სამუშაო დავასრულე"
+              loadingLabel="იგზავნება..."
+              onPress={markWorkDoneFromChat}
+              loading={markingWorkDone}
+              style={{ marginTop: spacing.sm + 2 }}
+            />
+          )}
+          {role === 'customer' && liveJobStatus === 'awaiting_customer_confirmation' && (
+            <View style={styles.statusCardActionsRow}>
+              <Pressable style={styles.statusProblemButton} onPress={() => setProblemSheetOpen(true)}>
+                <Text style={styles.statusProblemButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  პრობლემა მაქვს
+                </Text>
+              </Pressable>
+              <Pressable style={styles.statusConfirmButton} onPress={goToRatingFromChat}>
+                <Text style={styles.statusConfirmButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  დადასტურება
+                </Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       )}
 
@@ -354,6 +638,33 @@ if (
           contentContainerStyle={styles.messagesContent}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
+          {/* task — job-ის რეზიუმე ისტორიის ნაწილად, ბარათის სახით (ფასის
+              შეთავაზების ბარათის იგივე პრინციპი) — ჩანს **ორივე** მხარეს,
+              ერთხელ, ისტორიის თავში (ქრონოლოგიურად პირველი) — საუბრის
+              გაზრდისას ისტორიაში ზემოთ "იწევს" ჩვეულებრივი შეტყობინების
+              მსგავსად, header-ის "დეტ. ნახვა" ბმული კი (უცვლელი) მუდამ
+              ხელმისაწვდომია სწრაფი წვდომისთვის, ისტორიის სქროლვის
+              გარეშე. */}
+          {jobSummary && (
+            <View style={styles.jobSummaryCard}>
+              <View style={styles.jobSummaryHeaderRow}>
+                <CategoryIcon categoryId={jobSummary.category} size={32} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.jobSummaryTitle} numberOfLines={1}>
+                    {jobSummary.title}
+                  </Text>
+                  <Text style={styles.jobSummaryLocation} numberOfLines={1}>
+                    {jobSummary.location}
+                  </Text>
+                </View>
+              </View>
+              {!!jobSummary.desc && (
+                <Text style={styles.jobSummaryDesc} numberOfLines={4}>
+                  {jobSummary.desc}
+                </Text>
+              )}
+            </View>
+          )}
           {messages.map((m, idx) => {
             if (m.type === 'date') {
               return (
@@ -385,10 +696,14 @@ if (
                       {canRespond ? (
                         <View style={styles.offerActionsRow}>
                           <Pressable style={styles.offerDeclineButton} onPress={() => respondToOffer(m.id, 'declined')}>
-                            <Text style={styles.offerDeclineText}>უარყოფა</Text>
+                            <Text style={styles.offerDeclineText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                              უარყოფა
+                            </Text>
                           </Pressable>
                           <Pressable style={styles.offerAcceptButton} onPress={() => respondToOffer(m.id, 'accepted')}>
-                            <Text style={styles.offerAcceptText}>დათანხმება</Text>
+                            <Text style={styles.offerAcceptText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                              დათანხმება
+                            </Text>
                           </Pressable>
                         </View>
                       ) : (
@@ -495,20 +810,24 @@ if (
             no home-indicator/gesture-bar (older phones), where a small
             fixed floor is still wanted for visual breathing room. */}
         <View style={[styles.composer, { paddingBottom: insets.bottom > 0 ? insets.bottom + spacing.xs : spacing.sm + 2 }]}>
-          <Pressable testID="chat-attach-button" style={styles.attachButton} onPress={() => setAttachSheetOpen(true)}>
+          <Pressable
+            testID="chat-attach-button"
+            style={[styles.attachButton, awaitingProviderResponse && styles.attachButtonDisabled]}
+            onPress={() => setAttachSheetOpen(true)}
+            disabled={awaitingProviderResponse}
+          >
             <Camera size={17} color={colors.mutedForeground} />
           </Pressable>
-          {/* Second hardening pass, item 5 — offer-ს job_id სჭირდება
-              (supabase/migrations/0049), ამიტომ ღილაკი ჩანს მხოლოდ, როცა
-              route.params.jobId არსებობს. Audit fix — დამატებით მხოლოდ
-              status='pending'-ზე: Provider-ის არჩევის (select_provider())
-              შემდეგ ფასი job_posts.agreed_price-ზეა ჩაკეტილი და
-              respond_to_chat_offer() (0049/0066) ისედაც უარყოფდა ახალ
-              შეთავაზებას აქტიურ job-ზე — ღილაკი აქამდე მაინც ჩანდა
-              (ProviderJobDetailScreen-ის 'active'/'awaiting_confirmation'/
-              'disputed' variant-ებზეც), ფასის გაგზავნა კი ყოველთვის
-              ჩუმად ვარდებოდა. */}
-          {role === 'provider' && jobId && jobStatus === 'pending' && (
+          {/* Cold-DM reply fix (0077-შემდეგ) — ეს ღილაკი მანამდე მხოლოდ
+              route.params-ად პირდაპირ გადმოცემულ jobId/jobStatus-ს
+              ენდობოდა, რომელიც მხოლოდ Job Detail/Feed-დან შესვლისას
+              არსებობს — Chats-ის სიიდან ან შეტყობინებიდან შესვლისას
+              (StartJobChatSheet-ის ახალი "ცივი" ჩატის ჩათვლით) ეს ორივე
+              param ყოველთვის undefined იყო, ღილაკი კი საერთოდ არასდროს
+              ჩანდა, თუნდაც job რეალურად არსებობდეს და pending იყოს.
+              ახლა resolved `linkJobId`/`liveJobStatus`-ს იყენებს — იგივე
+              მნიშვნელობებს, რასაც header-ის "დეტ. ნახვა" ბმულიც. */}
+          {role === 'provider' && linkJobId && liveJobStatus === 'pending' && (
             <Pressable
               testID="chat-offer-open"
               style={styles.attachButton}
@@ -518,23 +837,34 @@ if (
             </Pressable>
           )}
           <View style={styles.textInputWrap}>
+            {/* Task (მეორე რაუნდი) — `editable={false}`-ის TextInput-ზე
+                გადართვა Android-ზე ცნობილად ტოვებდა native EditText-ს
+                ფოკუსის-მიღების უუნაროდ, `key`-ის ხელახალი-mount-ითაც კი
+                (ეს ცდა არ დაეხმარა) — ველი ისე რჩებოდა, თითქოს
+                კლავიატურა "აღარ ჩანდა". ახლა ველი **ყოველთვის
+                editable/focusable-ია** (native focus-ის ბაგი ფიზიკურად
+                აღარ არსებობს, რადგან `editable` აღარასდროს იცვლება) —
+                "სანამ ოსტატი არ უპასუხებს, ვერ გააგზავნი" კი დაცულია
+                ორმაგად: (1) გაგზავნის ღილაკი disabled-ია, (2) `sendMsg`
+                თავადაც no-op-ია ამ მდგომარეობაში (Enter-კლავიშითაც ვერ
+                გვერდის აუვლი). */}
             <TextInput
               testID="chat-message-input"
               value={msgText}
               onChangeText={setMsgText}
-              placeholder="დაწერე შეტყობინება..."
+              placeholder={awaitingProviderResponse ? 'ოსტატის პასუხს ელოდებით...' : 'დაწერე შეტყობინება...'}
               placeholderTextColor={colors.mutedForeground}
-              style={styles.textInput}
+              style={[styles.textInput, awaitingProviderResponse && styles.textInputLocked]}
               multiline
             />
           </View>
           <Pressable
             testID="chat-send-button"
-            style={[styles.sendButton, msgText.trim() && styles.sendButtonActive]}
+            style={[styles.sendButton, msgText.trim() && !awaitingProviderResponse && styles.sendButtonActive]}
             onPress={sendMsg}
-            disabled={!msgText.trim()}
+            disabled={!msgText.trim() || awaitingProviderResponse}
           >
-            <Send size={15} color={msgText.trim() ? colors.primaryForeground : colors.mutedForeground} />
+            <Send size={15} color={msgText.trim() && !awaitingProviderResponse ? colors.primaryForeground : colors.mutedForeground} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -592,6 +922,50 @@ if (
           label="გაგზავნა"
           onPress={sendOffer}
           disabled={!offerAmount || parseInt(offerAmount, 10) <= 0}
+        />
+      </BottomSheet>
+
+      <BottomSheet
+        visible={problemSheetOpen}
+        onClose={() => {
+          setProblemSheetOpen(false);
+          setProblemOption(null);
+          setProblemOther('');
+        }}
+      >
+        <Text style={styles.sheetTitle}>რა პრობლემა გაქვს?</Text>
+        <Text style={styles.problemIntro}>აირჩიე სიტუაცია, რომელიც შენი სიტუაციის შესაბამისია.</Text>
+        {PROBLEM_OPTIONS.map((opt) => {
+          const on = problemOption === opt;
+          return (
+            <Pressable
+              key={opt}
+              style={[styles.problemOption, on && styles.problemOptionOn]}
+              onPress={() => setProblemOption(opt)}
+            >
+              <View style={[styles.radioOuter, on && styles.radioOuterOn]}>{on && <View style={styles.radioInner} />}</View>
+              <Text style={[styles.problemOptionText, on && styles.problemOptionTextOn]}>{opt}</Text>
+            </Pressable>
+          );
+        })}
+        {problemOption === 'სხვა' && (
+          <TextInput
+            value={problemOther}
+            onChangeText={setProblemOther}
+            placeholder="აღწერე პრობლემა..."
+            placeholderTextColor={colors.mutedForeground}
+            multiline
+            numberOfLines={3}
+            style={styles.problemTextarea}
+          />
+        )}
+        <Button
+          label="გაგზავნა"
+          loadingLabel="იგზავნება..."
+          onPress={submitProblemFromChat}
+          disabled={!problemOption || (problemOption === 'სხვა' && !problemOther.trim())}
+          loading={reportingProblem}
+          style={{ marginTop: spacing.sm }}
         />
       </BottomSheet>
 
@@ -654,6 +1028,18 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     fontWeight: '700',
   },
+  headerJobLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 1,
+    marginTop: 2,
+    alignSelf: 'flex-start',
+  },
+  headerJobLinkText: {
+    ...typography.small,
+    color: colors.primary,
+    fontWeight: '600',
+  },
   jobCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -663,6 +1049,52 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
+  },
+  jobSummaryCard: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    alignSelf: 'stretch',
+  },
+  jobSummaryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    marginBottom: spacing.xs,
+  },
+  jobSummaryTitle: {
+    ...typography.captionMedium,
+    color: colors.foreground,
+    fontWeight: '700',
+  },
+  jobSummaryLocation: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    marginTop: 2,
+  },
+  jobSummaryDesc: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    lineHeight: 18,
+  },
+  awaitingBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    backgroundColor: colors.warningBackground,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FDE68A',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 4,
+  },
+  awaitingBannerText: {
+    ...typography.small,
+    color: colors.warning,
+    fontWeight: '600',
+    flex: 1,
   },
   offerBannerIcon: {
     width: 28,
@@ -677,6 +1109,114 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '700',
     flexShrink: 1,
+  },
+  statusCard: {
+    backgroundColor: colors.successBackground,
+    borderBottomWidth: 1,
+    borderBottomColor: '#A7F3D0',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  statusCardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  statusCardTitle: {
+    ...typography.small,
+    color: colors.success,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  statusCardActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm + 2,
+  },
+  statusProblemButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  statusProblemButtonText: {
+    ...typography.small,
+    color: colors.foreground,
+    fontWeight: '700',
+  },
+  statusConfirmButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  statusConfirmButtonText: {
+    ...typography.small,
+    color: colors.primaryForeground,
+    fontWeight: '700',
+  },
+  problemIntro: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    marginBottom: spacing.md,
+  },
+  problemOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 6,
+    marginBottom: spacing.sm,
+  },
+  problemOptionOn: {
+    borderColor: colors.primary,
+    backgroundColor: colors.secondary,
+  },
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioOuterOn: {
+    borderColor: colors.primary,
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+  },
+  problemOptionText: {
+    ...typography.caption,
+    color: colors.foreground,
+    fontWeight: '500',
+  },
+  problemOptionTextOn: {
+    color: colors.secondaryForeground,
+  },
+  problemTextarea: {
+    ...typography.caption,
+    color: colors.foreground,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.sm + 6,
+    minHeight: 72,
+    textAlignVertical: 'top',
+    marginBottom: spacing.sm,
   },
   messages: {
     flex: 1,
@@ -940,6 +1480,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  attachButtonDisabled: {
+    opacity: 0.5,
+  },
   textInputWrap: {
     flex: 1,
     backgroundColor: colors.muted,
@@ -954,6 +1497,9 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     maxHeight: 100,
     padding: 0,
+  },
+  textInputLocked: {
+    color: colors.mutedForeground,
   },
   sendButton: {
     width: 36,

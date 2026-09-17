@@ -131,8 +131,9 @@ appId: com.ostati.app
 # showing (autoFocus); both the typed price and the submit button must
 # stay visible above it. -----------------------------------------------
 - tapOn:
-    text: ".*დაინტ. ვარ.*"
+    text: ".*დეტ\\. ნახვა.*"
     index: 0
+- tapOn: ".*დაინტერესება.*"
 - assertVisible: ".*ჩაწერეთ თანხა.*"
 - tapOn: ".*ჩაწერეთ თანხა.*"
 - inputText: "555"

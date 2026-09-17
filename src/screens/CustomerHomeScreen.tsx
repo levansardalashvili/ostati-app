@@ -17,6 +17,7 @@ import { Avatar } from '../components/Avatar';
 import { CategoryIcon, getCategoryIcon } from '../components/CategoryIcon';
 import { ProviderCard, ProviderCardSkeleton } from '../components/ProviderCard';
 import { PopBadge } from '../components/PopBadge';
+import { StartJobChatSheet } from '../components/StartJobChatSheet';
 import { usePressScale } from '../utils/usePressScale';
 import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
@@ -28,6 +29,7 @@ import { jobService } from '../services/jobService';
 import { notificationService } from '../services/notificationService';
 import { userService } from '../services/userService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
+import { useTabBarScroll } from '../state/TabBarScrollContext';
 import type { CustomerJob } from '../types/job';
 import type { Provider } from '../types/provider';
 import { providerRankScore } from '../utils/providerRank';
@@ -45,6 +47,7 @@ type Props = CompositeScreenProps<
 // C1 — Customer Home / Browse (product-spec.md; დიზაინის რეფერენსის
 // CustomerHome-ის მიხედვით)
 export function CustomerHomeScreen({ navigation }: Props) {
+  const { handleScroll } = useTabBarScroll();
   const { profile } = useCustomerProfile();
   const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`;
   const [search, setSearch] = useState('');
@@ -125,13 +128,22 @@ export function CustomerHomeScreen({ navigation }: Props) {
   const handleOpenProvider = (id: string) => {
     navigation.navigate('ViewProviderProfile', { id });
   };
-  const handleOpenChat = (provider: Provider) => {
+  // "ცივი ჩატის → job-ის შექმნის" ხვრელის ფიქსი — StartJobChatSheet.tsx-ის
+  // თავზე სრული მიზეზი (ViewProviderProfileScreen-ის იგივე ცვლილება).
+  const [startChatProvider, setStartChatProvider] = useState<Provider | null>(null);
+  const handleOpenChat = (provider: Provider) => setStartChatProvider(provider);
+  const openChatWithJob = (jobId: string | null, draftMessage?: string) => {
+    if (!startChatProvider) return;
+    const provider = startChatProvider;
+    setStartChatProvider(null);
     navigation.navigate('ChatConversation', {
       chatId: provider.id,
       name: provider.name,
       initials: provider.initials,
       color: provider.color,
       role: 'customer',
+      jobId: jobId ?? undefined,
+      draftMessage,
     });
   };
   const handleAllServices = () => {
@@ -246,7 +258,12 @@ export function CustomerHomeScreen({ navigation }: Props) {
         </View>
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
         {currentJob && currentJobCategory && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>მიმდინარე სამუშაო</Text>
@@ -353,6 +370,11 @@ export function CustomerHomeScreen({ navigation }: Props) {
           )}
         </View>
       </ScrollView>
+      <StartJobChatSheet
+        provider={startChatProvider}
+        onClose={() => setStartChatProvider(null)}
+        onReady={openChatWithJob}
+      />
     </SafeAreaView>
   );
 }

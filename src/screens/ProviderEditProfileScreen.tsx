@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   },
   bodyContent: {
     padding: spacing.lg,
-    paddingBottom: spacing.xxl * 2,
+    paddingBottom: spacing.xl,
   },
   avatarRow: {
     alignItems: 'center',
@@ -383,11 +383,17 @@ const styles = StyleSheet.create({
     minHeight: 96,
     textAlignVertical: 'top',
   },
+  // Task — ადრე `position: 'absolute', bottom: 0` იყო, ანუ ScrollView
+  // ამ ღილაკისთვის სივრცეს არ იტოვებდა — footer უბრალოდ TOP-ზე "ეფინებოდა"
+  // სქროლვადი კონტენტის ბოლო ნაწილს (ნამუშევრების ფოტოების ბადეს),
+  // მიუხედავად სქროლვისა (მაქსიმალურ scroll-ზეც კონტენტი ამ ღილაკის
+  // მიღმა/ქვემოთ დარჩენილი იყო, ვერასდროს ჩანდა). ასევე Android-ზე
+  // KeyboardAvoidingView-ის ScrollView-ის ავტომატური "focused input
+  // keyboard-ის ზემოთ აწიე" ეს absolute overlay-ის გამო არასწორად
+  // ითვლიდა — "ჩემ შესახებ" ველი კლავიატურის უკან იმალებოდა. ჩვეულებრივი
+  // flex sibling (ProviderSetupScreen/PostJobScreen/CustomerSetupScreen-ის
+  // იგივე footer-პატერნი) ორივეს აგვარებს ერთდროულად.
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.border,

@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   },
   bodyContent: {
     padding: spacing.lg,
-    paddingBottom: spacing.xxl * 2,
+    paddingBottom: spacing.xl,
     gap: spacing.md,
   },
   providerCard: {
@@ -325,11 +325,12 @@ const styles = StyleSheet.create({
     minHeight: 96,
     textAlignVertical: 'top',
   },
+  // Task — იგივე absolute-footer ხარვეზი, რაც ProviderEditProfileScreen-ზე
+  // ნაპოვნია — ScrollView-ის ბოლო კონტენტს footer ეფინებოდა (scroll-ითაც
+  // ვერასდროს ჩანდა ბოლომდე) და Android-ის keyboard-avoid auto-scroll
+  // (კომენტარის textarea-სთვის) არასწორად ითვლიდა. ჩვეულებრივი flex
+  // sibling.
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.border,

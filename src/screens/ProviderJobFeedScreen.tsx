@@ -28,12 +28,23 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
       let cancelled = false;
       setIsLoading(true);
       const uid = authService.getCurrentUser()?.uid;
-      Promise.all([jobService.getOpenProviderFeedPosts(), uid ? quoteService.listMyResponseJobIds(uid) : Promise.resolve(new Set<string>())])
+      // Task — `get_open_provider_feed()` RPC-ს `authenticated` role სჭირდება
+      // (grant-ის დონეზეც, `SET search_path`-ის auth.uid()-checkis
+      // გვერდით) — ადრე ეს fetch უპირობოდ ეშვებოდა, სესიის მზადყოფნის
+      // გარეშეც (მაგ. logout-ის navigation.reset-ის შუალედში ეს ეკრანი
+      // ჯერ კიდევ focused-ია), რაც "permission denied for function
+      // get_open_provider_feed" (42501) uncaught rejection-ს იწვევდა —
+      // `uid`-ის სხვა ორ query-ის იგივე დაცვის ქვეშ ჩავაგდე, პლუს `.catch()`.
+      Promise.all([
+        uid ? jobService.getOpenProviderFeedPosts() : Promise.resolve([]),
+        uid ? quoteService.listMyResponseJobIds(uid) : Promise.resolve(new Set<string>()),
+      ])
         .then(([jobs, myResponses]) => {
           if (cancelled) return;
           setFiltered(jobs);
           setInterests(myResponses);
         })
+        .catch(() => {})
         .finally(() => {
           if (!cancelled) setIsLoading(false);
         });
@@ -58,16 +69,6 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
       jobStatus: job.status,
     });
   };
-  // Task — "დაინტ. ვარ" აღარ ხსნის ფასის sheet-ს ბარათიდანვე პირდაპირ
-  // (Provider სრული აღწერის/ფოტოების ნახვის გარეშე იძულებული იყო ფასი
-  // მაშინვე მიეთითებინა) — ნავიგირებს Detail-ზე, სადაც იგივე
-  // OfferPriceSheet ავტომატურად იხსნება (`autoOpenOffer`), მაგრამ სრული
-  // job-ის კონტექსტის გვერდით. `interests`-ის ლოკალური state ამ ეკრანზე
-  // useFocusEffect-ით ისედაც ახლდება ყოველ დაბრუნებაზე Detail-იდან.
-  const handleInterested = (job: FeedJob) => {
-    navigation.navigate('ProviderJobDetail', { id: job.id, job, autoOpenOffer: true });
-  };
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader title="ახალი მოთხოვნები" onBack={() => navigation.goBack()} />
@@ -95,7 +96,6 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
                 job={job}
                 sent={interests.has(job.id)}
                 onDetail={() => handleJobDetail(job)}
-                onInterested={() => handleInterested(job)}
                 onChat={() => handleOpenChat(job)}
               />
             ))}

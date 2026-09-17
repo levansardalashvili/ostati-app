@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AlertTriangle,
   Award,
+  Calendar,
   CheckCircle,
   Clock,
   Flag,
@@ -21,9 +22,11 @@ import { Button } from '../components/Button';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { OfferPriceSheet } from '../components/OfferPriceSheet';
 import { ReportJobSheet } from '../components/ReportJobSheet';
+import { SecureStorageImage } from '../components/SecureStorageImage';
 import { colors, radius, spacing, typography } from '../theme';
 import { Skeleton } from '../components/Skeleton';
 import { authService } from '../services/authService';
+import { chatService } from '../services/chatService';
 import { jobService } from '../services/jobService';
 import { quoteService } from '../services/quoteService';
 import { reviewService } from '../services/reviewService';
@@ -42,7 +45,6 @@ const EMPTY_JOB: FeedJob = {
   location: '',
   date: '',
   ago: '',
-  interested: 0,
   urgent: false,
   hasPhoto: false,
   desc: '',
@@ -67,7 +69,7 @@ const PROVIDER_CANCEL_REASONS: { code: string; label: string }[] = [
 // machine მუშაობს (JobStatusContext.tsx) — Provider-ს პირდაპირ დასრულება არ
 // შეუძლია, მხოლოდ "სამუშაო დავასრულე", რაც Customer-ის დადასტურებას ელოდება.
 export function ProviderJobDetailScreen({ navigation, route }: Props) {
-  const { id, mode = 'browse', job: passedJob, autoOpenOffer } = route.params;
+  const { id, mode = 'browse', job: passedJob } = route.params;
   const [job, setJob] = useState<FeedJob>(() => passedJob ?? EMPTY_JOB);
   const [jobLoading, setJobLoading] = useState(!passedJob);
   useEffect(() => {
@@ -98,7 +100,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   // ნავიგირებს აქ, სრული აღწერის/ფოტოების ნახვის შემდეგ ფასის მოთხოვნისთვის
   // (task-ის მოთხოვნა: Provider-მა ფასი უნდა შესთავაზოს მხოლოდ job-ის
   // დეტალების ნახვის შემდეგ, არა ერთი შეხედვით feed-ის ბარათზე).
-  const [offerSheetOpen, setOfferSheetOpen] = useState(!!autoOpenOffer);
+  const [offerSheetOpen, setOfferSheetOpen] = useState(false);
   const [offerPrice, setOfferPrice] = useState('');
   const { getStatus, setStatus } = useJobStatus();
 
@@ -150,6 +152,14 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
                   : 'browse';
 
   const [markingWorkDone, setMarkingWorkDone] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  // Task — footer (ჩატი/"სამუშაო დავასრულე") ადრე ნულოვანი paddingBottom-ით
+  // იჯდა ეკრანის ნამდვილ ქვედა კიდეზე (SafeAreaView-ს აქ `edges={['top']}`
+  // აქვს, ბოლო არ ჯავშნავს) — Android-ის gesture-ნავიგაციის ზოლს
+  // ხვდებოდა/თითქმის ხვდებოდა. ChatConversationScreen-ის კომპოზერის იგივე
+  // პრინციპი — ოდნავ (ზუსტად safe-area inset-ის ოდენობით) მაღლა სწევს.
+  const insets = useSafeAreaInsets();
+  const footerBottomPadding = insets.bottom > 0 ? insets.bottom + spacing.xs : spacing.md;
   const markWorkDone = async () => {
     if (!job.customerJobId || markingWorkDone) return;
     setMarkingWorkDone(true);
@@ -272,6 +282,17 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       await quoteService.expressInterest(job.id, priceNum);
       setExpressed(true);
       setOfferSheetOpen(false);
+      // Task — ინტერესის გამოხატვისას გაგზავნილი ფასი ახლა ავტომატურად
+      // ჩატშიც ჩნდება, სტრუქტურირებული offer-ბარათის სახით (არა მხოლოდ
+      // job_responses.offered_price-ში, ჩუმად) — Provider-ს აღარ სჭირდება
+      // იგივე ფასის ხელახლა, ცალკე გაგზავნა ჩატის Wallet-ღილაკიდან.
+      // Best-effort, fire-and-forget — ინტერესი უკვე წარმატებით
+      // გამოხატულია (job_responses-ის row უკვე არსებობს, რაც messages-ის
+      // INSERT policy-საც (0046) სჭირდება), ეს მხოლოდ ჩატს ამდიდრებს და
+      // ამ ჩავარდნაზე მთავარი ნაკადი არ უნდა დაბლოკოს.
+      if (job.customerId) {
+        chatService.sendRealOffer(job.customerId, uid, uid, priceNum, undefined, job.id).catch(() => {});
+      }
     } catch {
       Alert.alert('ვერ მოხერხდა', 'ინტერესის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
     } finally {
@@ -398,6 +419,18 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
                   <MapPin size={13} color={colors.mutedForeground} />
                   <Text style={styles.metaText}>{job.location}</Text>
                 </View>
+                {/* Task — "როდის სურს მომხმარებელს რომ მივიდე" (job.date,
+                    Customer-ის PostJobScreen-ზე არჩეული სასურველი თარიღი/
+                    დრო) ამ ეკრანზე საერთოდ არ ჩანდა — მხოლოდ `job.ago`
+                    (განცხადების გამოქვეყნების, არა სამუშაოს, დროა) იყო.
+                    CustomerJobDetailScreen-ს ეს უკვე ჰქონდა (იგივე
+                    `job.date`, Clock-აიქონით) — Provider-ის მხარეს
+                    დაემატა, `Calendar`-აიქონით (Clock-ს `job.ago`-სთვის
+                    დარჩენილი, რომ ორივე ცალსახად გამოირჩეოდეს). */}
+                <View style={styles.metaItem}>
+                  <Calendar size={13} color={colors.mutedForeground} />
+                  <Text style={styles.metaText}>{job.date}</Text>
+                </View>
                 <View style={styles.metaItem}>
                   <Clock size={13} color={colors.mutedForeground} />
                   <Text style={styles.metaText}>{job.ago}</Text>
@@ -405,18 +438,30 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               </View>
             </View>
           </View>
-
-          <View style={styles.statsRow}>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={styles.statLabel}>დაინტერესებული</Text>
-              <Text style={styles.statValue}>{job.interested + (expressed ? 1 : 0)}</Text>
-            </View>
-          </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>სამუშაოს აღწერა</Text>
           <Text style={styles.sectionText}>{job.desc}</Text>
+          {/* Task — Customer-ის ატვირთული ფოტოები (CustomerJobDetailScreen-ს
+              ეს უკვე ჰქონდა, #63) Provider-ის მხარეს არასდროს არ ჩანდა —
+              `FeedJob.photos` საერთოდ არ არსებობდა (მხოლოდ `hasPhoto`
+              badge-ისთვის), მიუხედავად იმისა, რომ ბექენდის RPC-ები
+              (`get_open_provider_feed`/`get_feed_job_by_id`) ისედაც
+              აბრუნებდნენ `photos`-ს. */}
+          {job.photos && job.photos.length > 0 && (
+            <View style={styles.photoRow}>
+              {job.photos.map((uri) => (
+                // Task — თამბნეილი ადრე გადიდებას/გახსნას არ უჭერდა
+                // მხარს — Provider-ს ფოტოს დეტალების უკეთ დანახვა არ
+                // შეეძლო. ChatConversationScreen-ის იმავე
+                // full-screen-preview პატერნით (Pressable + overlay).
+                <Pressable key={uri} style={styles.photoThumb} onPress={() => setPhotoPreview(uri)}>
+                  <SecureStorageImage reference={uri} style={styles.photoThumbImage} />
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -432,8 +477,17 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         </View>
       </ScrollView>
 
+      {/* Task — footer ისევ pinned bottom bar-ია (ScrollView-ის მიღმა,
+          content-ს არ მისდევს) — მომხმარებელმა დააზუსტა, რომ საწყისი
+          "ძაან ქვემოთაა" საჩივარი ეხებოდა ეკრანის ნამდვილ ქვედა კიდესთან
+          სიახლოვეს (Android-ის gesture-ნავიგაციის ზოლთან თითქმის
+          გადაფარვას), არა კონტენტიდან მანძილს — footer კონტენტში
+          გადატანა overshoot იყო. `paddingBottom` ახლა `insets.bottom`-ზეა
+          დაფუძნებული (ChatConversationScreen-ის კომპოზერის იგივე
+          პრინციპით) — ოდნავ მაღლა სწევს ღილაკებს ზუსტად imenad safe-area
+          inset-ის ოდენობით, gesture-ზოლთან შეხების თავიდან ასაცილებლად. */}
       {variant === 'browse' && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: footerBottomPadding }]}>
           {/* supabase/migrations/0046 — Provider→Customer chat now
               requires a real job_responses row (or assignment) server-side;
               the "any open pending job" exception is gone. Before
@@ -443,7 +497,9 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
           {expressed && (
             <Pressable style={styles.chatButton} onPress={handleChat}>
               <MessageCircle size={17} color={colors.foreground} />
-              <Text style={styles.chatButtonText}>ჩატი</Text>
+              <Text style={styles.chatButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                ჩატი
+              </Text>
             </Pressable>
           )}
           <Pressable
@@ -455,17 +511,19 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
             ) : (
               <ThumbsUp size={17} color={colors.primaryForeground} />
             )}
-            <Text style={styles.interestButtonText}>
+            <Text style={styles.interestButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
               {expressed ? (offerPrice ? `შეთავაზდა: ${offerPrice} ₾` : 'დაინტ. ხარ') : 'დაინტერესება'}
             </Text>
           </Pressable>
         </View>
       )}
       {variant === 'active' && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: footerBottomPadding }]}>
           <Pressable style={styles.chatButton} onPress={handleChat}>
             <MessageCircle size={17} color={colors.foreground} />
-            <Text style={styles.chatButtonText}>ჩატი</Text>
+            <Text style={styles.chatButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              ჩატი
+            </Text>
           </Pressable>
           {/* Provider-ს პირდაპირ დასრულების უფლება არა აქვს — ეს ღილაკი
               მხოლოდ "awaiting_customer_confirmation"-ზე გადადის, Customer-ის
@@ -479,7 +537,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               disabled={markingWorkDone}
             >
               <CheckCircle size={17} color={colors.primaryForeground} />
-              <Text style={styles.completeWorkButtonText}>
+              <Text style={styles.completeWorkButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                 {markingWorkDone ? 'იგზავნება...' : 'სამუშაო დავასრულე'}
               </Text>
             </Pressable>
@@ -487,37 +545,43 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         </View>
       )}
       {variant === 'awaiting_confirmation' && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: footerBottomPadding }]}>
           <View style={{ flex: 1 }}>
             <Text style={styles.waitingText}>ელოდება მომხმარებლის დადასტურებას</Text>
             <Pressable style={[styles.chatButton, { alignSelf: 'stretch' }]} onPress={handleChat}>
               <MessageCircle size={17} color={colors.foreground} />
-              <Text style={styles.chatButtonText}>ჩატი</Text>
+              <Text style={styles.chatButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                ჩატი
+              </Text>
             </Pressable>
           </View>
         </View>
       )}
       {variant === 'disputed' && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: footerBottomPadding }]}>
           <View style={{ flex: 1 }}>
             <Text style={styles.disputedFooterText}>მომხმარებელმა პრობლემა აღნიშნა — გაარკვიე დეტალები ჩატში.</Text>
             <Pressable style={[styles.chatButton, { alignSelf: 'stretch' }]} onPress={handleChat}>
               <MessageCircle size={17} color={colors.foreground} />
-              <Text style={styles.chatButtonText}>ჩატი</Text>
+              <Text style={styles.chatButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                ჩატი
+              </Text>
             </Pressable>
           </View>
         </View>
       )}
       {variant === 'completed' && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: footerBottomPadding }]}>
           <Pressable style={styles.reviewsButton} onPress={() => navigation.navigate('ProviderReviews')}>
             <Award size={17} color={colors.primary} />
-            <Text style={styles.reviewsButtonText}>ჩემი შეფასებები</Text>
+            <Text style={styles.reviewsButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              ჩემი შეფასებები
+            </Text>
           </Pressable>
         </View>
       )}
       {variant === 'cancelled' && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: footerBottomPadding }]}>
           <View style={{ flex: 1 }}>
             <Text style={styles.disputedFooterText}>
               {job.cancellationActor === 'provider' ? 'შენ გააუქმე ეს სამუშაო.' : 'მომხმარებელმა მოთხოვნა გააუქმა.'}
@@ -613,6 +677,15 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
           <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
         </Pressable>
       </BottomSheet>
+
+      {photoPreview && (
+        <Pressable style={styles.previewOverlay} onPress={() => setPhotoPreview(null)}>
+          <SecureStorageImage reference={photoPreview} style={styles.previewImage} resizeMode="cover" />
+          <Pressable style={styles.previewClose} onPress={() => setPhotoPreview(null)}>
+            <X size={18} color="#FFFFFF" />
+          </Pressable>
+        </Pressable>
+      )}
     </SafeAreaView>
   );
 }
@@ -717,6 +790,7 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.md,
     marginTop: spacing.sm,
   },
@@ -728,24 +802,6 @@ const styles = StyleSheet.create({
   metaText: {
     ...typography.caption,
     color: colors.mutedForeground,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.secondary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  statLabel: {
-    ...typography.small,
-    color: colors.primary,
-    opacity: 0.7,
-  },
-  statValue: {
-    ...typography.h3,
-    color: colors.foreground,
   },
   section: {
     backgroundColor: colors.card,
@@ -764,6 +820,51 @@ const styles = StyleSheet.create({
   sectionText: {
     ...typography.caption,
     color: colors.mutedForeground,
+  },
+  photoRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm + 2,
+    marginTop: spacing.sm + 2,
+  },
+  photoThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  photoThumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  previewOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.88)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewImage: {
+    width: '85%',
+    maxWidth: 320,
+    aspectRatio: 4 / 3,
+    borderRadius: radius.lg,
+  },
+  previewClose: {
+    position: 'absolute',
+    top: 60,
+    right: spacing.lg,
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   customerRow: {
     flexDirection: 'row',

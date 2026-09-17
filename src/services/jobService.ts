@@ -58,6 +58,29 @@ export function deriveJobTitle(category: string): string {
   return categoryService.getCategoryName(category);
 }
 
+// გატანილია PostJobScreen.tsx-იდან — იგივე Georgian error-mapping ახლა
+// StartJobChatSheet.tsx-საც სჭირდება (cold-chat quick-job creation), რომ
+// ორივე გამომძახებელს ერთი და იგივე ცნობილი, permanent შეცდომების
+// ტექსტი ჰქონდეს, დუბლირებული/დროთა განმავლობაში ერთმანეთისგან
+// გადახრილი ასლების ნაცვლად. `create_job`/`update_job_draft`/
+// `set_job_photos`/`finalize_job_publish`-ის specific, actionable
+// Postgres exceptions-ს მაპავს ცნობილ (permanent — იგივე input-ით
+// ხელახლა ცდა ისევ ჩაივარდნება) ქართულ ტექსტზე; ნებისმიერი სხვა
+// (გარდამავალი ქსელური/RPC ჩავარდნა) ორიგინალ, ზოგად ტექსტს იღებს.
+export function getPublishErrorMessage(err: unknown): string {
+  const message = (err as { message?: string } | null)?.message ?? '';
+  if (message.includes('category is no longer available')) {
+    return 'არჩეული კატეგორია აღარ არის ხელმისაწვდომი — აირჩიე სხვა კატეგორია და სცადე თავიდან.';
+  }
+  if (message.includes('Description must be')) {
+    return 'აღწერა უნდა იყოს 20–500 სიმბოლოს ფარგლებში — შეასწორე და სცადე თავიდან.';
+  }
+  if (message.includes('exact address is required')) {
+    return 'მისამართი სავალდებულოა — შეავსე ველი და სცადე თავიდან.';
+  }
+  return 'მოთხოვნის გამოქვეყნება ვერ მოხერხდა';
+}
+
 function fromJobPostRow(row: JobPostRow): CustomerJob {
   return {
     id: row.id,
@@ -95,9 +118,9 @@ function fromJobPostRowToFeedJob(row: JobPostRow): FeedJob {
     location: row.address,
     date: row.date,
     ago: formatAgo(row.created_at),
-    interested: 0,
     urgent: false,
     hasPhoto: row.photos.length > 0,
+    photos: row.photos,
     desc: row.description,
     assignedProviderId: row.provider_id,
     // real job_posts ერთადერთი ცხრილია (არა ორი ცალკე mock-კუნძული, #47-ის
@@ -171,6 +194,16 @@ export interface JobService {
   // ნებისმიერი სტატუსით — "მიმდინარე სამუშაო" ბარათისა (#69) და "ჩემი
   // სამუშაოები" ტაბის (ProviderMyJobsScreen) რეალური წყარო.
   listMyAssignedJobs(providerId: string): Promise<FeedJob[]>;
+
+  // Task — ChatsListScreen-იდან ჩატის გახსნისას `jobId` route param-ად არ
+  // გადაეცემა (`conversations` job-თან საერთოდ არ არის დაკავშირებული,
+  // #57-ის განზრახული გამარტივება) — ChatConversationScreen-ს ამ
+  // best-effort ძებნა სჭირდება, რომ header-ის "დეტ. ნახვა" ბმულმა მაინც
+  // იმუშაოს ამ შესვლის წერტილიდანაც. ჯერ ცდილობს რეალურად მინიჭებულ
+  // job-ს (`provider_id`-ით — ყველაზე ცალსახა, RLS-ითაც უპრობლემოდ
+  // წაკითხვადი), თუ არ მოიძებნა — ბოლო job_responses-ს (ჯერ არჩეული არაა,
+  // მაგრამ job კვლავ 'pending'-ია, ისევ წაკითხვადი).
+  findLatestSharedJobId(customerId: string, providerId: string): Promise<string | null>;
 
   // #72 — ოთხივე კრიტიკული სტატუსის გადასვლა Postgres RPC-ებზეა აგებული
   // (supabase/migrations/0014_job_workflow_rpcs.sql), არა თავისუფალ
@@ -302,6 +335,54 @@ export const jobService: JobService = {
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data as JobPostRow[]).map(fromJobPostRowToFeedJob);
+  },
+  async findLatestSharedJobId(customerId, providerId) {
+    // Priority 0 — the most recent message between this exact pair that
+    // explicitly carries a job_id (StartJobChatSheet.tsx's auto-sent
+    // first message, or any chat offer, #49) — the most direct signal
+    // of "which job this conversation is about". Unlike the checks
+    // below, this finds a freshly-created "cold chat" quick-job
+    // immediately, before the Provider has responded/been assigned at
+    // all (a pure `provider_id`/`job_responses` lookup stays empty
+    // until then, which used to make the header's "დეტ. ნახვა" link and
+    // the "awaiting provider response" banner both silently disappear
+    // on every re-open of the chat).
+    const { data: taggedMsg } = await supabase
+      .from('messages')
+      .select('job_id')
+      .eq('customer_id', customerId)
+      .eq('provider_id', providerId)
+      .not('job_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (taggedMsg && taggedMsg[0]) return (taggedMsg[0] as { job_id: string }).job_id;
+
+    const { data: assigned } = await supabase
+      .from('job_posts')
+      .select('id')
+      .eq('customer_id', customerId)
+      .eq('provider_id', providerId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (assigned && assigned[0]) return (assigned[0] as { id: string }).id;
+
+    const { data: responses } = await supabase
+      .from('job_responses')
+      .select('job_id')
+      .eq('provider_id', providerId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    const jobIds = ((responses ?? []) as { job_id: string }[]).map((r) => r.job_id);
+    if (jobIds.length === 0) return null;
+
+    const { data: posts } = await supabase
+      .from('job_posts')
+      .select('id')
+      .eq('customer_id', customerId)
+      .in('id', jobIds)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    return (posts?.[0] as { id: string } | undefined)?.id ?? null;
   },
   async selectProvider(jobId, providerId) {
     const { error } = await supabase.rpc('select_provider', { p_job_id: jobId, p_provider_id: providerId });

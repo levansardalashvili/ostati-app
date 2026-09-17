@@ -13,6 +13,7 @@ import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
 import { useJobStatus } from '../state/JobStatusContext';
+import { useTabBarScroll } from '../state/TabBarScrollContext';
 import type { CustomerJob, JobStatus } from '../types/job';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 import { usePressScale } from '../utils/usePressScale';
@@ -45,6 +46,7 @@ const EMPTY_TEXT: Record<Tab, string> = {
 // მოთხოვნები" მენიუც ამავე ტაბზე გადადის (CustomerProfileScreen.tsx),
 // push-ის ნაცვლად.
 export function CustomerJobsScreen({ navigation }: Props) {
+  const { handleScroll } = useTabBarScroll();
   const [tab, setTab] = useState<Tab>('pending');
   const [isLoading, setIsLoading] = useState(true);
   const [jobs, setJobs] = useState<CustomerJob[]>([]);
@@ -105,6 +107,7 @@ export function CustomerJobsScreen({ navigation }: Props) {
       initials: job.provider[0],
       color: colors.primary,
       role: 'customer',
+      jobId: job.id,
     });
   };
 
@@ -129,7 +132,14 @@ export function CustomerJobsScreen({ navigation }: Props) {
       <View style={styles.tabsRow}>
         {TABS.map((t) => (
           <Pressable key={t.id} style={[styles.tab, tab === t.id && styles.tabActive]} onPress={() => setTab(t.id)}>
-            <Text style={[styles.tabText, tab === t.id && styles.tabTextActive]}>{t.label}</Text>
+            <Text
+              style={[styles.tabText, tab === t.id && styles.tabTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+            >
+              {t.label}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -149,7 +159,12 @@ export function CustomerJobsScreen({ navigation }: Props) {
           <Text style={styles.emptySubtitle}>მოთხოვნები ამ სტატუსში არ მოიძებნა.</Text>
         </View>
       ) : (
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={styles.bodyContent}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
           {items.map((j) => (
             <JobCard
               key={j.id}

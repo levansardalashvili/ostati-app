@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { AlertCircle, Clock, Shield, ShieldCheck, XCircle } from 'lucide-react-native';
+import { Clock, Shield, ShieldCheck, XCircle } from 'lucide-react-native';
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
+import { ProfileCompletionRing } from './ProfileCompletionRing';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { userService } from '../services/userService';
@@ -119,12 +120,8 @@ export function VerificationRequestCard({ profile, onUpdated, onEditProfile }: P
 
       {!eligibility.eligible && (
         <View style={styles.missingBox}>
-          <View style={styles.missingHeaderRow}>
-            <AlertCircle size={15} color={colors.warning} />
-            <Text style={styles.missingHeaderText}>დაასრულე პროფილი მოთხოვნამდე</Text>
-          </View>
-          <Text style={styles.missingListText}>{eligibility.missingLabels.join(', ')}</Text>
-          <Pressable onPress={onEditProfile}>
+          <ProfileCompletionRing percent={eligibility.percent} />
+          <Pressable style={{ flex: 1 }} onPress={onEditProfile}>
             <Text style={styles.missingLink}>პროფილის რედაქტირება</Text>
           </Pressable>
         </View>
@@ -252,30 +249,17 @@ const styles = StyleSheet.create({
     color: colors.foreground,
   },
   missingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
     backgroundColor: colors.warningBackground,
     borderRadius: radius.md,
     padding: spacing.sm + 2,
-    gap: 4,
-  },
-  missingHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  missingHeaderText: {
-    ...typography.small,
-    color: colors.warning,
-    fontWeight: '700',
-  },
-  missingListText: {
-    ...typography.small,
-    color: colors.mutedForeground,
   },
   missingLink: {
     ...typography.small,
     color: colors.primary,
     fontWeight: '700',
-    marginTop: 2,
   },
   confirmIcon: {
     width: 48,

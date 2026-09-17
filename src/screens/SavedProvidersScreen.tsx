@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AlertCircle, Heart, MapPin, MessageCircle, Star } from 'lucide-react-native';
+import { AlertCircle, ChevronRight, Heart, MapPin, MessageCircle, Star } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
 import { Skeleton } from '../components/Skeleton';
+import { StartJobChatSheet } from '../components/StartJobChatSheet';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
@@ -53,13 +54,22 @@ export function SavedProvidersScreen({ navigation }: Props) {
   const saved = allProviders.filter((p) => favoriteIds.has(p.id));
 
   const openProfile = (id: string) => navigation.navigate('ViewProviderProfile', { id });
-  const openChat = (p: Provider) => {
+  // "ცივი ჩატის → job-ის შექმნის" ხვრელის ფიქსი — StartJobChatSheet.tsx-ის
+  // თავზე სრული მიზეზი (ViewProviderProfileScreen-ის იგივე ცვლილება).
+  const [startChatProvider, setStartChatProvider] = useState<Provider | null>(null);
+  const openChat = (p: Provider) => setStartChatProvider(p);
+  const openChatWithJob = (jobId: string | null, draftMessage?: string) => {
+    if (!startChatProvider) return;
+    const p = startChatProvider;
+    setStartChatProvider(null);
     navigation.navigate('ChatConversation', {
       chatId: p.id,
       name: p.name,
       initials: p.initials,
       color: p.color,
       role: 'customer',
+      jobId: jobId ?? undefined,
+      draftMessage,
     });
   };
 
@@ -112,6 +122,11 @@ export function SavedProvidersScreen({ navigation }: Props) {
           ))}
         </ScrollView>
       )}
+      <StartJobChatSheet
+        provider={startChatProvider}
+        onClose={() => setStartChatProvider(null)}
+        onReady={openChatWithJob}
+      />
     </SafeAreaView>
   );
 }
@@ -183,9 +198,15 @@ function SavedProviderCard({
       </Animated.View>
 
       <View style={styles.actionRow}>
-        <Text style={styles.priceText} numberOfLines={1}>
-          {p.price}
-        </Text>
+        <View style={styles.actionLeft}>
+          <Pressable style={styles.viewProfileLink} onPress={onOpenProfile} hitSlop={6}>
+            <Text style={styles.viewProfileLinkText}>პროფილის ნახვა</Text>
+            <ChevronRight size={12} color={colors.primary} />
+          </Pressable>
+          <Text style={styles.priceText} numberOfLines={1}>
+            {p.price}
+          </Text>
+        </View>
         <Animated.View style={{ transform: [{ scale: message.scale }] }}>
           <Pressable style={styles.messageButton} onPress={onMessage} onPressIn={message.onPressIn} onPressOut={message.onPressOut}>
             <MessageCircle size={14} color={colors.primaryForeground} />
@@ -302,6 +323,22 @@ const styles = StyleSheet.create({
     borderTopColor: colors.muted,
     marginTop: spacing.sm + 2,
     paddingTop: spacing.sm + 2,
+  },
+  actionLeft: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  viewProfileLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    alignSelf: 'flex-start',
+  },
+  viewProfileLinkText: {
+    ...typography.small,
+    color: colors.primary,
+    fontWeight: '700',
   },
   priceText: {
     ...typography.captionMedium,

@@ -7,6 +7,7 @@ import { Avatar } from '../components/Avatar';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
 import type { MediaItem } from '../components/MediaUploadGrid';
 import { Skeleton } from '../components/Skeleton';
+import { StartJobChatSheet } from '../components/StartJobChatSheet';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
@@ -93,13 +94,21 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
   const isSelfPreview = !!p.id && p.id === authService.getCurrentUser()?.uid;
   const favorite = isFavorite(p.id);
 
-  const handleChat = () => {
+  // "ცივი ჩატის → job-ის შექმნის" ხვრელის ფიქსი — "მიწერა" აღარ ხსნის
+  // ჩატს პირდაპირ, job-ის გარეშე (StartJobChatSheet.tsx-ის თავზე სრული
+  // მიზეზი). `startChatProvider` — null მალავს sheet-ს.
+  const [startChatProvider, setStartChatProvider] = useState<Provider | null>(null);
+  const handleChat = () => setStartChatProvider(p);
+  const openChatWithJob = (jobId: string | null, draftMessage?: string) => {
+    setStartChatProvider(null);
     navigation.navigate('ChatConversation', {
       chatId: p.id,
       name: p.name,
       initials: p.initials,
       color: p.color,
       role: 'customer',
+      jobId: jobId ?? undefined,
+      draftMessage,
     });
   };
 
@@ -197,29 +206,6 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
           <Text style={styles.sectionTitle}>სპეციალობები</Text>
           <View style={styles.tagsRow}>
             {p.specialties.map((s) => (
-              <View key={s} style={styles.skillTag}>
-                <Text style={styles.skillTagText}>{s}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>ფასი</Text>
-          {p.price || p.sqmPrice ? (
-            <View style={{ gap: spacing.xs + 2 }}>
-              {p.price && <Text style={styles.priceText}>{p.price}</Text>}
-              {p.sqmPrice && <Text style={styles.priceText}>ფასი კვ.მ-ზე: {p.sqmPrice} ₾ / მ²</Text>}
-            </View>
-          ) : (
-            <Text style={styles.priceTextMuted}>საბაზისო ფასი მითითებული არ არის</Text>
-          )}
-        </View>
-
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>სერვისები</Text>
-          <View style={styles.tagsRow}>
-            {p.skills.map((s) => (
               <View key={s} style={styles.skillTag}>
                 <Text style={styles.skillTagText}>{s}</Text>
               </View>
@@ -326,6 +312,11 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
 
       <MediaPreviewModal item={previewCert} icon={Award} onClose={() => setPreviewCert(null)} />
       <MediaPreviewModal item={previewPortfolio} icon={ImageIcon} onClose={() => setPreviewPortfolio(null)} />
+      <StartJobChatSheet
+        provider={startChatProvider}
+        onClose={() => setStartChatProvider(null)}
+        onReady={openChatWithJob}
+      />
     </SafeAreaView>
   );
 }
@@ -367,7 +358,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bodyContent: {
-    paddingBottom: spacing.xxl * 2,
+    paddingBottom: spacing.xl,
   },
   hero: {
     backgroundColor: colors.card,
@@ -509,16 +500,6 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
     lineHeight: 19,
-  },
-  priceText: {
-    ...typography.captionMedium,
-    color: colors.foreground,
-    fontWeight: '700',
-  },
-  priceTextMuted: {
-    ...typography.small,
-    color: colors.mutedForeground,
-    fontStyle: 'italic',
   },
   tagsRow: {
     flexDirection: 'row',
@@ -672,11 +653,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginLeft: 42,
   },
+  // Task — იგივე absolute-footer ხარვეზი (იხ. ProviderEditProfileScreen) —
+  // ScrollView-ის ბოლო სექციები (მაგ. reviews) footer-ის მიღმა/ქვემოთ
+  // რჩებოდა, scroll-ითაც ვერასდროს ჩანდა. ჩვეულებრივი flex sibling.
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.border,

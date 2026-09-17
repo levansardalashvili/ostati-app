@@ -23,7 +23,7 @@ export type RootStackParamList = {
   // `job` — არასავალდებულო, უკვე წამოღებული FeedJob (real Supabase-ის
   // job_posts-იდან, #54 "ეტაპი B"). თუ არ არის გადაცემული, ეკრანი თავად
   // წამოიღებს (jobService.getFeedJobPostById, #71).
-  ProviderJobDetail: { id: string; mode?: 'browse' | 'selected' | 'completed'; job?: FeedJob; autoOpenOffer?: boolean };
+  ProviderJobDetail: { id: string; mode?: 'browse' | 'selected' | 'completed'; job?: FeedJob };
   ProviderJobFeed: undefined;
   PostJob: undefined;
   // `job` — არასავალდებულო, უკვე წამოღებული CustomerJob ობიექტი (real
@@ -49,7 +49,22 @@ export type RootStackParamList = {
   // Wallet button regardless, so the send would silently fail. Optional —
   // when the caller doesn't have it handy, the composer button is hidden
   // rather than risk showing a broken affordance.
-  ChatConversation: { chatId: string; name: string; initials: string; color: string; role: Role; jobId?: string; jobStatus?: string };
+  ChatConversation: {
+    chatId: string;
+    name: string;
+    initials: string;
+    color: string;
+    role: Role;
+    jobId?: string;
+    jobStatus?: string;
+    // StartJobChatSheet.tsx-ის "ცივი ჩატის → job-ის შექმნის" ფიქსი — ახალი
+    // job-ის შექმნისას წინასწარ ამზადებს პირველი შეტყობინების ტექსტს
+    // (Customer-ის საკუთარი აღწერიდან), რომ Provider-მდე ეს job "ცხადად"
+    // მივიდეს ("ეს მომხმარებელი კონკრეტულად თქვენ გთხოვთ") — ტექსტი
+    // მხოლოდ წინასწარ ივსება ჩატის composer-ში, არ იგზავნება
+    // ავტომატურად (Customer თავად ხედავს/ასწორებს გაგზავნამდე).
+    draftMessage?: string;
+  };
   Notifications: { role: Role };
   NotificationSettings: { role: Role };
   ProfileSettings: undefined;

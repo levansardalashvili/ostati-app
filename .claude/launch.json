@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "ostati-admin-dev",
+      "name": "ostati-site-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "C:\\Users\\LS\\Desktop\\ostati-admin"],
+      "runtimeArgs": ["run", "dev", "--prefix", "C:\\Users\\LS\\Desktop\\ostati-site"],
       "port": 3000
     }
   ]

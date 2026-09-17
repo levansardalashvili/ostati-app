@@ -21,6 +21,7 @@ import { quoteService } from '../services/quoteService';
 import { userService } from '../services/userService';
 import { useJobStatus } from '../state/JobStatusContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
+import { useTabBarScroll } from '../state/TabBarScrollContext';
 import type { FeedJob } from '../types/job';
 import type { ProviderTabParamList, RootStackParamList } from '../navigation/types';
 
@@ -37,6 +38,7 @@ const HOME_FEED_LIMIT = 5;
 // B1 — Provider Home (product-spec.md; დიზაინის რეფერენსის ProviderHome-ის
 // მიხედვით)
 export function ProviderHomeScreen({ navigation }: Props) {
+  const { handleScroll } = useTabBarScroll();
   // `available` მხოლოდ push-შეტყობინებებზე მოქმედებს — Job Feed (`filtered`)
   // მისგან დამოუკიდებელია და OFF-ის დროსაც ჩანს (მომხმარებლის მოთხოვნით).
   // Task 2 — რეალურად Supabase-ზე (`provider_profiles.is_available`),
@@ -82,8 +84,14 @@ export function ProviderHomeScreen({ navigation }: Props) {
       let cancelled = false;
       setIsLoading(true);
       const uid = authService.getCurrentUser()?.uid;
+      // Task — `get_open_provider_feed()` RPC `authenticated`-ს ითხოვს —
+      // ადრე ეს fetch უპირობოდ ეშვებოდა, სესიის მზადყოფნის გარეშეც (მაგ.
+      // logout-ის navigation.reset-ის შუალედში), რაც "permission denied
+      // for function get_open_provider_feed" (42501) uncaught rejection-ს
+      // იწვევდა — დანარჩენი ორი query-ის იგივე `uid`-დაცვის ქვეშ ჩავაგდე,
+      // პლუს `.catch()`.
       Promise.all([
-        jobService.getOpenProviderFeedPosts(),
+        uid ? jobService.getOpenProviderFeedPosts() : Promise.resolve([]),
         uid ? quoteService.listMyResponseJobIds(uid) : Promise.resolve(new Set<string>()),
         uid ? jobService.listMyAssignedJobs(uid) : Promise.resolve([]),
       ])
@@ -93,6 +101,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
           setInterests(myResponses);
           setAssignedJobs(assigned);
         })
+        .catch(() => {})
         .finally(() => {
           if (!cancelled) setIsLoading(false);
         });
@@ -177,16 +186,6 @@ export function ProviderHomeScreen({ navigation }: Props) {
       jobStatus: job.status,
     });
   };
-  // Task — "დაინტ. ვარ" აღარ ხსნის ფასის sheet-ს ბარათიდანვე პირდაპირ
-  // (Provider სრული აღწერის/ფოტოების ნახვის გარეშე იძულებული იყო ფასი
-  // მაშინვე მიეთითებინა) — ნავიგირებს Detail-ზე, სადაც იგივე
-  // OfferPriceSheet ავტომატურად იხსნება (`autoOpenOffer`), მაგრამ სრული
-  // job-ის კონტექსტის გვერდით. `interests`-ის ლოკალური state ამ ეკრანზე
-  // useFocusEffect-ით ისედაც ახლდება ყოველ დაბრუნებაზე Detail-იდან.
-  const handleInterested = (job: FeedJob) => {
-    navigation.navigate('ProviderJobDetail', { id: job.id, job, autoOpenOffer: true });
-  };
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -211,7 +210,12 @@ export function ProviderHomeScreen({ navigation }: Props) {
         </View>
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
         <View style={styles.topCards}>
           <View style={[styles.availabilityCard, available ? styles.availabilityCardOn : styles.availabilityCardOff]}>
             <View style={styles.availabilityLeft}>
@@ -315,7 +319,6 @@ export function ProviderHomeScreen({ navigation }: Props) {
                   job={job}
                   sent={interests.has(job.id)}
                   onDetail={() => handleJobDetail(job)}
-                  onInterested={() => handleInterested(job)}
                   onChat={() => handleOpenChat(job)}
                 />
               ))}

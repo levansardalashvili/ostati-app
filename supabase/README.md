@@ -99,6 +99,10 @@ before applying them. None of the files drop tables.
 | `0068_job_posts_provider_name_column.sql` | Bug fix — `job_posts.provider_name` had been folded into 0004's `create table if not exists`, which is a no-op on any database where `job_posts` already existed before that edit; the column was silently never added there, breaking `get_open_provider_feed()`/`get_feed_job_by_id()` (0052) with "column jp.provider_name does not exist". Adds it via a standalone `alter table ... add column if not exists` — safe to run regardless of whether the column is already present |
 | `0069_provider_profiles_update_grant_fix.sql` | Bug fix (found via Maestro E2E testing) — every brand-new Provider registration failed at ProviderSetupScreen ("permission denied for table provider_profiles", hint pointed at a missing `GRANT UPDATE`). 0026 already contains the correct column-scoped grant, but a direct REST test against the live project showed it never actually took effect there (same live-database-vs-migration-file drift as 0068). Re-asserts the same grant from 0026 — idempotent, changes nothing else |
 | `0070_admin_role.sql` | Foundation for the admin panel (separate Next.js project, `ostati-admin` — its own folder/repo, not part of this one). Adds `'admin'` as a legal `users.role` value (provisioned manually, no self-service path) and opens `categories` INSERT/UPDATE/DELETE to admin accounts only — RLS-gated via a `users.role='admin'` subquery (safe: queries a different table than the one being protected, not the same self-referencing pattern 0026 moved away from). Provider verification approval and job_reports moderation are deferred to a later milestone |
+| `0071_site_content.sql` | Backend for the new public marketing site (`ostati-site`, another separate project — describes the app, how it works, privacy policy, store links) and its editor, folded into the existing `ostati-admin` panel rather than a third separate CMS/login. New `site_pages` (slug/title/markdown `content`) and `site_settings` (key/value — store URLs, contact email) — both admin-write (same pattern as 0070) but **public-read to `anon`**, not just `authenticated`, since marketing-site visitors are never signed in to Supabase at all |
+| `0072_admin_verification_and_reports.sql` | Third admin-panel milestone — Provider verification approval and job_reports moderation (both previously "future service_role tool", 0025/0034/0051). New `is_admin()` SECURITY DEFINER helper — needed because the new admin-read policy on `users` itself would otherwise be a self-referencing RLS subquery (the exact recursion footgun 0026 moved away from); 0070/0071's inline `role='admin'` subqueries are also swapped to call it, no behavior change. `admin_review_provider_verification(provider_id, approve, rejection_reason)` RPC is the only way pending -> verified/rejected (RPC, not a grant, since provider_profiles already has a permissive self-serve UPDATE policy a broad grant could collide with). `job_reports` gets a direct admin-only UPDATE(status) grant+policy instead (no existing user-facing UPDATE policy to collide with) |
+| `0073_categories_public_read.sql` | Opens `categories`' existing SELECT policy to `anon` (was `to authenticated` only, 0043) — the new public marketing site's `/services` page has no Supabase session at all, same situation site_pages/site_settings were in before 0071 |
+| `0074_site_blocks.sql` | Converts the last hardcoded marketing-site content into admin-editable data. New `site_blocks` table (block_key/sort_order/icon_key/title/description) for the two ORDERED-LIST sections that don't fit `site_pages`' single-title+body shape — home page's 4 feature cards (`block_key='home_features'`) and the 3 how-it-works steps (`block_key='how_it_works_steps'`, shared between the home preview and the full page). Same public-read/admin-write pattern as 0071/0073. Also seeds a new ordinary `site_pages` row (`slug='home_cta'`) for the home page's "დაიწყე დღესვე" CTA heading+subtext — that one IS just title+body, no new table needed for it |
 
 See `supabase/functions/send-push-notifications/README.md` for the Edge Function that actually sends pushes (deploy + Database Webhook setup — both manual, cannot be done from a migration).
 
@@ -394,3 +398,59 @@ to `undefined`.
 as a known gap — is resolved as of 0018; see the section above. As of
 0030, there are no further known RLS/security gaps documented in this
 migration set.)
+
+(Note: this file's per-migration writeups stop being kept current after
+0030 — migrations 0031–0074 exist and are applied, but were not indexed
+here. `0075` below picks the narrative back up for this one change; it
+does not attempt to backfill the missing 0031–0074 writeups.)
+
+## Chat offer acceptance auto-selects the Provider (0075)
+
+- **`0075`** — accepting a price offer in chat (`respond_to_chat_offer()`,
+  0049/0066) previously only synced `job_responses.offered_price` — the
+  Customer still had to separately open the job's detail screen and pick
+  the same Provider again via `select_provider()` to actually assign
+  them. New shared helper `assign_job_provider(job_id, provider_id,
+  provider_name, agreed_price, category)` (SECURITY DEFINER, no client
+  EXECUTE grant — same "internal helper" pattern as
+  `job_category_label()`/`specialty_to_category()`/`job_scheduled_start()`)
+  factors out the actual state transition (`job_posts.provider_id`/
+  `agreed_price`/`status='active'` + the "შენ აგირჩიეს" notification) so
+  both `select_provider()` and `respond_to_chat_offer()` call the same
+  code instead of duplicating it. On acceptance, `respond_to_chat_offer()`
+  now calls this helper right after its existing (unchanged)
+  `job_responses.offered_price` sync — all the preconditions it needs
+  (job still `pending`, a real `job_responses` row, a valid price) were
+  already being checked there. `select_provider()`'s own authorization/
+  validation is untouched, only its final update+insert block now
+  delegates to the helper. Client-side: `ChatConversationScreen.tsx`
+  syncs the local `JobStatusContext` cache to `'active'` on a successful
+  accept (so screens reading the cache reflect this immediately without
+  waiting on a refetch), and a new "სამუშაოს დეტალების ნახვა" banner link
+  (visible whenever the chat has a `jobId`) opens the job's detail screen
+  directly from the chat — `CustomerJobDetailScreen`/`CustomerJobsScreen`
+  now also pass `jobId` when opening a job-scoped chat (previously only
+  the three Provider-side job-context screens did).
+
+## `job_safe_area_label()` under-masking fix (0076)
+
+- **`0076`** — real privacy bug, not just a cosmetic one: the coarse
+  address label shown to a Provider before they're assigned/have
+  confirmed a price (`get_open_provider_feed()`/`get_feed_job_by_id()`,
+  0052) only stripped the FIRST comma-delimited segment of the address
+  (the house number). For the app's own short address format
+  (`AddressAutocompleteField`: "house number, street, area", e.g.
+  "12, შორაპნის ქუჩა, ვაკე"), that left the STREET NAME itself in the
+  "coarse" label — not coarse at all. Live data also revealed a second,
+  longer address shape (full untrimmed Nominatim output through
+  postcode+country) whose LAST segment is the country, not an area either
+  — so a first attempt at "just take the last segment" was itself wrong
+  and was corrected before shipping. Final rule, in `job_safe_area_label()`:
+  (1) any segment literally containing "რაიონი" (district) is trusted
+  verbatim wherever it sits; (2) otherwise, trailing postcode (all-digit)
+  and "საქართველო" segments are dropped, then the new last segment is
+  trusted only with >= 3 segments still remaining — never fewer, which
+  could still be the street. Every existing `job_posts.area_label` is
+  recomputed with the fixed function. No client-side change — every
+  Provider-facing surface (Job Feed cards, Job Detail, the in-chat job-
+  summary card) already reads this same server-computed value.

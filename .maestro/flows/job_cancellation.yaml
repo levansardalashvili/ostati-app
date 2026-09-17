@@ -207,8 +207,9 @@ appId: com.ostati.app
     timeout: 15000
 
 - tapOn:
-    text: ".*დაინტ. ვარ.*"
+    text: ".*დეტ\\. ნახვა.*"
     below: ".*${output.jobBMarker}.*"
+- tapOn: ".*დაინტერესება.*"
 - tapOn: ".*ჩაწერეთ თანხა.*"
 - inputText: "120"
 - hideKeyboard

@@ -27,7 +27,8 @@ import { EXPERIENCE_OPTIONS } from '../data/experience';
 import { authService } from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { userService } from '../services/userService';
-import { computeCompleteness, useProviderProfile } from '../state/ProviderProfileContext';
+import { useProviderProfile } from '../state/ProviderProfileContext';
+import { useTabBarScroll } from '../state/TabBarScrollContext';
 import { isNewProvider } from '../utils/providerRank';
 import type { ProviderTabParamList, RootStackParamList } from '../navigation/types';
 
@@ -39,12 +40,12 @@ type Props = CompositeScreenProps<
 // E1 — Provider-ის პროფილის ეკრანი (product-spec.md; დიზაინის რეფერენსის
 // ProviderProfile-ის მიხედვით)
 export function ProviderProfileScreen({ navigation }: Props) {
+  const { handleScroll } = useTabBarScroll();
   const { profile, setProfile } = useProviderProfile();
   const [logoutSheetOpen, setLogoutSheetOpen] = useState(false);
   const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`;
   const specialtyLabel = profile.specialty[0]?.label ?? '';
   const experienceLabel = EXPERIENCE_OPTIONS.find((e) => e.id === profile.experience)?.label ?? '';
-  const completeness = computeCompleteness(profile);
 
   // რეალური rating/reviews/jobs (#71) — ადრე ჰარდქოდილი "4.9★/127 შეფ./312
   // სამ." იყო, ანგარიშის რეალურ მდგომარეობასთან დაუკავშირებელი.
@@ -174,29 +175,12 @@ export function ProviderProfileScreen({ navigation }: Props) {
         </View>
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-        {completeness.percent < 100 && (
-          <Pressable style={styles.completenessCard} onPress={() => navigation.navigate('ProviderEditProfile')}>
-            <View style={styles.completenessHeaderRow}>
-              <Text style={styles.completenessTitle}>პროფილის სისრულე</Text>
-              <Text style={styles.completenessPercent}>{completeness.percent}%</Text>
-            </View>
-            <View style={styles.completenessTrack}>
-              <View style={[styles.completenessFill, { width: `${completeness.percent}%` }]} />
-            </View>
-            <View style={styles.completenessMissingRow}>
-              {completeness.missing.map((item) => (
-                <View key={item.key} style={[styles.completenessChip, item.optional && styles.completenessChipOptional]}>
-                  <Text style={[styles.completenessChipText, item.optional && styles.completenessChipTextOptional]}>
-                    {item.label}
-                    {item.optional ? ' (სურვილისამებრ)' : ''}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </Pressable>
-        )}
-
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
         <VerificationRequestCard
           profile={profile}
           onUpdated={setProfile}
@@ -369,67 +353,6 @@ const styles = StyleSheet.create({
   bodyContent: {
     padding: spacing.lg,
     gap: spacing.sm + 2,
-  },
-  completenessCard: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-  },
-  completenessHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  completenessTitle: {
-    ...typography.captionMedium,
-    color: colors.foreground,
-    fontWeight: '700',
-  },
-  completenessPercent: {
-    ...typography.captionMedium,
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  completenessTrack: {
-    height: 8,
-    borderRadius: radius.full,
-    backgroundColor: colors.muted,
-    overflow: 'hidden',
-    marginBottom: spacing.sm + 2,
-  },
-  completenessFill: {
-    height: '100%',
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-  },
-  completenessMissingRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs + 2,
-  },
-  completenessChip: {
-    backgroundColor: colors.warningBackground,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs + 2,
-  },
-  completenessChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.warning,
-  },
-  completenessChipOptional: {
-    backgroundColor: colors.muted,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-  },
-  completenessChipTextOptional: {
-    color: colors.mutedForeground,
   },
   previewButton: {
     flexDirection: 'row',

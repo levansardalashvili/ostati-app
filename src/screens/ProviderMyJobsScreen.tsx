@@ -14,6 +14,7 @@ import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
 import { quoteService } from '../services/quoteService';
 import { useJobStatus } from '../state/JobStatusContext';
+import { useTabBarScroll } from '../state/TabBarScrollContext';
 import type { FeedJob, JobStatus } from '../types/job';
 import type { ProviderTabParamList, RootStackParamList } from '../navigation/types';
 import { usePressScale } from '../utils/usePressScale';
@@ -42,6 +43,7 @@ const EMPTY_TEXT: Record<Tab, string> = {
 // JobStatusContext-ის კავშირის გარეშე. ახლა CustomerJobsScreen-ის იგივე
 // pattern-ს იზიარებს (`useFocusEffect`, სტატუსით navigate ProviderJobDetail-ზე).
 export function ProviderMyJobsScreen({ navigation }: Props) {
+  const { handleScroll } = useTabBarScroll();
   const [tab, setTab] = useState<Tab>('pending');
   const [isLoading, setIsLoading] = useState(true);
   const [jobs, setJobs] = useState<FeedJob[]>([]);
@@ -76,6 +78,7 @@ export function ProviderMyJobsScreen({ navigation }: Props) {
           setJobs(assigned);
           setPendingJobs(openFeed.filter((j) => myResponseIds.has(j.id)));
         })
+        .catch(() => {})
         .finally(() => {
           if (!cancelled) setIsLoading(false);
         });
@@ -121,7 +124,14 @@ export function ProviderMyJobsScreen({ navigation }: Props) {
       <View style={styles.tabsRow}>
         {TABS.map((t) => (
           <Pressable key={t.id} style={[styles.tab, tab === t.id && styles.tabActive]} onPress={() => setTab(t.id)}>
-            <Text style={[styles.tabText, tab === t.id && styles.tabTextActive]}>{t.label}</Text>
+            <Text
+              style={[styles.tabText, tab === t.id && styles.tabTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+            >
+              {t.label}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -140,7 +150,12 @@ export function ProviderMyJobsScreen({ navigation }: Props) {
           <Text style={styles.emptyTitle}>{EMPTY_TEXT[tab]}</Text>
         </View>
       ) : (
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={styles.bodyContent}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
           {items.map((j) => {
             const liveStatus = j.customerJobId ? (getStatus(j.customerJobId) ?? j.status) : j.status;
             return (

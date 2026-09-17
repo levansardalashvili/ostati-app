@@ -1,6 +1,6 @@
 import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Camera, Check, Clock, MapPin, MessageCircle, ThumbsUp } from 'lucide-react-native';
+import { Camera, Check, Clock, MapPin, MessageCircle } from 'lucide-react-native';
 import { CategoryIcon } from './CategoryIcon';
 import { Skeleton } from './Skeleton';
 import { colors, radius, spacing, typography } from '../theme';
@@ -12,14 +12,20 @@ type Props = {
   job: FeedJob;
   sent: boolean;
   onDetail: () => void;
-  onInterested: () => void;
   onChat: () => void;
 };
 
 // ProviderFeedJobCard — Job Feed-ის ერთი ბარათი (ProviderHomeScreen-ის
 // JobCard-იდან გამოტანილი, გაზიარებულია ProviderHomeScreen-სა და
 // ProviderJobFeedScreen-ს ("ყველას ნახვა") შორის).
-export function ProviderFeedJobCard({ job, sent, onDetail, onInterested, onChat }: Props) {
+//
+// Task — ბარათზე პირდაპირ "დაინტ. ვარ" ღილაკი ამოღებულია — Provider-მა
+// ჯერ სამუშაოს სრული დეტალები/აღწერა/ფოტოები უნდა ნახოს ("დეტ. ნახვა"),
+// ინტერესის/ფასის გაგზავნა კი მხოლოდ Job Detail-ის ეკრანზეა შესაძლებელი
+// (ქვედა footer, "დაინტერესება" ღილაკი). `sent`-ის შემდეგ კვლავ ჩანს
+// "ჩატის გახსნა" (ეს არ იცვლება — ცალკე, დასრულებული ინტერესის
+// შემდგომი მოქმედებაა).
+export function ProviderFeedJobCard({ job, sent, onDetail, onChat }: Props) {
   const category = CATEGORIES.find((c) => c.id === job.category) ?? CATEGORIES[0];
   const detail = usePressScale();
   const action = usePressScale();
@@ -68,8 +74,10 @@ export function ProviderFeedJobCard({ job, sent, onDetail, onInterested, onChat 
         </View>
       </View>
 
-      <View style={styles.jobActionRow}>
-        <Text style={styles.interestedCount}>{job.interested + (sent ? 1 : 0)} დაინტ.</Text>
+      {/* Task — Provider-ს არ უნდა დაინახოს, რამდენი კონკურენტი-ოსტატია
+          დაინტერესებული ამ job-ზე ("interestedCount" ტექსტი ამოღებულია
+          ორივე ადგილიდან — აქაც და ProviderJobDetailScreen-ის statsRow-იც). */}
+      <View style={[styles.jobActionRow, { justifyContent: 'flex-end' }]}>
         <View style={styles.jobActionButtons}>
           <Animated.View style={{ transform: [{ scale: detail.scale }] }}>
             <Pressable
@@ -81,8 +89,8 @@ export function ProviderFeedJobCard({ job, sent, onDetail, onInterested, onChat 
               <Text style={styles.detailButtonText}>დეტ. ნახვა</Text>
             </Pressable>
           </Animated.View>
-          <Animated.View style={{ transform: [{ scale: action.scale }] }}>
-            {sent ? (
+          {sent && (
+            <Animated.View style={{ transform: [{ scale: action.scale }] }}>
               <Pressable
                 style={styles.chatButton}
                 onPress={onChat}
@@ -92,18 +100,8 @@ export function ProviderFeedJobCard({ job, sent, onDetail, onInterested, onChat 
                 <MessageCircle size={13} color={colors.primaryForeground} />
                 <Text style={styles.chatButtonText}>ჩატის გახსნა</Text>
               </Pressable>
-            ) : (
-              <Pressable
-                style={styles.chatButton}
-                onPress={onInterested}
-                onPressIn={action.onPressIn}
-                onPressOut={action.onPressOut}
-              >
-                <ThumbsUp size={13} color={colors.primaryForeground} />
-                <Text style={styles.chatButtonText}>დაინტ. ვარ</Text>
-              </Pressable>
-            )}
-          </Animated.View>
+            </Animated.View>
+          )}
         </View>
       </View>
 
@@ -241,10 +239,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
-  },
-  interestedCount: {
-    ...typography.small,
-    color: colors.mutedForeground,
   },
   jobActionButtons: {
     flexDirection: 'row',

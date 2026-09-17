@@ -16,7 +16,24 @@ export interface ChatService {
   // მონაწილეთა სახელებს/ინიციალებს პირდაპირ `users`/`provider_profiles`-იდან
   // კითხულობს (SECURITY DEFINER), კლიენტის მტკიცებას აღარ ენდობა.
   listRealMessages(customerId: string, providerId: string, myUid: string): Promise<ChatMsg[]>;
-  sendRealMessage(customerId: string, providerId: string, senderId: string, text: string): Promise<ChatMsg>;
+  // Cold-chat → job creation gap fix (StartJobChatSheet.tsx) — before
+  // showing the quick "რისი გაკეთება გჭირდებათ?" form, we check whether
+  // this Customer/Provider pair has ANY message history already (not
+  // `findLatestSharedJobId`'s narrower "assigned or job_responses"
+  // check, which stays `false` right after a fresh quick-job is created
+  // and published — no assignment/interest has happened yet). A
+  // pre-existing conversation means a job was very likely already
+  // created for it the first time "მიწერა" was tapped — re-showing the
+  // form on every repeat visit to the same Provider's profile would spam
+  // job_posts with duplicate open jobs.
+  hasExistingConversation(customerId: string, providerId: string): Promise<boolean>;
+  // `jobId` (StartJobChatSheet.tsx-ის auto-sent პირველი შეტყობინება) —
+  // იგივე პრინციპი, რაც offer-ის `job_id`-ს ჰქონდა (#49): ტექსტურ
+  // შეტყობინებაზეც job_id-ის მიმაგრება საშუალებას აძლევს
+  // `findLatestSharedJobId()`-ს დაუყოვნებლივ, სანდოდ ამოიცნოს "რომელ
+  // job-ს ეხება ეს კონკრეტული საუბარი" — Provider-ის რაიმე
+  // პასუხის/მინიჭების ლოდინის გარეშეც.
+  sendRealMessage(customerId: string, providerId: string, senderId: string, text: string, jobId?: string): Promise<ChatMsg>;
   // `jobId` — second hardening pass, item 5 (supabase/migrations/0049):
   // ყოველ ფასის შეთავაზებას ახლა თან ახლავს, რომელ job-ს ეხება,
   // `respond_to_chat_offer`-ის (customer_id, provider_id)-დან
@@ -131,10 +148,27 @@ export const chatService: ChatService = {
     if (error) throw error;
     return (data as MessageRow[]).map((row) => fromMessageRow(row, myUid));
   },
-  async sendRealMessage(customerId, providerId, senderId, text) {
+  async hasExistingConversation(customerId, providerId) {
     const { data, error } = await supabase
       .from('messages')
-      .insert({ customer_id: customerId, provider_id: providerId, sender_id: senderId, type: 'text', text })
+      .select('id')
+      .eq('customer_id', customerId)
+      .eq('provider_id', providerId)
+      .limit(1);
+    if (error) throw error;
+    return !!data && data.length > 0;
+  },
+  async sendRealMessage(customerId, providerId, senderId, text, jobId) {
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        customer_id: customerId,
+        provider_id: providerId,
+        sender_id: senderId,
+        type: 'text',
+        text,
+        job_id: jobId ?? null,
+      })
       .select()
       .single();
     if (error) throw error;

@@ -15,6 +15,7 @@ import { jobService } from '../services/jobService';
 import { notificationService } from '../services/notificationService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useFavoriteProviders } from '../state/FavoriteProvidersContext';
+import { useTabBarScroll } from '../state/TabBarScrollContext';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -25,6 +26,7 @@ type Props = CompositeScreenProps<
 // E2 — Customer-ის პროფილის ეკრანი (product-spec.md; დიზაინის რეფერენსის
 // CustomerProfile-ის მიხედვით)
 export function CustomerProfileScreen({ navigation }: Props) {
+  const { handleScroll } = useTabBarScroll();
   const { profile } = useCustomerProfile();
   const { favoriteIds } = useFavoriteProviders();
   const initials = `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`;
@@ -124,7 +126,12 @@ export function CustomerProfileScreen({ navigation }: Props) {
         </View>
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
         {MENU.map((item) => (
           <ProfileMenuRow
             key={item.label}

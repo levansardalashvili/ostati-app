@@ -38,6 +38,9 @@ export function Chip({ label, selected, onPress, variant = 'outline' }: Props) {
             variant === 'filled' && styles.labelFilled,
             variant === 'filled' && selected && styles.labelFilledSelected,
           ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
         >
           {label}
         </Text>

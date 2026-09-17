@@ -1,6 +1,6 @@
 import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { MapPin, MessageCircle, Star } from 'lucide-react-native';
+import { ChevronRight, MapPin, MessageCircle, Star } from 'lucide-react-native';
 import { Avatar } from './Avatar';
 import { Skeleton } from './Skeleton';
 import { VerifiedBadge } from './VerifiedBadge';
@@ -81,9 +81,15 @@ export function ProviderCard({
       </Animated.View>
 
       <View style={styles.providerActionRow}>
-        <Text style={styles.priceText} numberOfLines={1}>
-          {provider.price}
-        </Text>
+        <View style={styles.providerActionLeft}>
+          <Pressable style={styles.viewProfileLink} onPress={onOpenProfile} hitSlop={6}>
+            <Text style={styles.viewProfileLinkText}>პროფილის ნახვა</Text>
+            <ChevronRight size={12} color={colors.primary} />
+          </Pressable>
+          <Text style={styles.priceText} numberOfLines={1}>
+            {provider.price}
+          </Text>
+        </View>
         <Animated.View style={{ transform: [{ scale: message.scale }] }}>
           <Pressable
             style={styles.messageButton}
@@ -224,6 +230,22 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
+  },
+  providerActionLeft: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  viewProfileLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    alignSelf: 'flex-start',
+  },
+  viewProfileLinkText: {
+    ...typography.small,
+    color: colors.primary,
+    fontWeight: '700',
   },
   priceText: {
     ...typography.small,

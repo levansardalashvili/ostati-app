@@ -69,13 +69,11 @@ const styles = StyleSheet.create({
   },
   bodyContent: {
     padding: spacing.lg,
-    paddingBottom: spacing.xxl * 2,
+    paddingBottom: spacing.xl,
   },
+  // Task — იგივე absolute-footer ხარვეზი (იხ. ProviderEditProfileScreen).
+  // ჩვეულებრივი flex sibling.
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.border,

@@ -64,9 +64,14 @@ export type FeedJob = {
   location: string;
   date: string;
   ago: string;
-  interested: number;
   urgent: boolean;
   hasPhoto: boolean;
+  // Task — `hasPhoto` მხოლოდ badge-ისთვის საკმარისი იყო ("ფოტოა" tag),
+  // მაგრამ თავად ფოტოს URL-ები არასდროს არ მოდიოდა Provider-ის მხარეს —
+  // ProviderJobDetailScreen-ს ფოტოს ჩვენება ფიზიკურად არ შეეძლო.
+  // `get_open_provider_feed()`/`get_feed_job_by_id()` RPC-ები (0048/0052)
+  // ისედაც აბრუნებდნენ `job_posts.photos`-ს — mapping-ში აკლდა.
+  photos?: string[];
   desc: string;
   // Customer-ის მიერ არჩეული Provider-ის id, თუ job უკვე გადაწყვეტილია.
   // CURRENT_PROVIDER_ID-ს დამთხვევისას job Feed-იდან ქრება და "მიმდინარე

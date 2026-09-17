@@ -11,6 +11,7 @@ import { Skeleton } from '../components/Skeleton';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
+import { useTabBarScroll } from '../state/TabBarScrollContext';
 import type { ChatEntry } from '../types/chat';
 import type { CustomerTabParamList, Role, RootStackParamList } from '../navigation/types';
 import { usePressScale } from '../utils/usePressScale';
@@ -26,6 +27,7 @@ type Props = CompositeScreenProps<
 // (არა plain `useEffect`), ტაბზე დაბრუნებისას ახალი შეტყობინება/ჩატი
 // განახლდეს.
 export function ChatsListScreen({ navigation, role }: Props) {
+  const { handleScroll } = useTabBarScroll();
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [chats, setChats] = useState<ChatEntry[]>([]);
@@ -104,7 +106,7 @@ export function ChatsListScreen({ navigation, role }: Props) {
           </Text>
         </View>
       ) : (
-        <ScrollView style={styles.body}>
+        <ScrollView style={styles.body} onScroll={handleScroll} scrollEventThrottle={16}>
           {filtered.map((c) => (
             <ChatRow key={c.id} chat={c} onPress={() => openChat(c)} />
           ))}

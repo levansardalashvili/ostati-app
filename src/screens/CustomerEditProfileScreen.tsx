@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   },
   bodyContent: {
     padding: spacing.lg,
-    paddingBottom: spacing.xxl * 2,
+    paddingBottom: spacing.xl,
   },
   avatarRow: {
     alignItems: 'center',
@@ -176,11 +176,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs + 2,
     paddingHorizontal: 2,
   },
+  // Task — ProviderEditProfileScreen-ის იგივე ხარვეზი (absolute footer
+  // ScrollView-ის ბოლო კონტენტს "ეფინებოდა", scroll-ითაც ვერასდროს
+  // ჩანდა; Android-ის keyboard-avoid auto-scroll-საც არასწორად ითვლიდა).
+  // ჩვეულებრივი flex sibling — იგივე ფიქსი, აქაც.
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: colors.card,
     borderTopWidth: 1,
     borderTopColor: colors.border,
