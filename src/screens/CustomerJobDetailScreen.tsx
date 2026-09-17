@@ -202,6 +202,22 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const effectiveStatus: JobStatus = sharedStatus;
   const showCompletionConfirmCard = effectiveStatus === 'awaiting_customer_confirmation';
 
+  // supabase/migrations/0079 — opportunistic, fire-and-forget auto-expiry
+  // check (ProviderJobDetailScreen-ის იგივე ეფექტის სარკე). RPC-ივე
+  // ამოწმებს რეალურ 72სთ-იან grace period-ს სერვერზე — თუ ჯერ ადრეა ან
+  // job სხვა სტატუსშია, უბრალოდ `false`-ს აბრუნებს, შეცდომის გარეშე.
+  useEffect(() => {
+    if (effectiveStatus !== 'awaiting_customer_confirmation' || !job.id) return;
+    const jobId = job.id;
+    jobService
+      .expireStaleJobConfirmation(jobId)
+      .then((expired) => {
+        if (expired) setStatus(jobId, 'confirmed_awaiting_rating');
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveStatus, job.id]);
+
   const progressSteps = [
     { label: 'მოთხოვნა გამოქვეყნდა', done: true },
     { label: 'ოსტატი შეირჩა', done: !!selectedProvider },

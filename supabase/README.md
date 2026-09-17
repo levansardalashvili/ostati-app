@@ -454,3 +454,116 @@ does not attempt to backfill the missing 0031–0074 writeups.)
   recomputed with the fixed function. No client-side change — every
   Provider-facing surface (Job Feed cards, Job Detail, the in-chat job-
   summary card) already reads this same server-computed value.
+
+## Cold-DM Provider reply fix (0077)
+
+- **`0077`** — the new `StartJobChatSheet` cold-DM flow (Customer messages
+  a Provider directly from their public profile, no prior job interest)
+  creates a real job and lets the Customer send the first message, but the
+  Provider could never reply — `messages`' INSERT policy (0067) only
+  allowed Provider -> Customer when a `job_responses` row already existed
+  (still pending) or the Provider was already assigned; neither is ever
+  true for a job the Customer just created and messaged this ONE Provider
+  about directly. The same gap blocked the Provider's first price offer
+  entirely (`respond_to_chat_offer()`, 0049/0066, required a pre-existing
+  `job_responses` row — circular for a first offer). Fix: a third
+  condition — "the Customer has already sent this Provider at least one
+  message directly" — is exactly as strong a proof of a real relationship
+  as `job_responses`/assignment, added to both the `messages` policy and
+  `can_access_private_chat_media()`. The offer-specific `job_responses`
+  pre-existence check is dropped (redundant once the outer relationship
+  check covers it); `respond_to_chat_offer()` now creates the missing
+  `job_responses` row itself on acceptance, from the offer message's own
+  already-validated amount, deriving `provider_name` server-side.
+
+## Admin dispute resolution (0078)
+
+- **`0078`** — closes a real dead-end: every RPC that touches `disputed`
+  (`customer_report_problem`, 0014/0022/0038/0045) only ever writes INTO
+  it — nothing transitioned a job OUT of `disputed`, so once a Customer
+  disputed a Provider's completion request, that job was stuck forever
+  (couldn't reach `completed` — no review can attach without a prompt —
+  and `cancel_job`/`provider_cancel_job`, 0032/0036, both explicitly
+  reject `disputed` as a source status by design). New admin-only RPC
+  `admin_resolve_job_dispute(job_id, resolution)` — same pattern as
+  0072's `admin_review_provider_verification()` (`is_admin()` gate,
+  `for update` lock, fixed-enum outcome, not a free-form status). Two
+  resolutions: `'reopen'` (admin sides with the Provider — back to
+  `awaiting_customer_confirmation`, `dispute_reason` cleared, Customer
+  gets another confirm/dispute cycle) or `'cancel'` (admin sides with the
+  Customer — `cancelled`, stamping the same columns `cancel_job()` does:
+  `cancelled_at`/`cancelled_by=auth.uid()`/`cancellation_actor='admin'`
+  — a value 0036 already reserved in its check constraint but no RPC had
+  ever actually used — `/cancellation_reason` carried forward from the
+  original `dispute_reason`). Both outcomes notify both participants
+  (`type='job_status_change'`, same pattern as every other job-workflow
+  RPC). No UI wiring in `ostati-app` — this is called from the separate
+  `ostati-admin` panel, matching 0072's other admin actions.
+
+## Stale-confirmation auto-expiry (0079)
+
+- **`0079`** — the second gap found alongside 0078: `awaiting_customer_confirmation`
+  has no timeout either. `provider_request_completion()` notifies the
+  Customer exactly once (`completion_reminder`) and nothing ever prompts
+  again — a Customer who never opens the app leaves the job stuck forever,
+  with no recourse for the Provider. Unlike 0078 (needs a human admin
+  decision), this has an unambiguous default: silence past a grace period
+  is implicit acceptance — standard in marketplaces with no payment/escrow
+  to hold (this app has neither). No cron/scheduled-function infrastructure
+  exists in this project (the push pipeline, 0037-0039, is event-driven via
+  a Database Webhook, not time-based) — rather than add pg_cron as new
+  infrastructure for one narrow check, new RPC `expire_stale_job_confirmation(job_id)`
+  is lazy/opportunistic: callable by either participant, but only actually
+  transitions the job once >=72h have elapsed since `job_posts.updated_at`
+  (already auto-stamped by the shared `set_updated_at` trigger on every
+  UPDATE — no new timestamp column needed, since nothing else touches a
+  job_posts row while it sits in `awaiting_customer_confirmation`).
+  Returns `false` (not an error) if called too early or on any other
+  status — only raises for auth/not-found/non-participant. Deliberately
+  preserves "review is always mandatory" (#18/#47): transitions to
+  `confirmed_awaiting_rating` (the exact state `customer_confirm_completion()`
+  reaches explicitly), never straight to `completed`. Notifies both
+  participants either way. Client wiring: `ProviderJobDetailScreen`/
+  `CustomerJobDetailScreen` call this fire-and-forget whenever either
+  loads a job in that status — the job self-heals the next time either
+  party happens to look, no background infrastructure required. Verified
+  live against real data: too-early call returns `false` with no state
+  change; after backdating `updated_at` past 72h (trigger temporarily
+  disabled to simulate elapsed time, a test-only maneuver — the trigger
+  fires normally on every real update), the RPC correctly transitions the
+  job and notifies both sides; a second call after transition is a no-op
+  (`false`, no duplicate notification); a non-participant caller is
+  rejected.
+  - **Adjacent pre-existing bug, also fixed while here:** `ProviderJobDetailScreen`
+    had no `variant` case for `confirmed_awaiting_rating` at all (reachable
+    even before 0079, via the Customer's ordinary explicit "დადასტურება"
+    tap) — it fell through to `'active'`, re-showing "სამუშაო დავასრულე"
+    even though the job was no longer `active` (the RPC would then reject
+    the tap). Now maps to the existing `'completed'` variant/banner, whose
+    title is accurate either way and whose star-rating block already
+    renders conditionally on a review existing.
+
+## Admin `job_posts` read access (0080)
+
+- **`0080`** — caught live, minutes after building the `ostati-admin`
+  "დავები" page on top of 0078: the page queries `job_posts where
+  status='disputed'` as the logged-in admin, through the anon-key +
+  cookie session (RLS-enforced, `ostati-site`'s
+  `src/lib/supabase-admin/server.ts` — never a service_role bypass).
+  `job_posts` only ever had three SELECT policies (0004): the job's own
+  Customer, a Provider on still-`pending` jobs, and the assigned
+  Provider — none match an admin who is neither. The query didn't error,
+  it silently returned zero rows (RLS filtering, not a failure) — the
+  disputes page showed "no disputes" for a job that was genuinely sitting
+  there disputed. 0072 added the identical "Admin can read all X" pattern
+  for `users`/`provider_verification_requests`/`job_reports` when
+  building the first two admin sections; `job_posts` was simply never
+  touched since no admin feature had needed to read it until now. New
+  policy, same `is_admin()` helper, read-only — `job_posts`
+  INSERT/UPDATE stay fully RPC-only (0026/0050/0052/0053) regardless;
+  `admin_resolve_job_dispute()` (0078) already does its own independent
+  `is_admin()` check before writing, so this changes nothing about who
+  can mutate a job. Verified live end-to-end through the actual admin UI
+  (not just direct SQL): clicking "ოსტატს ვემხრობი" on the one real
+  disputed test job correctly transitioned it to
+  `awaiting_customer_confirmation` with `dispute_reason` cleared.

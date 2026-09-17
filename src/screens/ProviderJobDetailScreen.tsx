@@ -141,7 +141,17 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         ? 'awaiting_confirmation'
         : linkedStatus === 'disputed'
           ? 'disputed'
-          : linkedStatus === 'completed'
+          : // Pre-existing gap, surfaced (not introduced) by 0079's auto-expiry:
+            // once the Customer confirms completion (explicitly, or via 0079's
+            // timeout) but hasn't submitted a rating yet, the job sits in
+            // `confirmed_awaiting_rating` — this had no case here at all and
+            // fell through to 'active' (re-showing "სამუშაო დავასრულე", which
+            // the RPC would then reject since the job is no longer `active`).
+            // Reuses the 'completed' variant/banner — its title ("სამუშაო
+            // დასრულებულად დადასტურდა") is accurate either way, and the
+            // star-rating block already renders conditionally on
+            // `receivedRating` existing.
+            linkedStatus === 'completed' || linkedStatus === 'confirmed_awaiting_rating'
             ? 'completed'
             : linkedStatus === 'active'
               ? 'active'
@@ -150,6 +160,24 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
                 : mode === 'selected'
                   ? 'active'
                   : 'browse';
+
+  // supabase/migrations/0079 — opportunistic, fire-and-forget check: no
+  // cron exists in this project, so simply loading this screen while the
+  // job has sat in awaiting_customer_confirmation is what "self-heals" a
+  // Customer who never responded. The RPC itself enforces the real 72h
+  // grace period server-side and safely no-ops otherwise — this effect
+  // does not need its own threshold logic client-side.
+  useEffect(() => {
+    if (linkedStatus !== 'awaiting_customer_confirmation' || !job.customerJobId) return;
+    const jobId = job.customerJobId;
+    jobService
+      .expireStaleJobConfirmation(jobId)
+      .then((expired) => {
+        if (expired) setStatus(jobId, 'confirmed_awaiting_rating');
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedStatus, job.customerJobId]);
 
   const [markingWorkDone, setMarkingWorkDone] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);

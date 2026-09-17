@@ -230,6 +230,19 @@ export interface JobService {
   // `reasonCode === 'other'`-ზეა სავალდებულო (RPC-ივე ამოწმებს სერვერზე).
   providerCancelJob(jobId: string, reasonCode: string, details?: string): Promise<void>;
 
+  // Stale-confirmation auto-expiry — supabase/migrations/0079. Fire-and-
+  // forget, opportunistic: no cron exists in this project, so either job-
+  // detail screen calls this whenever it loads a job still in
+  // `awaiting_customer_confirmation` — the RPC itself enforces the actual
+  // 72h grace period server-side and is a safe no-op (returns `false`,
+  // not an error) if called too early or on any other status. Resolves
+  // to `confirmed_awaiting_rating` (never straight to `completed` —
+  // review stays mandatory, #18/#47 unchanged) and notifies both
+  // participants. Returns whether it actually transitioned the job, so
+  // callers can sync `JobStatusContext`'s local cache immediately instead
+  // of waiting on a refetch.
+  expireStaleJobConfirmation(jobId: string): Promise<boolean>;
+
   // Second hardening pass, item 4 — job-ის ფოტოების ცალკე მიმაგრება
   // `create_job`-ის შემდეგ (`private-media/job/{jobId}/...`-ს job-ის
   // id სჭირდება, რომელიც შექმნამდე არ არსებობს). Owner-only, მხოლოდ
@@ -411,5 +424,10 @@ export const jobService: JobService = {
       p_details: details ?? null,
     });
     if (error) throw error;
+  },
+  async expireStaleJobConfirmation(jobId) {
+    const { data, error } = await supabase.rpc('expire_stale_job_confirmation', { p_job_id: jobId });
+    if (error) throw error;
+    return !!data;
   },
 };
