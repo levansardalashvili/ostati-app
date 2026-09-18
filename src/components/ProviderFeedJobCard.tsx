@@ -1,12 +1,12 @@
 import React from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Camera, Check, Clock, MapPin, MessageCircle } from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Camera, Check, Clock, MapPin } from 'lucide-react-native';
+import { Button } from './Button';
 import { CategoryIcon } from './CategoryIcon';
 import { Skeleton } from './Skeleton';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
 import type { FeedJob } from '../types/job';
-import { usePressScale } from '../utils/usePressScale';
 
 type Props = {
   job: FeedJob;
@@ -27,80 +27,64 @@ type Props = {
 // შემდგომი მოქმედებაა).
 export function ProviderFeedJobCard({ job, sent, onDetail, onChat }: Props) {
   const category = CATEGORIES.find((c) => c.id === job.category) ?? CATEGORIES[0];
-  const detail = usePressScale();
-  const action = usePressScale();
 
   return (
     <View style={styles.jobCard}>
       <View style={styles.jobCardBody}>
         <View style={styles.jobHeaderRow}>
-          <CategoryIcon categoryId={category.id} size={38} />
-          <View style={{ flex: 1 }}>
-            <View style={styles.jobTitleRow}>
-              <Text style={styles.jobTitle}>{job.title}</Text>
-              {job.urgent && (
-                <View style={styles.urgentBadge}>
-                  <Text style={styles.urgentBadgeText}>🔥 სასწ.</Text>
-                </View>
-              )}
-            </View>
-            <View style={styles.jobMetaRow}>
-              <Text style={styles.jobMetaText}>{category.label}</Text>
-              <Text style={styles.dotSeparator}>•</Text>
-              <View style={styles.jobMetaLocation}>
-                <MapPin size={10} color={colors.mutedForeground} />
-                <Text style={styles.jobMetaText}>{job.location}</Text>
-              </View>
-              <Text style={styles.dotSeparator}>•</Text>
-              <Text style={styles.jobMetaText}>{job.ago} წინ</Text>
-            </View>
+          <CategoryIcon categoryId={category.id} size={44} />
+          <View style={styles.jobTitleBlock}>
+            <Text style={styles.jobTitle} numberOfLines={1}>
+              {job.title}
+            </Text>
+            <Text style={styles.jobCategoryText} numberOfLines={1}>
+              {job.ago} წინ
+            </Text>
           </View>
-        </View>
-
-        <Text style={styles.jobDesc}>{job.desc}</Text>
-
-        <View style={styles.jobTimeRow}>
-          <Clock size={12} color={colors.primary} />
-          <Text style={styles.jobTimeText}>{job.date}</Text>
-        </View>
-
-        <View style={styles.jobTagsRow}>
-          {job.hasPhoto && (
-            <View style={styles.jobTag}>
-              <Camera size={10} color={colors.mutedForeground} />
-              <Text style={styles.jobTagText}>ფოტოა</Text>
+          {job.urgent && (
+            <View style={styles.urgentBadge}>
+              <Text style={styles.urgentBadgeText}>🔥 სასწ.</Text>
             </View>
           )}
         </View>
-      </View>
 
-      {/* Task — Provider-ს არ უნდა დაინახოს, რამდენი კონკურენტი-ოსტატია
-          დაინტერესებული ამ job-ზე ("interestedCount" ტექსტი ამოღებულია
-          ორივე ადგილიდან — აქაც და ProviderJobDetailScreen-ის statsRow-იც). */}
-      <View style={[styles.jobActionRow, { justifyContent: 'flex-end' }]}>
-        <View style={styles.jobActionButtons}>
-          <Animated.View style={{ transform: [{ scale: detail.scale }] }}>
-            <Pressable
-              style={styles.detailButton}
-              onPress={onDetail}
-              onPressIn={detail.onPressIn}
-              onPressOut={detail.onPressOut}
-            >
-              <Text style={styles.detailButtonText}>დეტ. ნახვა</Text>
-            </Pressable>
-          </Animated.View>
+        <Text style={styles.jobDesc} numberOfLines={3}>
+          {job.desc}
+        </Text>
+
+        <View style={styles.jobMetaRow}>
+          {!!job.date && (
+            <View style={styles.jobMetaItem}>
+              <Clock size={13} color={colors.primary} />
+              <Text style={[styles.jobMetaText, styles.jobTimeText]} numberOfLines={1}>
+                {job.date}
+              </Text>
+            </View>
+          )}
+          <View style={styles.jobMetaItem}>
+            <MapPin size={13} color={colors.mutedForeground} />
+            <Text style={styles.jobMetaText} numberOfLines={1}>
+              {job.location}
+            </Text>
+          </View>
+          {job.hasPhoto && (
+            <View style={styles.jobMetaItem}>
+              <Camera size={13} color={colors.mutedForeground} />
+              <Text style={styles.jobMetaText}>ფოტოა</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Provider-ს არ უნდა დაინახოს, რამდენი კონკურენტი-ოსტატია
+            დაინტერესებული ამ job-ზე — "interestedCount" აქაც არ ჩანს. */}
+        <View style={styles.jobActionRow}>
+          <View style={styles.actionButton}>
+            <Button label="დეტალების ნახვა" variant="outline" onPress={onDetail} />
+          </View>
           {sent && (
-            <Animated.View style={{ transform: [{ scale: action.scale }] }}>
-              <Pressable
-                style={styles.chatButton}
-                onPress={onChat}
-                onPressIn={action.onPressIn}
-                onPressOut={action.onPressOut}
-              >
-                <MessageCircle size={13} color={colors.primaryForeground} />
-                <Text style={styles.chatButtonText}>ჩატის გახსნა</Text>
-              </Pressable>
-            </Animated.View>
+            <View style={styles.actionButton}>
+              <Button label="ჩატის გახსნა" onPress={onChat} />
+            </View>
           )}
         </View>
       </View>
@@ -141,26 +125,26 @@ const styles = StyleSheet.create({
   },
   jobCardBody: {
     padding: spacing.md,
-    paddingBottom: spacing.sm + 2,
+    gap: spacing.md,
   },
   jobHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    marginBottom: spacing.sm + 2,
+    alignItems: 'center',
+    gap: spacing.sm + 2,
   },
-  jobTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
+  jobTitleBlock: {
+    flex: 1,
+    minWidth: 0,
   },
   jobTitle: {
-    ...typography.captionMedium,
+    ...typography.bodyMedium,
     color: colors.foreground,
     fontWeight: '700',
-    flex: 1,
+  },
+  jobCategoryText: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    marginTop: 1,
   },
   urgentBadge: {
     backgroundColor: colors.dangerBackground,
@@ -175,100 +159,39 @@ const styles = StyleSheet.create({
     color: colors.destructive,
     fontWeight: '700',
   },
+  jobDesc: {
+    ...typography.caption,
+    color: colors.mutedForeground,
+  },
   jobMetaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     flexWrap: 'wrap',
-    gap: spacing.xs,
+    gap: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  jobMetaLocation: {
+  jobMetaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 5,
+    flexShrink: 1,
   },
   jobMetaText: {
     ...typography.small,
     color: colors.mutedForeground,
-  },
-  dotSeparator: {
-    color: colors.border,
-    fontSize: 9,
-  },
-  jobDesc: {
-    ...typography.caption,
-    color: colors.mutedForeground,
-    marginBottom: spacing.sm + 2,
-  },
-  jobTimeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: spacing.sm + 2,
+    flexShrink: 1,
   },
   jobTimeText: {
-    ...typography.small,
     color: colors.primary,
     fontWeight: '600',
   },
-  jobTagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs + 2,
-  },
-  jobTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.muted,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-  },
-  jobTagText: {
-    ...typography.small,
-    color: colors.mutedForeground,
-  },
   jobActionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  jobActionButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.sm,
   },
-  detailButton: {
-    backgroundColor: colors.muted,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs + 2,
-  },
-  detailButtonText: {
-    ...typography.small,
-    color: colors.mutedForeground,
-    fontWeight: '600',
-  },
-  chatButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs + 2,
-  },
-  chatButtonText: {
-    ...typography.small,
-    color: colors.primaryForeground,
-    fontWeight: '600',
+  actionButton: {
+    flex: 1,
   },
   sentStrip: {
     flexDirection: 'row',

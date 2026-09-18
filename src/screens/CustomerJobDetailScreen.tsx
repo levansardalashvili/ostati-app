@@ -9,6 +9,7 @@ import {
   MapPin,
   MessageCircle,
   MoreVertical,
+  Pencil,
   Star,
   X,
   Image as ImageIcon,
@@ -28,9 +29,9 @@ import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
 import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
+import { notificationService } from '../services/notificationService';
 import { quoteService } from '../services/quoteService';
 import { reviewService } from '../services/reviewService';
-import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useJobStatus } from '../state/JobStatusContext';
 import type { CustomerJob } from '../types/job';
 import type { Provider } from '../types/provider';
@@ -108,8 +109,10 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       cancelled = true;
     };
   }, [job.id]);
+  useEffect(() => {
+    if (job.id) notificationService.markJobNotificationsRead(job.id).catch(() => {});
+  }, [job.id]);
   const { getStatus, setStatus } = useJobStatus();
-  const { profile: customerProfile } = useCustomerProfile();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [cancelSheetOpen, setCancelSheetOpen] = useState(false);
@@ -338,7 +341,6 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
             job.id,
             uid,
             selectedProvider.id,
-            `${customerProfile.firstName} ${customerProfile.lastName}`.trim(),
             data,
           );
           setRatingData(data);
@@ -585,7 +587,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
                 <Briefcase size={22} color={colors.mutedForeground} />
               </View>
               <Text style={styles.emptyText}>
-                ჯერ არ გაუხატეს ინტერესი.{'\n'}ოსტატები მალე გამოეხმაურებიან.
+                დაინტერესებული ოსტატი არ არის
               </Text>
             </View>
           ) : (
@@ -684,16 +686,34 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       )}
 
       <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)}>
-        <Pressable
-          style={styles.menuRow}
-          onPress={() => {
-            setMenuOpen(false);
-            setReportSheetOpen(true);
-          }}
-        >
-          <Flag size={15} color={colors.mutedForeground} />
-          <Text style={styles.menuRowText}>პრობლემის შეტყობინება</Text>
-        </Pressable>
+        {/* მომლოდინე განცხადებაზე ოსტატი ჯერ არ არის არჩეული — არავისზე
+            შეიძლება საჩივარი ("ოსტატი არ გამოცხადდა" და ა.შ.); ღილაკი
+            მხოლოდ არჩევის შემდეგ ჩანს. */}
+        {effectiveStatus === 'pending' && (
+          <Pressable
+            testID="job-edit-menu-row"
+            style={styles.menuRow}
+            onPress={() => {
+              setMenuOpen(false);
+              navigation.navigate('PostJob', { editJob: job });
+            }}
+          >
+            <Pencil size={15} color={colors.mutedForeground} />
+            <Text style={styles.menuRowText}>რედაქტირება</Text>
+          </Pressable>
+        )}
+        {effectiveStatus !== 'pending' && (
+          <Pressable
+            style={styles.menuRow}
+            onPress={() => {
+              setMenuOpen(false);
+              setReportSheetOpen(true);
+            }}
+          >
+            <Flag size={15} color={colors.mutedForeground} />
+            <Text style={styles.menuRowText}>პრობლემის შეტყობინება</Text>
+          </Pressable>
+        )}
         <Pressable
           style={styles.menuRow}
           onPress={() => {

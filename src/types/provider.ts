@@ -18,6 +18,9 @@ export type Provider = {
   id: string;
   name: string;
   category: string;
+  // ყველა არჩეული სპეციალობის კატეგორია (`category` მხოლოდ პირველია) —
+  // ფილტრები ამით ეძებენ, რომ ოსტატი ყველა თავისი სპეციალობით მოიძებნოს.
+  categories: string[];
   years: number;
   rating: number;
   reviews: number;

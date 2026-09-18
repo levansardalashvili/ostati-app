@@ -11,6 +11,7 @@ import {
   MapPin,
   MessageCircle,
   MoreVertical,
+  ShieldCheck,
   Star,
   ThumbsUp,
   X,
@@ -28,12 +29,11 @@ import { Skeleton } from '../components/Skeleton';
 import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
 import { jobService } from '../services/jobService';
+import { notificationService } from '../services/notificationService';
 import { quoteService } from '../services/quoteService';
-import { reviewService } from '../services/reviewService';
 import { useJobStatus } from '../state/JobStatusContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { FeedJob } from '../types/job';
-import type { RatingData } from '../types/review';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderJobDetail'>;
@@ -108,6 +108,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   // (task-ის მოთხოვნა: Provider-მა ფასი უნდა შესთავაზოს მხოლოდ job-ის
   // დეტალების ნახვის შემდეგ, არა ერთი შეხედვით feed-ის ბარათზე).
   const [offerSheetOpen, setOfferSheetOpen] = useState(false);
+  const [verifySheetOpen, setVerifySheetOpen] = useState(false);
   const [offerPrice, setOfferPrice] = useState('');
   const { getStatus, setStatus } = useJobStatus();
 
@@ -186,6 +187,9 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedStatus, job.customerJobId]);
 
+  useEffect(() => {
+    if (job.id) notificationService.markJobNotificationsRead(job.id).catch(() => {});
+  }, [job.id]);
   const [markingWorkDone, setMarkingWorkDone] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   // Task — footer (ჩატი/"სამუშაო დავასრულე") ადრე ნულოვანი paddingBottom-ით
@@ -219,24 +223,6 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       setMarkingWorkDone(false);
     }
   };
-
-  const [receivedRating, setReceivedRating] = useState<RatingData | null>(null);
-  useEffect(() => {
-    if (variant !== 'completed' || !job.id) {
-      setReceivedRating(null);
-      return;
-    }
-    let cancelled = false;
-    reviewService
-      .getReviewByJobId(job.id)
-      .then((real) => {
-        if (!cancelled) setReceivedRating(real);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [variant, job.id]);
 
   const handleChat = () => {
     if (!job.customerId) return;
@@ -332,10 +318,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       const message = (err as { message?: string } | null)?.message ?? '';
       if (message.includes('PROVIDER_NOT_VERIFIED')) {
         setOfferSheetOpen(false);
-        Alert.alert(
-          'საჭიროა ვერიფიკაცია',
-          'სამუშაოზე ინტერესის გამოსახატად ჯერ საჭიროა ვერიფიკაციის გავლა — შეამოწმე პროფილის ტაბი.',
-        );
+        setVerifySheetOpen(true);
       } else {
         Alert.alert('ვერ მოხერხდა', 'ინტერესის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
       }
@@ -381,7 +364,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         title="განცხადება"
         onBack={() => navigation.goBack()}
         right={
-          jobLoading ? undefined : (
+          jobLoading || variant === 'browse' ? undefined : (
             <Pressable testID="job-detail-menu-button" style={styles.iconButton} onPress={handleMore}>
               <MoreVertical size={16} color={colors.foreground} />
             </Pressable>
@@ -400,10 +383,10 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
           <View style={styles.selectedBanner}>
             <View style={styles.bannerHeaderRow}>
               <CheckCircle size={16} color={colors.success} />
-              <Text style={styles.selectedBannerTitle}>შენ აგირჩიეს ამ სამუშაოსთვის</Text>
+              <Text style={styles.selectedBannerTitle}>თქვენ აგირჩიეს ამ სამუშაოსთვის</Text>
             </View>
             <Text style={styles.selectedBannerText}>
-              დაასრულე სამუშაო და დააჭირე „სამუშაო დავასრულე" — მომხმარებელი დაადასტურებს დასრულებას.
+              დაასრულეთ სამუშაო და დააკლიკეთ „სამუშაო დავასრულე" - მომხმარებელი დაადასტურებს დასრულებას
             </Text>
           </View>
         )}
@@ -451,26 +434,6 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               <Award size={16} color={colors.primary} />
               <Text style={styles.completedBannerTitle}>სამუშაო დასრულებულად დადასტურდა</Text>
             </View>
-            {receivedRating && (
-              <>
-                <View style={styles.completedStarsRow}>
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Star key={s} size={15} color="#FBBF24" fill={receivedRating.stars >= s ? '#FBBF24' : 'transparent'} />
-                  ))}
-                  <Text style={styles.completedStarsLabel}>{receivedRating.stars}.0</Text>
-                </View>
-                {receivedRating.chips.length > 0 && (
-                  <View style={styles.completedChipsRow}>
-                    {receivedRating.chips.map((c) => (
-                      <View key={c} style={styles.completedChip}>
-                        <Text style={styles.completedChipText}>{c}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-                <Text style={styles.completedReviewText}>"{receivedRating.review}"</Text>
-              </>
-            )}
           </View>
         )}
 
@@ -579,10 +542,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
             onPress={() => {
               if (expressed) return;
               if (!isVerified) {
-                Alert.alert(
-                  'საჭიროა ვერიფიკაცია',
-                  'სამუშაოზე ინტერესის გამოსახატად ჯერ საჭიროა ვერიფიკაციის გავლა — შეამოწმე პროფილის ტაბი.',
-                );
+                setVerifySheetOpen(true);
                 return;
               }
               setOfferSheetOpen(true);
@@ -594,7 +554,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               <ThumbsUp size={17} color={colors.primaryForeground} />
             )}
             <Text style={styles.interestButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-              {expressed ? (offerPrice ? `შეთავაზდა: ${offerPrice} ₾` : 'დაინტ. ხარ') : 'დაინტერესება'}
+              {expressed ? (offerPrice ? `შეთავაზდა: ${offerPrice} ₾` : 'დაინტ. ხარ') : 'ფასის შეთავაზება'}
             </Text>
           </Pressable>
           {/* supabase/migrations/0081 — გადაფიქრების გზა, job კვლავ
@@ -695,6 +655,25 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         onClose={() => setOfferSheetOpen(false)}
         submitting={sendingInterest}
       />
+
+      <BottomSheet visible={verifySheetOpen} onClose={() => setVerifySheetOpen(false)}>
+        <View style={styles.verifyIconWrap}>
+          <ShieldCheck size={30} color={colors.primary} />
+        </View>
+        <Text style={styles.sheetTitle}>საჭიროა ვერიფიკაცია</Text>
+        <Text style={styles.sheetSubtitle}>ფასის შესათავაზებლად საჭიროა ვერიფიკაციის გავლა</Text>
+        <Button
+          label="ვერიფიკაცია"
+          onPress={() => {
+            setVerifySheetOpen(false);
+            // ვერიფიკაციის ბარათი პროფილის ტაბზეა (VerificationRequestCard)
+            (navigation as any).navigate('ProviderHome', { screen: 'Profile' });
+          }}
+        />
+        <Pressable style={styles.sheetCancelLink} onPress={() => setVerifySheetOpen(false)}>
+          <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
+        </Pressable>
+      </BottomSheet>
 
       <ReportJobSheet
         visible={reportSheetOpen}
@@ -1134,6 +1113,16 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     textAlign: 'center',
     marginBottom: spacing.xs,
+  },
+  verifyIconWrap: {
+    alignSelf: 'center',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
   },
   sheetSubtitle: {
     ...typography.caption,

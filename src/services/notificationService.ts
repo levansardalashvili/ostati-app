@@ -51,6 +51,10 @@ export interface NotificationService {
   listMine(userId: string): Promise<NotificationEntry[]>;
   markRead(id: string): Promise<void>;
   markAllRead(userId: string): Promise<void>;
+  // ეკრანის გახსნისას მასთან დაკავშირებული შეტყობინებები ავტომატურად
+  // წაკითხულდება (RLS მხოლოდ საკუთარ row-ებს უშვებს).
+  markChatNotificationsRead(participantIds: string[]): Promise<void>;
+  markJobNotificationsRead(jobId: string): Promise<void>;
   subscribeToUnreadCount(userId: string, onChange: (count: number) => void): () => void;
 
   // Task 3 — `notification_preferences` (NotificationSettingsScreen-ის
@@ -75,6 +79,23 @@ export const notificationService: NotificationService = {
   },
   async markRead(id) {
     const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
+    if (error) throw error;
+  },
+  async markChatNotificationsRead(participantIds) {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('read', false)
+      .eq('target->>screen', 'ChatConversation')
+      .in('target->>chatId', participantIds);
+    if (error) throw error;
+  },
+  async markJobNotificationsRead(jobId) {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('read', false)
+      .or(`target->>jobId.eq.${jobId},target->>id.eq.${jobId}`);
     if (error) throw error;
   },
   async markAllRead(userId) {

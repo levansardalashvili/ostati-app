@@ -147,6 +147,9 @@ function fromProviderProfileRowToPublicProvider(row: ProviderProfileRow, stats?:
     id: row.id,
     name,
     category: specialtyIdToCategoryId(specialtyId) ?? specialtyId,
+    categories: row.specialty
+      .filter((s) => !s.id.startsWith('custom:'))
+      .map((s) => specialtyIdToCategoryId(s.id) ?? s.id),
     years: row.experience ? (EXPERIENCE_YEARS[row.experience] ?? 0) : 0,
     rating: stats?.avg_rating ?? 0,
     reviews: stats?.review_count ?? 0,

@@ -5,7 +5,8 @@ import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
 import { getCategoryIcon } from './CategoryIcon';
 import { colors, radius, spacing, typography } from '../theme';
-import { SPECIALTIES } from '../data/specialties';
+import { CATEGORIES } from '../data/categories';
+import { SPECIALTIES, specialtyIdToCategoryId } from '../data/specialties';
 
 export type SpecialtyOption = { id: string; label: string };
 export type SelectedSpecialty = SpecialtyOption[];
@@ -65,13 +66,21 @@ export function SpecialtyPickerField({ value, onChange }: Props) {
         {SPECIALTIES.map((sp) => {
           const on = isSelected(sp.id);
           const SpecialtyIcon = getCategoryIcon(sp.id);
+          // `sp.id` ჯერ პირდაპირ უნდა შემოწმდეს — ნახევარ SPECIALTIES-ს
+          // (tile/flooring/furniture/ac) CATEGORIES-ის იგივე id აქვს,
+          // ალიასის გარეშე (getCategoryIcon()-ის იგივე fallback-ჯაჭვი,
+          // იხ. CategoryIcon.tsx).
+          const iconColor =
+            CATEGORIES.find((c) => c.id === sp.id)?.dot ??
+            CATEGORIES.find((c) => c.id === specialtyIdToCategoryId(sp.id))?.dot ??
+            colors.mutedForeground;
           return (
             <Pressable key={sp.id} style={styles.row} onPress={() => toggle(sp.id, sp.label)}>
               <View style={[styles.checkbox, on && styles.checkboxOn]}>
                 {on && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
               </View>
               <View style={styles.rowIconWrap}>
-                <SpecialtyIcon size={18} color={colors.mutedForeground} strokeWidth={2} />
+                <SpecialtyIcon size={18} color={iconColor} strokeWidth={2} />
               </View>
               <Text style={styles.rowLabel}>{sp.label}</Text>
             </Pressable>

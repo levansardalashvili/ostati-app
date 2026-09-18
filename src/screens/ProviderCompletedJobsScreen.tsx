@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Award, Clock, MapPin, Star } from 'lucide-react-native';
+import { Award, Clock, MapPin } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
@@ -11,7 +11,6 @@ import { StatusPill } from '../components/StatusPill';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
-import { reviewService } from '../services/reviewService';
 import type { FeedJob } from '../types/job';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -25,7 +24,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProviderCompletedJobs'>
 export function ProviderCompletedJobsScreen({ navigation }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [completedJobs, setCompletedJobs] = useState<FeedJob[]>([]);
-  const [ratings, setRatings] = useState<Record<string, number>>({});
 
   useFocusEffect(
     useCallback(() => {
@@ -37,11 +35,11 @@ export function ProviderCompletedJobsScreen({ navigation }: Props) {
         setIsLoading(false);
         return;
       }
-      Promise.all([jobService.listMyAssignedJobs(uid), reviewService.listReviewStarsByJob(uid)])
-        .then(([jobs, stars]) => {
+      jobService
+        .listMyAssignedJobs(uid)
+        .then((jobs) => {
           if (cancelled) return;
           setCompletedJobs(jobs.filter((j) => j.status === 'completed'));
-          setRatings(stars);
         })
         .finally(() => {
           if (!cancelled) setIsLoading(false);
@@ -72,7 +70,6 @@ export function ProviderCompletedJobsScreen({ navigation }: Props) {
       ) : (
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
           {completedJobs.map((j) => {
-            const stars = ratings[j.id] ?? null;
             return (
               <View key={j.id} style={styles.card}>
                 <CategoryIcon categoryId={j.category} size={40} />
@@ -90,13 +87,6 @@ export function ProviderCompletedJobsScreen({ navigation }: Props) {
                   </View>
                   <View style={styles.statusRow}>
                     <StatusPill status="completed" />
-                    {stars !== null && (
-                      <View style={styles.starsRow}>
-                        {Array.from({ length: stars }).map((_, i) => (
-                          <Star key={i} size={12} color="#FBBF24" fill="#FBBF24" />
-                        ))}
-                      </View>
-                    )}
                   </View>
                 </View>
               </View>

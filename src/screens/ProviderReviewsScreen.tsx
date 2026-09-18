@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Star } from 'lucide-react-native';
+import { Star, User } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
 import { Skeleton } from '../components/Skeleton';
@@ -95,9 +95,9 @@ export function ProviderReviewsScreen({ navigation }: Props) {
                 <View style={styles.reviewTop}>
                   <View style={styles.reviewNameRow}>
                     <View style={styles.reviewAvatar}>
-                      <Text style={styles.reviewAvatarText}>{r.name[0]}</Text>
+                      <User size={14} color={colors.primary} />
                     </View>
-                    <Text style={styles.reviewName}>{r.name}</Text>
+                    <Text style={styles.reviewName}>ანონიმური მომხმარებელი</Text>
                   </View>
                   <Text style={styles.reviewDate}>{r.date}</Text>
                 </View>

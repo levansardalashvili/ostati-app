@@ -34,7 +34,7 @@ const TABS: { id: Tab; label: string }[] = [
 const EMPTY_TEXT: Record<Tab, string> = {
   pending: 'მომლოდინე სამუშაოები არ გაქვს',
   active: 'დადასტურებული სამუშაოები არ გაქვს',
-  done: 'დასრულებული სამუშაოები არ გაქვს',
+  done: 'დასრულებული ან გაუქმებული სამუშაოები არ გაქვს',
 };
 
 // ProviderMyJobs — "ჩემი სამუშაოები" ტაბი, რეალურ `job_posts`-ზე აგებული
@@ -106,7 +106,7 @@ export function ProviderMyJobsScreen({ navigation }: Props) {
               status === 'disputed'
             );
           }
-          return status === 'completed';
+          return status === 'completed' || status === 'cancelled';
         });
 
   return (

@@ -161,11 +161,11 @@ export function ProviderProfileScreen({ navigation }: Props) {
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>{displayStats.jobs}</Text>
-            <Text style={styles.statLabel}>შესრულ. სამ.</Text>
+            <Text style={styles.statLabel}>სამუშაო</Text>
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>{experienceLabel || '—'}</Text>
-            <Text style={styles.statLabel}>გამოცდ.</Text>
+            <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit>გამოცდილება</Text>
           </View>
         </View>
 
@@ -223,7 +223,7 @@ export function ProviderProfileScreen({ navigation }: Props) {
           <LogOut size={22} color={colors.destructive} />
         </View>
         <Text style={styles.sheetTitle}>გასვლა</Text>
-        <Text style={styles.sheetSubtitle}>ნამდვილად გსურს ანგარიშიდან გასვლა?</Text>
+        <Text style={styles.sheetSubtitle}>ნამდვილად გსურთ ანგარიშიდან გასვლა?</Text>
         <Button testID="logout-confirm-button" label="გასვლა" variant="destructive" onPress={confirmLogout} />
         <Pressable style={styles.sheetCancelLink} onPress={() => setLogoutSheetOpen(false)}>
           <Text style={styles.sheetCancelLinkText}>გაუქმება</Text>

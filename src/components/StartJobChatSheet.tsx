@@ -189,8 +189,7 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
         <>
           <Text style={styles.sheetTitle}>რისი გაკეთება გჭირდებათ?</Text>
           <Text style={styles.sheetSubtitle}>
-            {provider?.name ? `${provider.name}-სთან` : 'ოსტატთან'} მიწერამდე მოკლედ აღწერე სამუშაო — ეს
-            შენახავს მოთხოვნას, რომ მერე შეფასების დაწერაც შეძლო.
+            {provider?.name ? `${provider.name}-სთან` : 'ოსტატთან'} მიწერამდე მოკლედ აღწერეთ სამუშაო - თქვენი სამუშაო გამოჩნდება მხოლოდ ამ ოსტატისთვის
           </Text>
 
           <Text style={styles.fieldLabel}>მოკლე აღწერა</Text>
@@ -218,7 +217,7 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
           {!!submitError && <Text style={styles.errorText}>{submitError}</Text>}
 
           <Button
-            label="მიწერის დაწყება"
+            label="გაგზავნა"
             loadingLabel="იქმნება..."
             onPress={handleSubmit}
             disabled={submitTouched && !canSubmit}

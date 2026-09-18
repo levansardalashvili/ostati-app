@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Award, Heart, Image as ImageIcon, MapPin, MessageCircle, Share2, Star } from 'lucide-react-native';
+import { ArrowLeft, Award, Heart, Image as ImageIcon, MapPin, MessageCircle, Share2, Star, User } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
 import type { MediaItem } from '../components/MediaUploadGrid';
 import { Skeleton } from '../components/Skeleton';
 import { StartJobChatSheet } from '../components/StartJobChatSheet';
+import { Toast } from '../components/Toast';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
@@ -26,6 +27,7 @@ const EMPTY_PROVIDER: Provider = {
   id: '',
   name: '',
   category: '',
+  categories: [],
   years: 0,
   rating: 0,
   reviews: 0,
@@ -93,6 +95,12 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
   const { isFavorite, toggleFavorite } = useFavoriteProviders();
   const isSelfPreview = !!p.id && p.id === authService.getCurrentUser()?.uid;
   const favorite = isFavorite(p.id);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const handleToggleFavorite = () => {
+    const willBeFavorite = !favorite;
+    toggleFavorite(p.id);
+    setToastMessage(willBeFavorite ? 'ოსტატი დამატებულია რჩეულებში' : 'ოსტატი წაშლილია რჩეულებიდან');
+  };
 
   // "ცივი ჩატის → job-ის შექმნის" ხვრელის ფიქსი — "მიწერა" აღარ ხსნის
   // ჩატს პირდაპირ, job-ის გარეშე (StartJobChatSheet.tsx-ის თავზე სრული
@@ -128,7 +136,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
         <Text style={styles.headerTitle}>ოსტატის პროფილი</Text>
         <View style={styles.headerActions}>
           {!loading && !isSelfPreview && (
-            <Pressable testID="favorite-toggle" style={styles.iconButton} onPress={() => toggleFavorite(p.id)}>
+            <Pressable testID="favorite-toggle" style={styles.iconButton} onPress={handleToggleFavorite}>
               <Heart size={17} color={favorite ? colors.destructive : colors.mutedForeground} fill={favorite ? colors.destructive : 'transparent'} />
             </Pressable>
           )}
@@ -188,11 +196,11 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
             </View>
             <View style={[styles.statBox, styles.statBoxBordered]}>
               <Text style={styles.statValue}>{p.years}</Text>
-              <Text style={styles.statLabel}>წ. გამოცდ.</Text>
+              <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit>წ. გამოცდილება</Text>
             </View>
             <View style={styles.statBox}>
               <Text style={styles.statValue}>{p.jobs}</Text>
-              <Text style={styles.statLabel}>შესრულ.</Text>
+              <Text style={styles.statLabel}>სამუშაო</Text>
             </View>
           </View>
         </View>
@@ -279,10 +287,10 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
                   <View style={styles.reviewTop}>
                     <View style={styles.reviewNameRow}>
                       <View style={styles.reviewAvatar}>
-                        <Text style={styles.reviewAvatarText}>{r.name[0]}</Text>
+                        <User size={14} color={colors.primary} />
                       </View>
                       <View>
-                        <Text style={styles.reviewName}>{r.name}</Text>
+                        <Text style={styles.reviewName}>ანონიმური მომხმარებელი</Text>
                         <View style={styles.reviewStars}>
                           {Array.from({ length: r.stars }).map((_, j) => (
                             <Star key={j} size={10} color="#FBBF24" fill="#FBBF24" />
@@ -305,7 +313,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
           <MessageCircle size={18} color={colors.primaryForeground} />
           <Text style={styles.chatButtonText}>მიწერა</Text>
         </Pressable>
-        <Text style={styles.footerNote}>საკონტაქტო ინფორმაცია დაცულია და ავტომატურად არ არის გაზიარებული.</Text>
+        <Text style={styles.footerNote}>თქვენი ადგილმდებარეობა ოსტატისთვის მიუწვდომელია, ოსტატთან შეთანხმებამდე</Text>
       </View>
         </>
       )}
@@ -317,6 +325,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
         onClose={() => setStartChatProvider(null)}
         onReady={openChatWithJob}
       />
+      <Toast message={toastMessage} bottom={130} />
     </SafeAreaView>
   );
 }

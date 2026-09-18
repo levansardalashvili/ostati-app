@@ -266,6 +266,7 @@ export interface JobService {
   // `NewJobPostInput` minus `customerName` (never was accepted here) —
   // reuses it directly rather than a near-duplicate type.
   updateJobDraft(jobId: string, input: NewJobPostInput): Promise<CustomerJob>;
+  updatePendingJob(jobId: string, input: NewJobPostInput): Promise<CustomerJob>;
 
   // Third hardening pass, priority 2 — draft -> pending. ერთადერთი გზაა,
   // რომლითაც job Provider-ის feed-ში ხილული ხდება (supabase/migrations/0053).
@@ -296,6 +297,19 @@ export const jobService: JobService = {
   },
   async updateJobDraft(jobId, input) {
     const { data, error } = await supabase.rpc('update_job_draft', {
+      p_job_id: jobId,
+      p_category: input.category,
+      p_description: input.description,
+      p_address: input.address,
+      p_date: input.date,
+      p_preferred_date: input.preferredDate ?? null,
+      p_time_slot: input.timeSlot ?? null,
+    });
+    if (error) throw error;
+    return fromJobPostRow(data as JobPostRow);
+  },
+  async updatePendingJob(jobId, input) {
+    const { data, error } = await supabase.rpc('update_pending_job', {
       p_job_id: jobId,
       p_category: input.category,
       p_description: input.description,

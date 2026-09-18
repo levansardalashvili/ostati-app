@@ -36,6 +36,7 @@ function fromJobResponseRowFallback(row: JobResponseRow): JobQuote {
       id: row.provider_id,
       name: row.provider_name,
       category: '',
+      categories: [],
       years: 0,
       rating: 0,
       reviews: 0,

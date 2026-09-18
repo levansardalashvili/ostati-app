@@ -45,8 +45,8 @@ export function ProviderCard({
             </Text>
             {provider.verified && <VerifiedBadge size={15} />}
           </View>
-          <Text style={styles.providerMeta}>
-            {specialty} • {provider.years} წ. გამოცდ.
+          <Text style={styles.providerMeta} numberOfLines={1} adjustsFontSizeToFit>
+            {specialty} • {provider.years} წ. გამოცდილება
           </Text>
           <View style={styles.providerStatsRow}>
             {isNewProvider(provider) ? (
@@ -81,16 +81,11 @@ export function ProviderCard({
       </Animated.View>
 
       <View style={styles.providerActionRow}>
-        <View style={styles.providerActionLeft}>
-          <Pressable style={styles.viewProfileLink} onPress={onOpenProfile} hitSlop={6}>
-            <Text style={styles.viewProfileLinkText}>პროფილის ნახვა</Text>
-            <ChevronRight size={12} color={colors.primary} />
-          </Pressable>
-          <Text style={styles.priceText} numberOfLines={1}>
-            {provider.price}
-          </Text>
-        </View>
-        <Animated.View style={{ transform: [{ scale: message.scale }] }}>
+        <Pressable style={styles.viewProfileLink} onPress={onOpenProfile} hitSlop={6}>
+          <Text style={styles.viewProfileLinkText}>პროფილის ნახვა</Text>
+          <ChevronRight size={12} color={colors.primary} />
+        </Pressable>
+        <Animated.View style={[styles.messageButtonWrap, { transform: [{ scale: message.scale }] }]}>
           <Pressable
             style={styles.messageButton}
             onPress={onMessage}
@@ -221,40 +216,37 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
   },
+  // Task — "პროფილის ნახვა"/"მიწერა" ორივე თანაბრად გადანაწილებული
+  // (flex: 1 თითო), თითოეული საკუთარ ნახევარში ცენტრირებული (ჰორიზონტალურადაც,
+  // ვერტიკალურადაც — ადრე მარცხნივ იყო `alignSelf: 'flex-start'`-ით).
   providerActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
   },
-  providerActionLeft: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-  },
   viewProfileLink: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 2,
-    alignSelf: 'flex-start',
   },
   viewProfileLinkText: {
     ...typography.small,
     color: colors.primary,
     fontWeight: '700',
   },
-  priceText: {
-    ...typography.small,
-    color: colors.mutedForeground,
-    flexShrink: 1,
+  messageButtonWrap: {
+    flex: 1,
+    alignItems: 'center',
   },
   messageButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: colors.primary,
     borderRadius: radius.md,

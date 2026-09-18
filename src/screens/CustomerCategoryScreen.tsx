@@ -49,7 +49,7 @@ export function CustomerCategoryScreen({ navigation, route }: Props) {
     };
   }, []);
   const providers = useMemo(
-    () => allProviders.filter((p) => p.category === route.params.id),
+    () => allProviders.filter((p) => p.categories.includes(route.params.id)),
     [allProviders, route.params.id],
   );
 

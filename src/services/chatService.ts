@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { notificationService } from './notificationService';
 import type { ChatEntry, ChatMsg, OfferStatus } from '../types/chat';
 import type { Role } from '../types/user';
 
@@ -46,7 +47,7 @@ export interface ChatService {
     comment: string | undefined,
     jobId: string,
   ): Promise<ChatMsg>;
-  sendRealImage(customerId: string, providerId: string, senderId: string, imageUrl: string): Promise<ChatMsg>;
+  sendRealImage(customerId: string, providerId: string, senderId: string, imageUrl: string, jobId?: string): Promise<ChatMsg>;
   respondToRealOffer(messageId: string, status: Extract<OfferStatus, 'accepted' | 'declined'>): Promise<void>;
   subscribeToMessages(
     customerId: string,
@@ -78,7 +79,7 @@ type MessageRow = {
   customer_id: string;
   provider_id: string;
   sender_id: string;
-  type: 'text' | 'offer' | 'image';
+  type: 'text' | 'offer' | 'image' | 'completion';
   text: string;
   image_url: string | null;
   amount: number | null;
@@ -131,10 +132,13 @@ function fromMessageRow(row: MessageRow, myUid: string): ChatMsg {
       jobId: row.job_id ?? undefined,
     };
   }
-  if (row.type === 'image') {
-    return { id: row.id, type: 'image', from, t, state: 'read', imageUrl: row.image_url ?? undefined };
+  if (row.type === 'completion') {
+    return { id: row.id, type: 'completion', from, t, state: 'read', jobId: row.job_id ?? undefined };
   }
-  return { id: row.id, type: 'text', from, text: row.text, t, state: 'read' };
+  if (row.type === 'image') {
+    return { id: row.id, type: 'image', from, t, state: 'read', imageUrl: row.image_url ?? undefined, jobId: row.job_id ?? undefined };
+  }
+  return { id: row.id, type: 'text', from, text: row.text, t, state: 'read', jobId: row.job_id ?? undefined };
 }
 
 export const chatService: ChatService = {
@@ -193,7 +197,7 @@ export const chatService: ChatService = {
     if (error) throw error;
     return fromMessageRow(data as MessageRow, senderId);
   },
-  async sendRealImage(customerId, providerId, senderId, imageUrl) {
+  async sendRealImage(customerId, providerId, senderId, imageUrl, jobId) {
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -203,6 +207,7 @@ export const chatService: ChatService = {
         type: 'image',
         text: '',
         image_url: imageUrl,
+        job_id: jobId ?? null,
       })
       .select()
       .single();
@@ -272,6 +277,9 @@ export const chatService: ChatService = {
       p_provider_id: providerId,
     });
     if (error) throw error;
+    // ჩატის შეტყობინების (push/in-app) ავტომატური წაკითხულად მონიშვნა —
+    // წარუმატებლობა ჩატის გახსნას არ უნდა აფერხებდეს.
+    notificationService.markChatNotificationsRead([customerId, providerId]).catch(() => {});
   },
 
   subscribeToUnreadCount(myUid, myRole, onChange) {

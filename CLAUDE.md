@@ -593,6 +593,24 @@
     - **მომხმარებლისგან საჭირო ხელით ნაბიჯები (კოდით ვერ სრულდება, `supabase/README.md`-ში დეტალურად):** Apple Developer capability + Services ID + private key + Supabase Dashboard-ის Apple provider-ის კონფიგურაცია; Twilio Verify Service + Supabase Dashboard-ის Phone provider-ის კონფიგურაცია; ახალი EAS native rebuild (`expo-apple-authentication`-ისთვის — Android-ის JS-დონის fallback (`isAvailableAsync()→false`) უკვე მუშაობს rebuild-ის გარეშეც, ცოცხლად დადასტურებული).
     - **ცოცხლად დადასტურებულია Android ემულატორზე (Apple-ის ტესტვა შეუძლებელია Android-ზე — მხოლოდ iOS):** `LoginScreen`/`RegisterScreen` სწორად რენდერდება (Apple ღილაკი გამქრალია, ტელეფონის ლინკი სწორი), `PhoneLoginScreen`-ის ვალიდაცია/`+995`-პრეფიქსი მუშაობს, "კოდის გაგზავნა" გრეისფულად აჩვენებს ქართულ fallback-შეცდომას (Twilio Verify ჯერ არ არის კონფიგურირებული Dashboard-ში — მომხმარებლის დარჩენილი ხელით ნაბიჯი). სრული end-to-end OTP-ტესტი და Apple-ის რეალური ტესტი დამოკიდებულია ზემოთ ჩამოთვლილ, ჯერ არ დასრულებულ ხელით ნაბიჯებზე.
 
+108. **ანონიმური შეფასებები (`0085_reviews_anonymous.sql`).** Customer-ის სახელი შეფასებაზე არც საჯაროდ ჩანს, არც ოსტატს — დამალვა სერვერზეა (არა მხოლოდ UI-ში), `submitReview` აღარ აწვდის სახელს. `ViewProviderProfile`/`ProviderReviews`/`ProviderJobDetail`/`ProviderCompletedJobs` შესაბამისად განახლდა.
+
+109. **მომლოდინე განცხადების რედაქტირება (`0086_update_pending_job.sql`).** `update_pending_job()` RPC მხოლოდ `pending` job-ს ცვლის; `CustomerJobDetail`-ის ⋮ მენიუში "რედაქტირება" (მხოლოდ pending-ზე), `PostJob` იღებს `editJob` param-ს (ფოტოები რედაქტირებისას დამალულია). "პრობლემის შეტყობინება" pending/browse-ზე დამალულია (ალოგიკურია — no-show მხოლოდ დადასტურებულზე).
+
+110. **შეტყობინებების ავტო-წაკითხვა.** ჩატის ან job-ის გახსნისას მასთან დაკავშირებული შეტყობინებები ავტომატურად "წაკითხულად" ინიშნება (`notificationService.markChatNotificationsRead`/`markJobNotificationsRead`, `markConversationRead`-იდან და job detail ეკრანებიდან).
+
+111. **Provider verification gate — UI.** სერვერი (`0084`, `express_interest()` → `PROVIDER_NOT_VERIFIED`) უკვე კეტავდა; `ProviderJobDetail`-ის ღილაკი "დაინტერესება"→**"ფასის შეთავაზება"**, ვერიფიცირებამდე Alert-ის ნაცვლად BottomSheet (ფარის აიქონი, "ფასის შესათავაზებლად საჭიროა ვერიფიკაციის გავლა", ღილაკი "ვერიფიკაცია" → პროფილის ტაბი, სადაც `VerificationRequestCard`-ია). იგივე sheet ჩნდება სერვერის უარზეც.
+
+112. **ჩატში "სამუშაო დასრულებულია" ბარათი (`0087_completion_chat_card.sql`).** `messages.type` მიიღო `'completion'`; ბარათს წერს `job_posts`-ის ტრიგერი (`on_job_completion_chat`, SECURITY DEFINER) `awaiting_customer_confirmation`-ზე გადასვლისას, ოსტატის სახელით — client-ისთვის ეს ტიპი restrictive INSERT policy-ით დაბლოკილია (ვერ გააყალბებს). `handle_new_message` completion-ზე conversations-ს ანახლებს, მაგრამ ცალკე notification/push არ იგზავნება (`completion_reminder` უკვე იგზავნება). ბარათს აქვს ღილაკი: Customer-ს "დადასტურება" → `CustomerJobDetail`, Provider-ს "განცხადების ნახვა".
+
+113. **ჩატში job-ის გამყოფები.** ტექსტი/სურათი ახლა თავის `job_id`-ს ატარებს (`linkJobId`; ადრე მხოლოდ offer/completion). როცა ჩატში 2+ განსხვავებული job_id ჩანს, job-ის შეცვლისას ჩნდება გამყოფი ("სათაური · თარიღი", არსებული `'date'` ტიპით). ძველი (job_id=null) შეტყობინებები წინა გამყოფის ქვეშ ხვდება. ცალკე ჩატი თითო job-ზე **არ** აშენებულა (`conversations` კვლავ (customer, provider) წყვილია).
+
+114. **ოსტატის მთავარი: "სტატისტიკა" = "შემოსავალი" + "სამუშაო".** შემოსავალი = დასრულებული job-ების `agreed_price`-ების ჯამი (`listMyAssignedJobs`-იდან, მხოლოდ საინფორმაციო — გადახდა აპში არ არსებობს); "შეფ." უჯრა ამოღებულია. ასევე: ვერიფიკაციისა და "თქვენ აგირჩიეს" ბანერის ტექსტები თქვენობითშია.
+
+115. **`ProviderMyJobsScreen` — გაუქმებული job "დასრულებული" ტაბშია** (ცალკე მეოთხე ტაბი განზრახ არა — ვიწრო ეკრანზე არ ჯდება).
+
+116. **სპეციალობა = კატეგორია (`0088_specialties_use_categories.sql`).** ოსტატის `SPECIALTIES` (8 ძველი id) ჩანაცვლდა `CATEGORIES`-იდან გამოყვანილი იგივე 15 პუნქტით (`src/data/specialties.ts`; `pricePerSqm` — painting/tile/flooring/renovation). არსებული `provider_profiles.specialty`/`sqm_prices` გადაიწერა ახალ id-ებზე (`custom:*` უცვლელი). `Provider`-ს დაემატა `categories: string[]` (`category` მხოლოდ პირველია) და Home/Category/ProviderList ფილტრები ყველა სპეციალობით ეძებენ. `specialtyIdToCategoryId` ალიასი თავსებადობისთვის რჩება. "სხვა" (custom) სპეციალობები კვლავ ვერ იღებენ `new_jobs_in_area` შეტყობინებას. **წინა დაკვირვება (#39, "8 vs 15") მოძველდა.**
+
 - ფერები: `src/theme/colors.ts` (light bg, ერთი აქცენტი, სემანტიკური success/warning/danger)
 - Radius/spacing/typography ტოკენები: `src/theme/index.ts`
 - Card radius: 12-16px (`radius.lg` = 16)

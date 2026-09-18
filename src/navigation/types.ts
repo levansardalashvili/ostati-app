@@ -50,7 +50,9 @@ export type RootStackParamList = {
   // წამოიღებს (jobService.getFeedJobPostById, #71).
   ProviderJobDetail: { id: string; mode?: 'browse' | 'selected' | 'completed'; job?: FeedJob };
   ProviderJobFeed: undefined;
-  PostJob: undefined;
+  // `editJob` — მომლოდინე (pending) განცხადების რედაქტირების რეჟიმი: ფორმა
+  // წინასწარ ივსება, "შენახვა" update_pending_job() RPC-ს იძახებს.
+  PostJob: { editJob?: CustomerJob } | undefined;
   // `job` — არასავალდებულო, უკვე წამოღებული CustomerJob ობიექტი (real
   // Supabase-ის job_posts-იდან, #53), როცა გამომძახებელს (CustomerJobsScreen,
   // PostJobScreen) ეს უკვე ხელთ აქვს — ხელახალი fetch-ის თავიდან ასაცილებლად.

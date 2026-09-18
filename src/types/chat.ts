@@ -9,7 +9,7 @@ export type OfferStatus = QuoteStatus;
 
 export type ChatMsg = {
   id: string;
-  type: 'text' | 'image' | 'date' | 'offer';
+  type: 'text' | 'image' | 'date' | 'offer' | 'completion';
   from: 'me' | 'other';
   text?: string;
   imgColor?: string;

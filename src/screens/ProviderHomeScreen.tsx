@@ -7,6 +7,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { type CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
+import { Button } from '../components/Button';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { ProviderFeedJobCard, ProviderFeedJobCardSkeleton } from '../components/ProviderFeedJobCard';
 import { PopBadge } from '../components/PopBadge';
@@ -154,9 +155,14 @@ export function ProviderHomeScreen({ navigation }: Props) {
       cancelled = true;
     };
   }, []);
+  // შემოსავალი = დასრულებული სამუშაოების შეთანხმებული ფასების ჯამი
+  // (job_posts.agreed_price, მხოლოდ საინფორმაციო — გადახდა აპში არ არის).
+  const income = assignedJobs
+    .filter((j) => j.status === 'completed')
+    .reduce((sum, j) => sum + (j.agreedPrice ?? 0), 0);
   const homeStats = [
-    { key: 'jobs', value: String(stats.jobs), label: 'სამ.' },
-    { key: 'rating', value: stats.reviews === 0 ? '—' : `${stats.rating.toFixed(1)}★`, label: 'შეფ.' },
+    { key: 'income', value: `${income} ₾`, label: 'შემოსავალი' },
+    { key: 'jobs', value: String(stats.jobs), label: 'სამუშაო' },
   ];
 
   const homeFeed = filtered.slice(0, HOME_FEED_LIMIT);
@@ -235,7 +241,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
               <Text style={styles.verifyBannerSubtitle}>
                 {providerProfile.verificationStatus === 'pending'
                   ? 'მოთხოვნა განხილვის პროცესშია — შედეგს ვაცნობებთ.'
-                  : 'სერვისით სარგებლობისთვის (სამუშაოზე ინტერესის გამოხატვა) გაიარე ვერიფიკაცია.'}
+                  : 'სერვისით სარგებლობისთვის (სამუშაოს მიღება) გაიარეთ ვერიფიკაცია'}
               </Text>
             </View>
             <ChevronRight size={16} color={colors.mutedForeground} />
@@ -253,7 +259,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
                   {available ? 'ხელმისაწვდომი' : 'დაკავებული'}
                 </Text>
                 <Text style={[styles.availabilitySubtitle, { color: available ? colors.success : colors.mutedForeground }]}>
-                  {available ? 'შეტყობინებები ჩართულია' : 'შეტყობინებები გამორთულია'}
+                  {available ? 'მზად ვარ მუშაობისთვის' : 'სამუშაოდ ვარ'}
                 </Text>
               </View>
             </View>
@@ -288,28 +294,37 @@ export function ProviderHomeScreen({ navigation }: Props) {
         {currentJob && currentJobCategory && (
           <View style={styles.currentJobSection}>
             <Text style={styles.currentJobSectionTitle}>მიმდინარე სამუშაო</Text>
-            <Pressable style={styles.currentJobCard} onPress={handleOpenCurrentJob}>
-              <CategoryIcon categoryId={currentJobCategory.id} size={44} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <View style={styles.currentJobCustomerRow}>
-                  <User size={12} color={colors.mutedForeground} />
+            <View style={styles.currentJobCard}>
+              <View style={styles.currentJobTop}>
+                <CategoryIcon categoryId={currentJobCategory.id} size={44} />
+                <View style={styles.currentJobTitleBlock}>
                   <Text style={styles.currentJobCustomer} numberOfLines={1}>
                     {currentJob.customer}
                   </Text>
+                  <Text style={styles.currentJobCategoryText} numberOfLines={1}>
+                    {currentJobCategory.label}
+                  </Text>
                 </View>
-                <Text style={styles.currentJobCategoryText}>{currentJobCategory.label}</Text>
-                <View style={styles.currentJobMetaRow}>
-                  <Clock size={11} color={colors.mutedForeground} />
-                  <Text style={styles.currentJobMetaText}>{currentJob.date}</Text>
-                  <MapPin size={11} color={colors.mutedForeground} />
-                  <Text style={styles.currentJobMetaText}>{currentJob.location}</Text>
-                </View>
-              </View>
-              <View style={styles.currentJobRight}>
                 <StatusPill status={currentJobStatus ?? 'active'} />
-                <ChevronRight size={16} color={colors.mutedForeground} />
               </View>
-            </Pressable>
+              <View style={styles.currentJobMetaRow}>
+                {!!currentJob.date && (
+                  <View style={styles.currentJobMetaItem}>
+                    <Clock size={13} color={colors.mutedForeground} />
+                    <Text style={styles.currentJobMetaText} numberOfLines={1}>
+                      {currentJob.date}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.currentJobMetaItem}>
+                  <MapPin size={13} color={colors.mutedForeground} />
+                  <Text style={styles.currentJobMetaText} numberOfLines={1}>
+                    {currentJob.location}
+                  </Text>
+                </View>
+              </View>
+              <Button label="დეტალების ნახვა" variant="outline" onPress={handleOpenCurrentJob} />
+            </View>
           </View>
         )}
 
@@ -629,25 +644,26 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm + 2,
   },
   currentJobCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm + 2,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.lg,
     padding: spacing.md,
+    gap: spacing.md,
   },
-  currentJobCustomerRow: {
+  currentJobTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.sm + 2,
+  },
+  currentJobTitleBlock: {
+    flex: 1,
+    minWidth: 0,
   },
   currentJobCustomer: {
     ...typography.bodyMedium,
     color: colors.foreground,
     fontWeight: '700',
-    flexShrink: 1,
   },
   currentJobCategoryText: {
     ...typography.small,
@@ -656,18 +672,21 @@ const styles = StyleSheet.create({
   },
   currentJobMetaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 4,
-    marginTop: 2,
+    gap: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  currentJobMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
   },
   currentJobMetaText: {
     ...typography.small,
     color: colors.mutedForeground,
-    marginRight: spacing.xs + 2,
-  },
-  currentJobRight: {
-    alignItems: 'flex-end',
-    gap: spacing.xs + 2,
+    flexShrink: 1,
   },
 });

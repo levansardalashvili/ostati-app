@@ -102,7 +102,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
   const rankedInArea = useMemo(() => {
     return providers
       .filter((p) => {
-        if (selCats.size > 0 && !selCats.has(p.category)) return false;
+        if (selCats.size > 0 && !p.categories.some((c) => selCats.has(c))) return false;
         if (myDistrict && !p.areas.includes(myDistrict)) return false;
         if (search.trim()) {
           const q = search.toLowerCase();
@@ -226,17 +226,18 @@ export function CustomerHomeScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
-          <Avatar initials={initials} color="#7C3AED" size={38} />
           <View style={styles.headerText}>
-            <Text style={styles.greeting}>გამარჯობა,</Text>
             <Text style={styles.name} numberOfLines={1}>
-              {profile.firstName} {profile.lastName.charAt(0)}. 👋
+              გამარჯობა, {profile.firstName} 👋
             </Text>
           </View>
-          <Pressable testID="notification-bell" style={styles.bellButton} onPress={handleNotifications}>
-            <Bell size={19} color={colors.foreground} strokeWidth={1.8} />
-            {unreadNotifCount > 0 && <PopBadge style={styles.bellDot} />}
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Avatar initials={initials} color={colors.primary} size={38} />
+            <Pressable testID="notification-bell" style={styles.bellButton} onPress={handleNotifications}>
+              <Bell size={19} color={colors.foreground} strokeWidth={1.8} />
+              {unreadNotifCount > 0 && <PopBadge style={styles.bellDot} />}
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.searchWrap}>
@@ -428,6 +429,7 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xs,
@@ -435,14 +437,16 @@ const styles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
-  },
-  greeting: {
-    ...typography.small,
-    color: colors.mutedForeground,
+    minWidth: 0,
   },
   name: {
     ...typography.h2,
     color: colors.foreground,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
   },
   bellButton: {
     width: 40,

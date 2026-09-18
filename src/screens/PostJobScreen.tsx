@@ -63,11 +63,12 @@ const DESCRIPTION_MIN = 20;
 
 // C2 — Post a Job ფორმა (product-spec.md; დიზაინის რეფერენსის PostJob-ის
 // მიხედვით, ფოტოს ლიმიტის override-ით 5-დან 3-მდე)
-export function PostJobScreen({ navigation }: Props) {
+export function PostJobScreen({ navigation, route }: Props) {
   const { profile } = useCustomerProfile();
-  const [category, setCategory] = useState('');
+  const editJob = route.params?.editJob;
+  const [category, setCategory] = useState(editJob?.category ?? '');
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState(editJob?.desc ?? '');
   // ლოკალური ფაილის URI-ები (expo-image-picker-იდან) — რეალური thumbnail-ები,
   // ფერადი mock კვადრატების ნაცვლად. Supabase Storage-ში იტვირთება
   // "გამოქვეყნება"-ზე დაჭერისას (#61).
@@ -76,9 +77,12 @@ export function PostJobScreen({ navigation }: Props) {
   // მისამართი წინასწარ ივსება პროფილის default address-ით, მაგრამ აქ
   // ცვლილება არასდროს არ სცვლის თავად default address-ს (მხოლოდ ამ
   // კონკრეტული job post-ის მისამართია) — მომხმარებლის მოთხოვნით.
-  const [address, setAddress] = useState(profile.defaultAddress);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedTime, setSelectedTime] = useState<TimeSlot | ''>('');
+  const [address, setAddress] = useState(editJob?.address ?? profile.defaultAddress);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
+    const m = editJob?.preferredDate?.match(/^(d{4})-(d{2})-(d{2})/);
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+  });
+  const [selectedTime, setSelectedTime] = useState<TimeSlot | ''>(editJob?.timeSlot ?? '');
   const selectedTimeLabel = TIME_SLOTS.find((t) => t.code === selectedTime)?.label ?? '';
   const [timeSheetOpen, setTimeSheetOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -125,7 +129,7 @@ export function PostJobScreen({ navigation }: Props) {
   // მათთვის სვეტი განზრახ არ აქვს).
   const selectedStyle = CATEGORIES.find((c) => c.id === category);
 
-  const categoryError = submitTouched && !category ? 'აირჩიე კატეგორია' : '';
+  const categoryError = submitTouched && !category ? 'აირჩიეთ კატეგორია' : '';
   const descriptionError =
     submitTouched && description.trim().length > 0 && description.trim().length < DESCRIPTION_MIN
       ? 'აღწერა ძალიან მოკლეა'
@@ -137,7 +141,7 @@ export function PostJobScreen({ navigation }: Props) {
   // სავალდებულოა (თარიღის გარეშე დროც არ მოწმდება — ორივე ერთად
   // ივსება/არცერთი, DatePickerField-ის arსებული UX-ის მიხედვით).
   const addressError = submitTouched && !address.trim() ? 'მისამართი სავალდებულოა' : '';
-  const dateTimeError = submitTouched && !!selectedDate && !selectedTime ? 'აირჩიე სასურველი დრო' : '';
+  const dateTimeError = submitTouched && !!selectedDate && !selectedTime ? 'აირჩიეთ სასურველი დრო' : '';
   const canSubmit =
     !!category && description.trim().length >= DESCRIPTION_MIN && !!address.trim() && (!selectedDate || !!selectedTime);
   const selectedCategory = activeCategories.find((c) => c.id === category) ?? null;
@@ -150,7 +154,19 @@ export function PostJobScreen({ navigation }: Props) {
     setLoading(true);
     const uid = authService.getCurrentUser()?.uid;
     try {
-      if (!uid) throw new Error('არ ხარ ავტორიზებული.');
+      if (!uid) throw new Error('არ ხართ ავტორიზებული.');
+      if (editJob) {
+        const updated = await jobService.updatePendingJob(editJob.id, {
+          category,
+          description: description.trim(),
+          address: address.trim(),
+          date: selectedDate ? `${formatPickedDate(selectedDate)}${selectedTimeLabel ? ` ${selectedTimeLabel}` : ''}` : '',
+          preferredDate: selectedDate ? toIsoDateString(selectedDate) : null,
+          timeSlot: selectedTime || null,
+        });
+        navigation.popTo('CustomerJobDetail', { jobId: updated.id, job: updated });
+        return;
+      }
       // Third hardening pass, priority 2 — idempotent publish. The job
       // row is created ONCE, as a draft (invisible to every Provider
       // read) — a retry after a later step fails resumes that SAME
@@ -280,7 +296,7 @@ export function PostJobScreen({ navigation }: Props) {
             <CheckCircle size={40} color={colors.success} strokeWidth={1.8} />
           </View>
           <Text style={styles.successTitle}>მოთხოვნა გამოქვეყნებულია!</Text>
-          <Text style={styles.successSubtitle}>შენი მოთხოვნა შესაბამის ოსტატებს უკვე შეუძლიათ ნახონ.</Text>
+          <Text style={styles.successSubtitle}>თქვენი მოთხოვნა შესაბამის ოსტატებს უკვე შეუძლიათ ნახონ.</Text>
           <View style={styles.successActions}>
             <Button
               label="მოთხოვნის ნახვა"
@@ -308,7 +324,7 @@ export function PostJobScreen({ navigation }: Props) {
           screen and could leave a job published with the user never
           seeing the success screen. Back is inert (not hidden — a full
           hide/show flicker for a few seconds would be worse) while `loading`. */}
-      <BackHeader title="მოთხოვნის გამოქვეყნება" onBack={() => !loading && navigation.goBack()} />
+      <BackHeader title={editJob ? 'განცხადების რედაქტირება' : 'მოთხოვნის გამოქვეყნება'} onBack={() => !loading && navigation.goBack()} />
 
       {/* Android's native window-resize silently no-ops under edge-to-edge
           rendering (Expo SDK 52+ default) — without this, the description/
@@ -329,7 +345,7 @@ export function PostJobScreen({ navigation }: Props) {
               strokeWidth={2}
             />
             <Text style={[styles.categoryButtonText, !selectedCategory && styles.categoryButtonPlaceholder]} numberOfLines={1}>
-              {selectedCategory?.name ?? 'აირჩიე კატეგორია'}
+              {selectedCategory?.name ?? 'აირჩიეთ კატეგორია'}
             </Text>
             <ChevronRight size={16} color={colors.mutedForeground} />
           </Pressable>
@@ -342,7 +358,7 @@ export function PostJobScreen({ navigation }: Props) {
             testID="post-job-description"
             value={description}
             onChangeText={(v) => setDescription(v.slice(0, DESCRIPTION_MAX))}
-            placeholder="დეტალურად აღწერე რა პრობლემაა და რა სამუშაოს შესრულება გჭირდება..."
+            placeholder="დეტალურად აღწერეთ რა პრობლემაა და რა სამუშაოს შესრულება გჭირდებათ..."
             placeholderTextColor={colors.mutedForeground}
             multiline
             numberOfLines={4}
@@ -356,6 +372,7 @@ export function PostJobScreen({ navigation }: Props) {
           </View>
         </View>
 
+        {!editJob && (
         <View style={styles.field}>
           <Text style={styles.plainLabel}>ფოტოების დამატება</Text>
           <Text style={styles.hint}>ფოტოები ოსტატს პრობლემის უკეთ შეფასებაში დაეხმარება.</Text>
@@ -383,6 +400,7 @@ export function PostJobScreen({ navigation }: Props) {
           </View>
           {!!photoError && <FieldError message={photoError} />}
         </View>
+        )}
 
         <View style={styles.field}>
           <FieldLabel text="მისამართი" required />
@@ -393,7 +411,7 @@ export function PostJobScreen({ navigation }: Props) {
             placeholderTextColor={colors.mutedForeground}
             style={[styles.input, addressError && styles.inputError]}
           />
-          <Text style={styles.hint}>ავტომატურად შეივსო შენი მისამართით — შეგიძლია შეცვალო ამ მოთხოვნისთვის.</Text>
+          <Text style={styles.hint}>ავტომატურად შეივსო თქვენი მისამართით — შეგიძლიათ შეცვალოთ ამ მოთხოვნისთვის.</Text>
           <FieldError message={addressError} />
         </View>
 
@@ -411,7 +429,7 @@ export function PostJobScreen({ navigation }: Props) {
           >
             <Clock size={16} color={colors.mutedForeground} />
             <Text style={[styles.categoryButtonText, !selectedTime && styles.categoryButtonPlaceholder]} numberOfLines={1}>
-              {selectedTimeLabel || (selectedDate ? 'აირჩიე დრო' : 'ჯერ აირჩიე თარიღი')}
+              {selectedTimeLabel || (selectedDate ? 'აირჩიეთ დრო' : 'ჯერ აირჩიეთ თარიღი')}
             </Text>
             <ChevronRight size={16} color={colors.mutedForeground} />
           </Pressable>
@@ -424,10 +442,10 @@ export function PostJobScreen({ navigation }: Props) {
           </View>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={styles.privacyText}>
-              შენი ტელეფონი, ელ. ფოსტა და ზუსტი მისამართი ოსტატებისთვის ავტომატურად არ გამოჩნდება.
+              თქვენი ადგილმდებარეობა ოსტატისთვის მიუწვდომელია, ოსტატთან შეთანხმებამდე.
             </Text>
             <Text style={styles.privacyText}>
-              ფასს ადგენს ოსტატი შენი აღწერისა და ფოტოების ნახვის შემდეგ — ის შემოგთავაზებს ფასს ჩატში, სადაც შეძლებ დათანხმებას ან უარყოფას.
+              ფასს ადგენს ოსტატი თქვენი აღწერისა ან/და ფოტოების ნახვის შემდეგ - ოსტატი შემოგთავაზებთ ფასს ჩატში, სადაც შეძლებთ დათანხმებას ან უარყოფას.
             </Text>
           </View>
         </View>
@@ -438,8 +456,8 @@ export function PostJobScreen({ navigation }: Props) {
           <InlineBanner type="error" msg={publishError} action="თავიდან ცდა" onAction={handlePublish} />
         )}
         <Button
-          label={canSubmit ? 'გამოქვეყნება' : 'შეავსე სავალდებულო ველები'}
-          loadingLabel="გამოქვეყნება..."
+          label={canSubmit ? (editJob ? 'შენახვა' : 'გამოქვეყნება') : 'შეავსეთ სავალდებულო ველები'}
+          loadingLabel={editJob ? 'ინახება...' : 'გამოქვეყნება...'}
           onPress={handlePublish}
           disabled={!canSubmit}
           loading={loading}

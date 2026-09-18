@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { ArrowLeft, Check, Mail, Phone } from 'lucide-react-native';
+import { ArrowLeft, Mail, Phone } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AddressAutocompleteField } from '../components/AddressAutocompleteField';
 import { Button } from '../components/Button';
@@ -48,7 +48,6 @@ export function RegisterScreen({ navigation, route }: Props) {
   const [address, setAddress] = useState('');
   const [pass, setPass] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [agreed, setAgreed] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [gLoading, setGLoading] = useState(false);
@@ -88,12 +87,7 @@ export function RegisterScreen({ navigation, route }: Props) {
 
   const nameValid = !!firstName.trim() && !!lastName.trim();
   const allValid =
-    nameValid &&
-    isEmail(email) &&
-    (isProvider || address.trim()) &&
-    pass.length >= 8 &&
-    pass === confirm &&
-    (isProvider || agreed);
+    nameValid && isEmail(email) && (isProvider || address.trim()) && pass.length >= 8 && pass === confirm;
 
   const handleSubmit = async () => {
     setTouched({ firstName: true, lastName: true, email: true, address: !isProvider, pass: true, confirm: true });
@@ -281,31 +275,15 @@ export function RegisterScreen({ navigation, route }: Props) {
               autoCapitalize="none"
             />
 
-            {/* Task — Provider-ისთვის მომსახურების პირობების დათანხმება
-                გადატანილია ProviderSetupScreen-ის (მეორე გვერდის) ბოლოში —
-                იქ ჩნდება მხოლოდ იმ ეკრანის სავალდებულო ველების შევსების
-                შემდეგ. Customer-ისთვის (ცალკე მოთხოვნილი არ ყოფილა, და
-                CustomerSetupScreen-ს საერთოდ არ აქვს სავალდებულო ველი,
-                რასაც ეს გეითი დაეყრდნობოდა) აქვე, უცვლელად რჩება. */}
-            {!isProvider && (
-              <View style={styles.termsRow}>
-                <Pressable
-                  testID="register-terms-checkbox"
-                  style={[styles.checkbox, agreed && styles.checkboxChecked]}
-                  onPress={() => setAgreed((a) => !a)}
-                >
-                  {agreed && <Check size={11} color={colors.primaryForeground} strokeWidth={3} />}
-                </Pressable>
-                <Text style={styles.termsText}>
-                  ვეთანხმები <Text style={styles.termsLink}>მომსახურების პირობებს</Text> და{' '}
-                  <Text style={styles.termsLink}>კონფიდენციალურობის პოლიტიკას</Text>
-                </Text>
-              </View>
-            )}
-
+            {/* Task — მომსახურების პირობების დათანხმება ორივე როლისთვის
+                გადატანილია მეორე გვერდის (ProviderSetup/CustomerSetup)
+                ბოლოში — Provider-ისთვის ჩნდება მხოლოდ იმ ეკრანის
+                სავალდებულო ველების შევსების შემდეგ, Customer-ისთვის კი
+                (მეორე გვერდს სავალდებულო ველი არ აქვს) დაუყოვნებლივ
+                ხელმისაწვდომია. */}
             <Button
-              label={isProvider ? 'გაგრძელება' : 'რეგისტრაცია'}
-              loadingLabel={isProvider ? 'გაგრძელება...' : 'რეგისტრაცია...'}
+              label="გაგრძელება"
+              loadingLabel="გაგრძელება..."
               onPress={handleSubmit}
               disabled={!allValid}
               loading={loading}
@@ -409,36 +387,6 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     gap: spacing.sm + 2,
-  },
-  termsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    paddingTop: spacing.xs,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  checkboxChecked: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  termsText: {
-    ...typography.caption,
-    color: colors.mutedForeground,
-    flex: 1,
-  },
-  termsLink: {
-    color: colors.primary,
-    fontWeight: '600',
   },
   divider: {
     flexDirection: 'row',

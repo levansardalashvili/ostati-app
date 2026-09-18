@@ -157,7 +157,7 @@ export function CustomerProfileScreen({ navigation }: Props) {
           <LogOut size={22} color={colors.destructive} />
         </View>
         <Text style={styles.sheetTitle}>გასვლა</Text>
-        <Text style={styles.sheetSubtitle}>ნამდვილად გსურს ანგარიშიდან გასვლა?</Text>
+        <Text style={styles.sheetSubtitle}>ნამდვილად გსურთ ანგარიშიდან გასვლა?</Text>
         <Button testID="logout-confirm-button" label="გასვლა" variant="destructive" onPress={confirmLogout} />
         <Pressable style={styles.sheetCancelLink} onPress={() => setLogoutSheetOpen(false)}>
           <Text style={styles.sheetCancelLinkText}>გაუქმება</Text>

@@ -28,6 +28,12 @@ function getInitials(name: string) {
 export function CustomerSetupScreen({ navigation, route }: Props) {
   const { userName } = route.params;
   const [loading, setLoading] = useState(false);
+  // Task — მომსახურების პირობების დათანხმება RegisterScreen-იდან (პირველი
+  // გვერდი) ამ, მეორე გვერდზეა გადმოტანილი — ProviderSetupScreen-ის
+  // იგივე პატერნის მიხედვით. ამ ეკრანს სავალდებულო ველი არ აქვს (userName
+  // უკვე route param-შია), ამიტომ checkbox დაუყოვნებლივ ხელმისაწვდომია,
+  // გეითინგის გარეშე.
+  const [agreed, setAgreed] = useState(false);
 
   const initials = getInitials(userName);
 
@@ -67,10 +73,23 @@ export function CustomerSetupScreen({ navigation, route }: Props) {
       </View>
 
       <View style={styles.footer}>
+        <View style={styles.termsRow}>
+          <Pressable
+            style={[styles.checkbox, agreed && styles.checkboxChecked]}
+            onPress={() => setAgreed((a) => !a)}
+          >
+            {agreed && <Check size={11} color={colors.primaryForeground} strokeWidth={3} />}
+          </Pressable>
+          <Text style={styles.termsText}>
+            ვეთანხმები <Text style={styles.termsLink}>მომსახურების პირობებს</Text> და{' '}
+            <Text style={styles.termsLink}>კონფიდენციალურობის პოლიტიკას</Text>
+          </Text>
+        </View>
         <Button
           label="დასრულება"
           loadingLabel="შენახვა..."
           onPress={handleDone}
+          disabled={!agreed}
           loading={loading}
         />
       </View>
@@ -160,5 +179,38 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
+    gap: spacing.sm + 2,
+  },
+  // Task — RegisterScreen.tsx-ის ყოფილი termsRow/checkbox/checkboxChecked/
+  // termsText/termsLink-ის იგივე ვიზუალი (ProviderSetupScreen.tsx-შიც
+  // იმეორებს ამ პატერნს).
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  termsText: {
+    ...typography.caption,
+    color: colors.mutedForeground,
+    flex: 1,
+  },
+  termsLink: {
+    color: colors.primary,
+    fontWeight: '600',
   },
 });

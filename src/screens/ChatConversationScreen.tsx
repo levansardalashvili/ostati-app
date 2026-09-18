@@ -172,7 +172,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     if (role === 'provider') {
       switch (liveJobStatus) {
         case 'active':
-          return 'შენ აგირჩიეს ამ სამუშაოსთვის';
+          return 'თქვენ აგირჩიეს ამ სამუშაოსთვის';
         case 'awaiting_customer_confirmation':
           return 'ელოდება მომხმარებლის დადასტურებას';
         case 'disputed':
@@ -267,6 +267,42 @@ export function ChatConversationScreen({ navigation, route }: Props) {
   // პირდაპირ `users`/`provider_profiles`-იდან კითხულობს, სერვერის მხარეს.
 
   const [messages, setMessages] = useState<ChatMsg[]>([]);
+
+  // ერთ წყვილს რამდენიმე job რომ აქვს, მესიჯები ერთ ჩატში ერევა — როცა
+  // ჩატში 2+ განსხვავებული job_id ჩანს, job-ის შეცვლისას გამყოფი ჩნდება
+  // (არსებული 'date' ტიპის ხაზი, ახალი ტიპი არ დაგვჭირდა).
+  const [jobLabels, setJobLabels] = useState<Record<string, string>>({});
+  const jobIdsKey = [...new Set(messages.map((m) => m.jobId).filter((x): x is string => !!x))].join(',');
+  useEffect(() => {
+    const ids = jobIdsKey ? jobIdsKey.split(',') : [];
+    if (ids.length < 2) return;
+    let cancelled = false;
+    Promise.all(
+      ids.map((jid) =>
+        (role === 'provider' ? jobService.getFeedJobPostById(jid) : jobService.getJobPostById(jid))
+          .then((j) => [jid, j ? `${j.title}${j.date ? ' · ' + j.date : ''}` : ''] as const)
+          .catch(() => [jid, ''] as const),
+      ),
+    ).then((pairs) => {
+      if (!cancelled) setJobLabels(Object.fromEntries(pairs));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [jobIdsKey, role]);
+  const displayMessages: ChatMsg[] = (() => {
+    if (!jobIdsKey.includes(',')) return messages;
+    const out: ChatMsg[] = [];
+    let last: string | undefined;
+    for (const m of messages) {
+      if (m.jobId && m.jobId !== last) {
+        last = m.jobId;
+        out.push({ id: `jobdiv-${m.id}`, type: 'date', from: 'other', label: jobLabels[m.jobId] || 'სამუშაო' });
+      }
+      out.push(m);
+    }
+    return out;
+  })();
 
   useEffect(() => {
     if (!customerId || !providerId || !myUid) return;
@@ -375,11 +411,11 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     const text = msgText.trim();
     if (!text || awaitingProviderResponse) return;
     const id = `new-${Date.now()}`;
-    setMessages((prev) => [...prev, { id, type: 'text', from: 'me', text, t: 'ახლა', state: 'sending' }]);
+    setMessages((prev) => [...prev, { id, type: 'text', from: 'me', text, t: 'ახლა', state: 'sending', jobId: linkJobId }]);
     setMsgText('');
     if (!customerId || !providerId || !myUid) return;
     chatService
-      .sendRealMessage(customerId, providerId, myUid, text)
+      .sendRealMessage(customerId, providerId, myUid, text, linkJobId)
       .then((real) => {
         setMessages((prev) => prev.map((m) => (m.id === id ? { ...real, state: 'sent' } : m)));
       })
@@ -403,12 +439,12 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     const localUri = result.assets[0].uri;
 
     const id = `img-${Date.now()}`;
-    setMessages((prev) => [...prev, { id, type: 'image', from: 'me', imageUrl: localUri, t: 'ახლა', state: 'sending' }]);
+    setMessages((prev) => [...prev, { id, type: 'image', from: 'me', imageUrl: localUri, t: 'ახლა', state: 'sending', jobId: linkJobId }]);
 
     if (!customerId || !providerId || !myUid) return;
     try {
       const privateReference = await storageService.uploadPrivateChatImage( customerId, providerId, myUid, localUri, );
-      const real = await chatService.sendRealImage( customerId, providerId, myUid, privateReference,);
+      const real = await chatService.sendRealImage(customerId, providerId, myUid, privateReference, linkJobId);
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...real, state: 'sent' } : m)));
     } catch {
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, state: 'failed' } : m)));
@@ -470,7 +506,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     try {
       let real: ChatMsg;
       if (msg.type === 'text') {
-        real = await chatService.sendRealMessage(customerId, providerId, myUid, msg.text ?? '');
+        real = await chatService.sendRealMessage(customerId, providerId, myUid, msg.text ?? '', msg.jobId);
       } else if (msg.type === 'offer') {
         if (!msg.jobId) throw new Error('Offer message is missing jobId');
         real = await chatService.sendRealOffer(customerId, providerId, myUid, msg.amount ?? 0, msg.comment, msg.jobId);
@@ -493,7 +529,7 @@ if (
     uploadedUrl,
   );
 }
-        real = await chatService.sendRealImage(customerId, providerId, myUid, uploadedUrl);
+        real = await chatService.sendRealImage(customerId, providerId, myUid, uploadedUrl, msg.jobId);
       } else {
         retryingRef.current.delete(id);
         return;
@@ -572,7 +608,7 @@ if (
         <View style={styles.awaitingBanner}>
           <AlertCircle size={16} color={colors.warning} />
           <Text style={styles.awaitingBannerText}>
-            თქვენი მოთხოვნა გაიგზავნა — საუბრის გასაგრძელებლად ოსტატმა ჯერ უნდა ნახოს და უპასუხოს.
+            თქვენი მოთხოვნა გაიგზავნა, საუბრის გასაგრძელებლად ოსტატმა უნდა გიპასუხოთ
           </Text>
         </View>
       )}
@@ -665,7 +701,7 @@ if (
               )}
             </View>
           )}
-          {messages.map((m, idx) => {
+          {displayMessages.map((m, idx) => {
             if (m.type === 'date') {
               return (
                 <View key={m.id} style={styles.dateRow}>
@@ -675,8 +711,46 @@ if (
             }
 
             const isMe = m.from === 'me';
-            const prevMsg = messages[idx - 1];
+            const prevMsg = displayMessages[idx - 1];
             const showSpacing = prevMsg && prevMsg.type !== 'date' && prevMsg.from !== m.from;
+
+            if (m.type === 'completion') {
+              return (
+                <View key={m.id} style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther, showSpacing && styles.msgSpacing]}>
+                  <View style={styles.offerCardWrap}>
+                    <View style={[styles.offerCard, { borderColor: colors.success }]}>
+                      <View style={styles.offerHeaderRow}>
+                        <View style={[styles.offerIcon, { backgroundColor: colors.muted }]}>
+                          <CheckCircle size={15} color={colors.success} />
+                        </View>
+                        <Text style={styles.offerLabel}>სამუშაო დასრულებულია</Text>
+                      </View>
+                      <Text style={styles.offerComment}>
+                        {role === 'customer'
+                          ? 'ოსტატმა სამუშაო დასრულებულად მონიშნა — გთხოვთ, დაადასტუროთ განცხადების გვერდიდან.'
+                          : 'დასრულება გაიგზავნა — ველოდებით მომხმარებლის დადასტურებას.'}
+                      </Text>
+                      <Pressable
+                        style={[styles.offerAcceptButton, { flex: 0, marginTop: spacing.md }]}
+                        onPress={() => {
+                          const target = m.jobId ?? linkJobId;
+                          if (!target) return;
+                          if (role === 'customer') navigation.navigate('CustomerJobDetail', { jobId: target });
+                          else navigation.navigate('ProviderJobDetail', { id: target });
+                        }}
+                      >
+                        <Text style={styles.offerAcceptText} numberOfLines={1}>
+                          {role === 'customer' ? 'დადასტურება' : 'განცხადების ნახვა'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                    <View style={[styles.msgFooter, isMe ? styles.msgFooterMe : styles.msgFooterOther]}>
+                      <Text style={styles.msgTime}>{m.t}</Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            }
 
             if (m.type === 'offer') {
               const canRespond = role === 'customer' && !isMe && m.offerStatus === 'pending';

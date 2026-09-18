@@ -77,8 +77,14 @@ export function CustomerProviderListScreen({ navigation }: Props) {
     const areaQuery = areaSearch.trim().toLowerCase();
     return providers
       .filter((p) => {
-        if (selCategory && p.category !== selCategory) return false;
-        if (areaQuery && !p.areas.some((a) => a.toLowerCase().includes(areaQuery))) return false;
+        if (selCategory && !p.categories.includes(selCategory)) return false;
+        // Task — `.includes()` (ნებისმიერ ადგილას substring) მცდარად
+        // ემთხვეოდა "გორი"-ს ძებნას "სამგორი"-სთან (თბილისის რაიონი,
+        // sql-ით დადასტურებული: `areas::text ilike '%გორი%'` აბრუნებდა
+        // მხოლოდ "სამგორი"-ს მქონე Provider-ებს) — `.startsWith()` ამ
+        // კონკრეტულ collision-ს გამორიცხავს, დანარჩენი პრეფიქსული ძებნა
+        // (მაგ. "ვაკ" → "ვაკე") უცვლელად მუშაობს.
+        if (areaQuery && !p.areas.some((a) => a.toLowerCase().startsWith(areaQuery))) return false;
         if (search.trim()) {
           const q = search.toLowerCase();
           const spec = (SPECIALTY_LABEL[p.category] ?? '').toLowerCase();
@@ -95,7 +101,8 @@ export function CustomerProviderListScreen({ navigation }: Props) {
     setSearch('');
   };
 
-  const selectedCategoryLabel = CATEGORIES.find((c) => c.id === selCategory)?.label ?? null;
+  const selectedCategory = CATEGORIES.find((c) => c.id === selCategory) ?? null;
+  const selectedCategoryLabel = selectedCategory?.label ?? null;
   const SelectedCategoryIcon = getCategoryIcon(selCategory ?? '');
 
   const handleOpenProvider = (id: string) => {
@@ -145,7 +152,7 @@ export function CustomerProviderListScreen({ navigation }: Props) {
       <View style={styles.filtersSection}>
         <View style={styles.categoryFieldWrap}>
           <Pressable style={styles.categoryField} onPress={() => setCategorySheetOpen(true)}>
-            <SelectedCategoryIcon size={17} color={selCategory ? colors.primary : colors.mutedForeground} strokeWidth={2} />
+            <SelectedCategoryIcon size={17} color={selectedCategory ? selectedCategory.dot : colors.mutedForeground} strokeWidth={2} />
             <Text style={[styles.categoryFieldText, !selCategory && styles.categoryFieldPlaceholder]} numberOfLines={1}>
               {selectedCategoryLabel ?? 'აირჩიე სერვისი'}
             </Text>
@@ -153,7 +160,6 @@ export function CustomerProviderListScreen({ navigation }: Props) {
           </Pressable>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          <Chip variant="filled" label="ყველა არეალი" selected={!areaSearch.trim()} onPress={() => setAreaSearch('')} />
           {myDistrict && (
             <Chip
               variant="filled"
@@ -164,6 +170,7 @@ export function CustomerProviderListScreen({ navigation }: Props) {
               }
             />
           )}
+          <Chip variant="filled" label="ყველა არეალი" selected={!areaSearch.trim()} onPress={() => setAreaSearch('')} />
         </ScrollView>
         <View style={styles.areaSearchWrap}>
           <View style={styles.searchBar}>
@@ -251,7 +258,7 @@ export function CustomerProviderListScreen({ navigation }: Props) {
                 style={styles.categorySheetRow}
               >
                 <View style={styles.categoryIconWrap}>
-                  <Icon size={18} color={on ? colors.primary : colors.mutedForeground} strokeWidth={2} />
+                  <Icon size={18} color={c.dot} strokeWidth={2} />
                 </View>
                 <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{c.label}</Text>
                 {on && <Check size={16} color={colors.primary} strokeWidth={3} />}

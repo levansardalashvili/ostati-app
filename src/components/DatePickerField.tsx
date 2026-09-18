@@ -14,7 +14,7 @@ type Props = {
 // DatePickerField — ველი + BottomSheet-ში ჩაშენებული CalendarPicker.
 // თარიღზე დაჭერისას იხურება sheet (მოთხოვნა: "თარიღზე დაჭერისას გაიხსნას
 // კალენდარი").
-export function DatePickerField({ value, onChange, placeholder = 'აირჩიე თარიღი' }: Props) {
+export function DatePickerField({ value, onChange, placeholder = 'აირჩიეთ თარიღი' }: Props) {
   const [open, setOpen] = useState(false);
 
   return (

@@ -7,6 +7,7 @@ import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
 import { Skeleton } from '../components/Skeleton';
 import { StartJobChatSheet } from '../components/StartJobChatSheet';
+import { Toast } from '../components/Toast';
 import { VerifiedBadge } from '../components/VerifiedBadge';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
@@ -30,6 +31,7 @@ export function SavedProvidersScreen({ navigation }: Props) {
   const [allProviders, setAllProviders] = useState<Provider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [toastCount, setToastCount] = useState(0);
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
@@ -116,7 +118,10 @@ export function SavedProvidersScreen({ navigation }: Props) {
               key={p.id}
               provider={p}
               onOpenProfile={() => openProfile(p.id)}
-              onToggleFavorite={() => toggleFavorite(p.id)}
+              onToggleFavorite={() => {
+                toggleFavorite(p.id);
+                setToastCount((n) => n + 1);
+              }}
               onMessage={() => openChat(p)}
             />
           ))}
@@ -127,6 +132,7 @@ export function SavedProvidersScreen({ navigation }: Props) {
         onClose={() => setStartChatProvider(null)}
         onReady={openChatWithJob}
       />
+      <Toast key={toastCount} message={toastCount ? 'ოსტატი წაშლილია რჩეულებიდან' : null} bottom={110} />
     </SafeAreaView>
   );
 }
@@ -159,8 +165,8 @@ function SavedProviderCard({
               </Text>
               {p.verified && <VerifiedBadge size={15} />}
             </View>
-            <Text style={styles.meta}>
-              {specialty} • {p.years} წ. გამოცდ.
+            <Text style={styles.meta} numberOfLines={1} adjustsFontSizeToFit>
+              {specialty} • {p.years} წ. გამოცდილება
             </Text>
             <View style={styles.statsRow}>
               {isNewProvider(p) ? (
