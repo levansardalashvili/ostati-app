@@ -8,7 +8,8 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.ostati.app"
+      "bundleIdentifier": "com.ostati.app",
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.ostati.app",
@@ -29,6 +30,7 @@
     },
     "plugins": [
       "@react-native-google-signin/google-signin",
+      "expo-apple-authentication",
       [
         "expo-image-picker",
         {

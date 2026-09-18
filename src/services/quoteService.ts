@@ -76,6 +76,11 @@ export interface QuoteService {
   // another display identity. Direct client INSERT on job_responses is
   // revoked; this RPC is the only way to create a response.
   expressInterest(jobId: string, offeredPrice: number): Promise<void>;
+  // supabase/migrations/0081 — RPC-only, სანამ job კვლავ `pending`-ია
+  // (RPC თავად ამოწმებს სერვერზე). Provider-ს შეუძლია გადაიფიქროს/
+  // შეცდომით გაგზავნილი ფასი უკან წაიღოს, job_posts-ს/select_provider()-ს
+  // ცალკე ცვლილება არ სჭირდება — job_responses-ის row-ის წაშლა საკმარისია.
+  withdrawInterest(jobId: string): Promise<void>;
   // Provider-ის საკუთარი პასუხების job-id-ების სია — Feed/დეტალის ეკრანებზე
   // "უკვე დაინტერესებული ხარ" state-ის აღსადგენად.
   listMyResponseJobIds(providerId: string): Promise<Set<string>>;
@@ -92,6 +97,10 @@ export const quoteService: QuoteService = {
       p_job_id: jobId,
       p_offered_price: offeredPrice,
     });
+    if (error) throw error;
+  },
+  async withdrawInterest(jobId) {
+    const { error } = await supabase.rpc('withdraw_interest', { p_job_id: jobId });
     if (error) throw error;
   },
   async listMyResponseJobIds(providerId) {

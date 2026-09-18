@@ -218,6 +218,16 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveStatus, job.id]);
 
+  // supabase/migrations/0082 — იგივე lazy/opportunistic პატერნი, "job-ის
+  // აღების" მხარეს: თუ ჯერ არავინ დაინტერესებულა 48სთ-ის განმავლობაში,
+  // RPC სერვერზევე ამოწმებს (idempotent — ერთხელ, `stale_interest_reminder_sent_at`-ით
+  // დაცული) და საჭიროებისას Customer-ს ატყობინებს. Job-ის სტატუსს არ
+  // ცვლის, ამიტომ `setStatus` აქ არაფერზე არ არის საჭირო.
+  useEffect(() => {
+    if (effectiveStatus !== 'pending' || !job.id) return;
+    jobService.checkStaleJobInterest(job.id).catch(() => {});
+  }, [effectiveStatus, job.id]);
+
   const progressSteps = [
     { label: 'მოთხოვნა გამოქვეყნდა', done: true },
     { label: 'ოსტატი შეირჩა', done: !!selectedProvider },

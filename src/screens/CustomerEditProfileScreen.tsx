@@ -89,14 +89,33 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
               </View>
             </View>
             <TextField label="მისამართი" value={address} onChangeText={setAddress} placeholder="ქ., არეალი" />
-            <View>
-              <Text style={styles.infoLabel}>ანგარიშის ინფორმაცია</Text>
-              <View style={styles.infoCard}>
-                <Text style={styles.infoCardLabel}>ელ. ფოსტა</Text>
-                <Text style={styles.infoCardValue}>{profile.email}</Text>
+            {(!!profile.email || !!profile.phone) && (
+              <View>
+                <Text style={styles.infoLabel}>ანგარიშის ინფორმაცია</Text>
+                <View style={styles.infoCard}>
+                  {/* #107 — ტელეფონის OTP-ით რეგისტრირებულ ანგარიშებს
+                      email არ აქვთ (`''`) — ორივე ველი პირობითია, არა
+                      უპირობოდ ცარიელი "ელ. ფოსტა" row-ის ჩვენება. */}
+                  {!!profile.email && (
+                    <>
+                      <Text style={styles.infoCardLabel}>ელ. ფოსტა</Text>
+                      <Text style={styles.infoCardValue}>{profile.email}</Text>
+                    </>
+                  )}
+                  {!!profile.phone && (
+                    <>
+                      <Text style={[styles.infoCardLabel, !!profile.email && styles.infoCardLabelSpaced]}>
+                        ტელეფონი
+                      </Text>
+                      <Text style={styles.infoCardValue}>{profile.phone}</Text>
+                    </>
+                  )}
+                </View>
+                <Text style={styles.infoNote}>
+                  {profile.email ? 'ელ. ფოსტის შეცვლისთვის დაგვიკავშირდით.' : 'ტელეფონის ნომრის შეცვლისთვის დაგვიკავშირდით.'}
+                </Text>
               </View>
-              <Text style={styles.infoNote}>ელ. ფოსტის შეცვლისთვის დაგვიკავშირდით.</Text>
-            </View>
+            )}
           </View>
         </ScrollView>
 
@@ -165,6 +184,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.mutedForeground,
     marginBottom: 2,
+  },
+  infoCardLabelSpaced: {
+    marginTop: spacing.sm,
   },
   infoCardValue: {
     ...typography.caption,

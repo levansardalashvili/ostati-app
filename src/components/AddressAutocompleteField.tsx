@@ -75,6 +75,8 @@ type Props = {
   onBlur?: () => void;
   placeholder?: string;
   error?: string;
+  // TextField.tsx-ის იგივე პრინციპი — წითელი "*" ლეიბლის გვერდით.
+  required?: boolean;
 };
 
 const MIN_QUERY_LEN = 3;
@@ -93,7 +95,7 @@ const BLUR_HIDE_DELAY_MS = 200;
 // შენიშვნა: Nominatim-ის უფასო public API-ს აქვს rate-limit (~1 req/sec) —
 // მასშტაბის ზრდისას განსახილველია საკუთარი Nominatim instance ან ფასიანი
 // providers (Google Places).
-export function AddressAutocompleteField({ label, value, onChangeText, onSelect, onBlur, placeholder, error }: Props) {
+export function AddressAutocompleteField({ label, value, onChangeText, onSelect, onBlur, placeholder, error, required }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [showList, setShowList] = useState(false);
@@ -187,7 +189,10 @@ export function AddressAutocompleteField({ label, value, onChangeText, onSelect,
   return (
     <View style={[styles.wrap, dropdownOpen ? styles.wrapElevated : null]}>
       <View onLayout={onFieldLayout}>
-        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.label}>
+          {label}
+          {required && <Text style={styles.requiredMark}> *</Text>}
+        </Text>
         <View style={styles.inputWrapper}>
           <View style={styles.leftIcon}>
             <MapPin size={15} color={colors.mutedForeground} />
@@ -253,6 +258,9 @@ const styles = StyleSheet.create({
     ...typography.captionMedium,
     color: colors.foreground,
     marginBottom: spacing.sm,
+  },
+  requiredMark: {
+    color: colors.destructive,
   },
   inputWrapper: {
     position: 'relative',

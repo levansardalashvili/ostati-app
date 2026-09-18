@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Briefcase, ChevronRight, Clock, MapPin, User } from 'lucide-react-native';
+import { Bell, Briefcase, ChevronRight, Clock, MapPin, ShieldAlert, User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { type CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
@@ -216,6 +216,32 @@ export function ProviderHomeScreen({ navigation }: Props) {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
+        {/* Task — მომხმარებლის აშკარა მოთხოვნა: სანამ ოსტატი ვერიფიკაციას
+            არ გაივლის, ეს ბანერი მუდმივად ეჩვენება Home-ზე (გვერდის
+            პირველი, ყველაზე თვალშისაცემი ელემენტი, "როცა ანგარიშში შედის").
+            Real gate-ი (`express_interest()` RPC-ის შიგნით, 0084) ცალკეა —
+            ეს მხოლოდ ხილული შეხსენებაა, არა თავად ბლოკვის მექანიზმი. */}
+        {providerProfile.verificationStatus !== 'verified' && (
+          <Pressable
+            style={styles.verifyBanner}
+            onPress={() => navigation.navigate('Profile')}
+            accessibilityRole="button"
+          >
+            <View style={styles.verifyBannerIcon}>
+              <ShieldAlert size={18} color={colors.warning} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.verifyBannerTitle}>საჭიროა ვერიფიკაციის გავლა</Text>
+              <Text style={styles.verifyBannerSubtitle}>
+                {providerProfile.verificationStatus === 'pending'
+                  ? 'მოთხოვნა განხილვის პროცესშია — შედეგს ვაცნობებთ.'
+                  : 'სერვისით სარგებლობისთვის (სამუშაოზე ინტერესის გამოხატვა) გაიარე ვერიფიკაცია.'}
+              </Text>
+            </View>
+            <ChevronRight size={16} color={colors.mutedForeground} />
+          </Pressable>
+        )}
+
         <View style={styles.topCards}>
           <View style={[styles.availabilityCard, available ? styles.availabilityCardOn : styles.availabilityCardOff]}>
             <View style={styles.availabilityLeft}>
@@ -395,6 +421,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     gap: spacing.md,
+  },
+  verifyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: colors.warningBackground,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  verifyBannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyBannerTitle: {
+    ...typography.captionMedium,
+    color: '#92400E',
+    fontWeight: '700',
+  },
+  verifyBannerSubtitle: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    marginTop: 2,
+    lineHeight: 16,
   },
   availabilityCard: {
     flexDirection: 'row',

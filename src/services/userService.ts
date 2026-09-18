@@ -13,6 +13,8 @@ type UserRow = {
   last_name: string;
   email: string;
   default_address: string;
+  // #107 — supabase/migrations/0083.
+  phone: string;
 };
 
 function fromRow(row: UserRow): UserRecord {
@@ -30,6 +32,7 @@ function fromRow(row: UserRow): UserRecord {
     lastName: row.last_name ?? '',
     email: row.email,
     defaultAddress: row.default_address,
+    phone: row.phone ?? '',
   };
 }
 
@@ -175,6 +178,7 @@ const DEFAULT_CUSTOMER_PROFILE: CustomerProfile = {
   lastName: 'სულაბერიძე',
   email: 'nino.sulaberidze@gmail.com',
   defaultAddress: 'ვაკე, თბილისი',
+  phone: '',
 };
 
 const DEFAULT_PROVIDER_PROFILE: ProviderProfile = {
@@ -286,6 +290,7 @@ export const userService: UserService = {
       last_name: record.lastName,
       email: record.email,
       default_address: record.defaultAddress,
+      phone: record.phone,
     });
     if (error) throw error;
   },
@@ -302,6 +307,7 @@ export const userService: UserService = {
     if (patch.lastName !== undefined) row.last_name = patch.lastName;
     if (patch.email !== undefined) row.email = patch.email;
     if (patch.defaultAddress !== undefined) row.default_address = patch.defaultAddress;
+    if (patch.phone !== undefined) row.phone = patch.phone;
     const { error } = await supabase.from('users').update(row).eq('id', uid);
     if (error) throw error;
   },

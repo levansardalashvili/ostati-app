@@ -24,10 +24,17 @@ type Props = {
   icon?: IconComponent;
   keyboardType?: KeyboardTypeOptions;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  // #107 — OtpCodeInput-ისთვის (6-ციფრიანი კოდი), ტელეფონის ნომრის
+  // ველისთვის და ა.შ. არასავალდებულო, დანარჩენ ყველა არსებულ
+  // გამომძახებელზე ეფექტი არ აქვს (`undefined` = შეუზღუდავი, უცვლელი).
+  maxLength?: number;
   // E2E (Maestro) support — some screens have two fields with the same
   // placeholder (e.g. password/confirm-password both show "••••••••"),
   // which text-based selectors can't disambiguate.
   testID?: string;
+  // Task — წითელი "*" ველის ლეიბლის გვერდით, სავალდებულო ველების
+  // მკაფიო ვიზუალური მონიშვნისთვის (მომხმარებლის მოთხოვნით).
+  required?: boolean;
 };
 
 // საერთო ტექსტური ველი — label, არასავალდებულო წამყვანი აიქონი,
@@ -45,13 +52,18 @@ export function TextField({
   icon: Icon,
   keyboardType,
   autoCapitalize = 'sentences',
+  maxLength,
   testID,
+  required,
 }: Props) {
   const [hidden, setHidden] = useState(!!secureTextEntry);
 
   return (
     <View>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>
+        {label}
+        {required && <Text style={styles.requiredMark}> *</Text>}
+      </Text>
       <View style={styles.inputWrapper}>
         {Icon && (
           <View style={styles.leftIcon}>
@@ -68,6 +80,7 @@ export function TextField({
           secureTextEntry={secureTextEntry && hidden}
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
+          maxLength={maxLength}
           style={[
             styles.input,
             Icon ? styles.inputWithLeftIcon : null,
@@ -102,6 +115,9 @@ const styles = StyleSheet.create({
     ...typography.captionMedium,
     color: colors.foreground,
     marginBottom: spacing.sm,
+  },
+  requiredMark: {
+    color: colors.destructive,
   },
   inputWrapper: {
     position: 'relative',

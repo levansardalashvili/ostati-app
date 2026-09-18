@@ -1,0 +1,16 @@
+-- 0083_users_phone_column.sql
+-- CLAUDE.md #107 — adds Sign in with Apple + phone/SMS OTP alongside the
+-- existing Email/Password + Google auth. This migration is the phone
+-- half's only schema change: `phone`, denormalized onto `public.users`
+-- from `auth.users.phone` at registration time, following the exact same
+-- pattern `email` already uses (0002) — every other identity field this
+-- app's screens read comes from `public.users` via PostgREST, never a
+-- direct `auth.users` read (that table isn't exposed to non-admin roles
+-- at all), so `phone` follows suit rather than being read through a
+-- different mechanism.
+--
+-- No RLS change needed: `public.users`' existing owner-only select/
+-- insert/update policies (0002) are row-level, not column-level — they
+-- already cover this new column with zero additional statements, exactly
+-- as they already do for `email`/`default_address`.
+alter table public.users add column if not exists phone text not null default '';

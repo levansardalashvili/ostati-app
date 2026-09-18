@@ -10,6 +10,10 @@ export type CustomerProfile = {
   lastName: string;
   email: string;
   defaultAddress: string;
+  // #107 — ტელეფონის OTP-ით რეგისტრირებულ ანგარიშებს არ აქვთ email —
+  // ცარიელი სტრიქონი ორივე ველისთვის (`email`-ის იგივე default-ი,
+  // #2-ის migration 0002-დანვე).
+  phone: string;
 };
 
 // Supabase-ის `users` ცხრილის row-ის ფორმა — ანგარიშის საბაზისო
@@ -26,4 +30,7 @@ export type UserRecord = {
   lastName: string;
   email: string;
   defaultAddress: string;
+  // #107 — `public.users.phone` (supabase/migrations/0083), Email-ის
+  // იგივე "ცარიელი, თუ ეს მეთოდით არ დარეგისტრირებულა" პრინციპით.
+  phone: string;
 };

@@ -13,6 +13,12 @@ import { RegisterScreen } from '../screens/RegisterScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { GoogleCompleteScreen } from '../screens/GoogleCompleteScreen';
+import { AppleCompleteScreen } from '../screens/AppleCompleteScreen';
+import { PhoneRegisterScreen } from '../screens/PhoneRegisterScreen';
+import { PhoneRegisterVerifyScreen } from '../screens/PhoneRegisterVerifyScreen';
+import { PhoneLoginScreen } from '../screens/PhoneLoginScreen';
+import { PhoneForgotPasswordScreen } from '../screens/PhoneForgotPasswordScreen';
+import { PhoneForgotPasswordVerifyScreen } from '../screens/PhoneForgotPasswordVerifyScreen';
 import { CustomerSetupScreen } from '../screens/CustomerSetupScreen';
 import { ProviderSetupScreen } from '../screens/ProviderSetupScreen';
 import { CustomerTabs } from './CustomerTabs';
@@ -132,6 +138,12 @@ export function RootNavigator() {
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="GoogleComplete" component={GoogleCompleteScreen} />
+      <Stack.Screen name="AppleComplete" component={AppleCompleteScreen} />
+      <Stack.Screen name="PhoneRegister" component={PhoneRegisterScreen} />
+      <Stack.Screen name="PhoneRegisterVerify" component={PhoneRegisterVerifyScreen} />
+      <Stack.Screen name="PhoneLogin" component={PhoneLoginScreen} />
+      <Stack.Screen name="PhoneForgotPassword" component={PhoneForgotPasswordScreen} />
+      <Stack.Screen name="PhoneForgotPasswordVerify" component={PhoneForgotPasswordVerifyScreen} />
       <Stack.Screen name="CustomerSetup" component={CustomerSetupScreen} />
       <Stack.Screen name="ProviderSetup" component={ProviderSetupScreen} />
       {/* CustomerHome/ProviderHome routes render the Bottom Tab navigators

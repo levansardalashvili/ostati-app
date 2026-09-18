@@ -25,8 +25,8 @@ export function WelcomeScreen({ navigation }: Props) {
         <View style={styles.logoCircle}>
           <Wrench size={40} color={colors.primary} strokeWidth={1.8} />
         </View>
-        <Text style={styles.appName}>ოსტატები</Text>
-        <Text style={styles.tagline}>იპოვე სანდო ოსტატი შენს არეალში</Text>
+        <Text style={styles.appName}>ოსტატი</Text>
+        <Text style={styles.tagline}>იპოვე სანდო ოსტატი შენთან ახლოს</Text>
       </View>
 
       <View style={styles.actions}>

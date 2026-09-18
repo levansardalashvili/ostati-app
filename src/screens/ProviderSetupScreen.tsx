@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Award, Camera, ChevronRight, Image as ImageIcon, MapPin, User } from 'lucide-react-native';
+import { ArrowLeft, Award, Camera, Check, ChevronRight, Image as ImageIcon, MapPin, User } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
@@ -52,6 +52,11 @@ export function ProviderSetupScreen({ navigation }: Props) {
   const [previewPortfolio, setPreviewPortfolio] = useState<MediaItem | null>(null);
   const [sqmPrices, setSqmPrices] = useState<Record<string, string>>({});
   const [saveError, setSaveError] = useState(false);
+  // Task — მომსახურების პირობებზე დათანხმება RegisterScreen-იდან (პირველი
+  // გვერდი) ამ, მეორე გვერდზეა გადმოტანილი Provider-ისთვის — ლოგიკურად
+  // მხოლოდ მას შემდეგ, რაც ყველა სავალდებულო ველია შევსებული (იხ.
+  // `requiredFieldsFilled` ქვემოთ), შეიძლება მისი მონიშვნა.
+  const [agreed, setAgreed] = useState(false);
 
   // კვ.მ-ზე ფასიანი სპეციალობები, provider-ის შერჩეულთაგან — ერთი ველი
   // თითო სპეციალობაზე, საერთო მნიშვნელობის ნაცვლად (მომხმარებლის მოთხოვნით).
@@ -59,8 +64,10 @@ export function ProviderSetupScreen({ navigation }: Props) {
 
   // პროფილის შევსება სავალდებულოა — "გამოტოვება" შესაძლებლობა განზრახ
   // არ არსებობს (მომხმარებლის მოთხოვნით). სერთიფიკატები/ნამუშევრები
-  // არასავალდებულოა და canSave-ს არ მოქმედებს.
-  const canSave = specialty.length > 0 && areas.length > 0;
+  // არასავალდებულოა და canSave-ს არ მოქმედებს. Task — გამოცდილებაც
+  // დაემატა სავალდებულო სიას (მანამდე canSave-ს არ ამოწმებდა).
+  const requiredFieldsFilled = specialty.length > 0 && areas.length > 0 && !!experience;
+  const canSave = requiredFieldsFilled && agreed;
 
   // რეალური კამერა/გალერეის picker (#62) — ლოკალური URI მაშინვე ემატება
   // ბადეს (მყისიერი preview), Storage-ში ატვირთვა კი შენახვისას ხდება
@@ -161,12 +168,13 @@ export function ProviderSetupScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
-          <View style={styles.headerSpacer} />
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+            <ArrowLeft size={18} color={colors.foreground} />
+          </Pressable>
           <ProgressBar step={2} total={2} />
           <View style={styles.headerSpacer} />
         </View>
         <Text style={styles.title}>შექმენი ოსტატის პროფილი</Text>
-        <Text style={styles.subtitle}>მომხმარებლები უკეთ გიპოვებენ.</Text>
       </View>
 
       {/* Android's native window-resize silently no-ops under edge-to-edge
@@ -202,8 +210,10 @@ export function ProviderSetupScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>სპეციალიზაცია</Text>
-          <Text style={styles.sectionHint}>აირჩიე შენი ძირითადი პროფესია</Text>
+          <Text style={styles.sectionLabel}>
+            სპეციალიზაცია<Text style={styles.requiredMark}> *</Text>
+          </Text>
+          <Text style={styles.sectionHint}>აირჩიეთ თქვენი პროფესია</Text>
           <SpecialtyPickerField value={specialty} onChange={setSpecialty} />
         </View>
 
@@ -225,13 +235,17 @@ export function ProviderSetupScreen({ navigation }: Props) {
         )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>გამოცდილება</Text>
+          <Text style={styles.sectionLabel}>
+            გამოცდილება<Text style={styles.requiredMark}> *</Text>
+          </Text>
           <ExperiencePickerField value={experience} onChange={setExperience} />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>სამუშაო არეალი</Text>
-          <Text style={styles.sectionHint}>სად გინდა მუშაობა?</Text>
+          <Text style={styles.sectionLabel}>
+            სამუშაო არეალი<Text style={styles.requiredMark}> *</Text>
+          </Text>
+          <Text style={styles.sectionHint}>სად გსურთ მუშაობა?</Text>
           <Pressable style={styles.areaPickerButton} onPress={openAreaPicker}>
             <MapPin size={16} color={colors.mutedForeground} />
             <Text style={styles.areaPickerButtonText} numberOfLines={1}>
@@ -246,7 +260,7 @@ export function ProviderSetupScreen({ navigation }: Props) {
           <TextInput
             value={about}
             onChangeText={(v) => setAbout(v.slice(0, ABOUT_MAX))}
-            placeholder="მოკლედ აღწერე შენი გამოცდილება, სამუშაო სტილი..."
+            placeholder="მოკლედ აღწერეთ თქვენი გამოცდილება, სამუშაო სტილი..."
             placeholderTextColor={colors.mutedForeground}
             multiline
             numberOfLines={4}
@@ -288,6 +302,25 @@ export function ProviderSetupScreen({ navigation }: Props) {
         {saveError && (
           <InlineBanner type="error" msg="პროფილის შენახვა ვერ მოხერხდა" action="თავიდან ცდა" onAction={handleContinue} />
         )}
+        <View style={styles.termsRow}>
+          <Pressable
+            style={[
+              styles.checkbox,
+              agreed && styles.checkboxChecked,
+              !requiredFieldsFilled && styles.checkboxDisabled,
+            ]}
+            onPress={() => {
+              if (!requiredFieldsFilled) return;
+              setAgreed((a) => !a);
+            }}
+          >
+            {agreed && <Check size={11} color={colors.primaryForeground} strokeWidth={3} />}
+          </Pressable>
+          <Text style={styles.termsText}>
+            ვეთანხმები <Text style={styles.termsLink}>მომსახურების პირობებს</Text> და{' '}
+            <Text style={styles.termsLink}>კონფიდენციალურობის პოლიტიკას</Text>
+          </Text>
+        </View>
         <Button
           label="პროფილის შექმნა"
           loadingLabel="შენახვა..."
@@ -336,14 +369,19 @@ const styles = StyleSheet.create({
   headerSpacer: {
     width: 36,
   },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: colors.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
     ...typography.h2,
     color: colors.foreground,
     marginBottom: spacing.xs / 2,
-  },
-  subtitle: {
-    ...typography.caption,
-    color: colors.mutedForeground,
+    textAlign: 'center',
   },
   content: {
     paddingHorizontal: spacing.lg,
@@ -412,6 +450,9 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     marginBottom: spacing.xs / 2,
   },
+  requiredMark: {
+    color: colors.destructive,
+  },
   sectionHint: {
     ...typography.small,
     color: colors.mutedForeground,
@@ -457,5 +498,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     gap: spacing.sm + 2,
+  },
+  // Task — RegisterScreen.tsx-ის იგივე ვიზუალი (termsRow/checkbox/
+  // checkboxChecked/termsText/termsLink) — მხოლოდ დამატებული
+  // `checkboxDisabled`, სავალდებულო ველების შევსებამდე მონიშვნის
+  // დასაბლოკად.
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkboxDisabled: {
+    opacity: 0.4,
+  },
+  termsText: {
+    ...typography.caption,
+    color: colors.mutedForeground,
+    flex: 1,
+  },
+  termsLink: {
+    color: colors.primary,
+    fontWeight: '600',
   },
 });

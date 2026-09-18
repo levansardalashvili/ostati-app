@@ -717,6 +717,13 @@ if (
                           {m.offerStatus === 'accepted' && <Check size={12} color={colors.success} strokeWidth={2.5} />}
                           {m.offerStatus === 'declined' && <X size={12} color={colors.destructive} strokeWidth={2.5} />}
                           {m.offerStatus === 'pending' && <Clock size={12} color={colors.mutedForeground} />}
+                          {/* supabase migration — ახალი offer ავტომატურად
+                              "superseded"-ად ნიშნავს იმავე job-ზე იმავე
+                              Provider-ის ძველ, ჯერ-კიდევ-pending
+                              შეთავაზებებს (DB trigger) — აქ უბრალოდ
+                              ვასახავთ, აქცია აღარ სჭირდება (canRespond
+                              ისედაც false-ია). */}
+                          {m.offerStatus === 'superseded' && <Clock size={12} color={colors.mutedForeground} />}
                           <Text
                             style={[
                               styles.offerStatusText,
@@ -727,6 +734,7 @@ if (
                             {m.offerStatus === 'accepted' && 'ფასი დათანხმებულია'}
                             {m.offerStatus === 'declined' && 'ფასი უარყოფილია'}
                             {m.offerStatus === 'pending' && 'ელოდება პასუხს'}
+                            {m.offerStatus === 'superseded' && 'მოძველებულია — ახალი შეთავაზება გაიგზავნა'}
                           </Text>
                         </View>
                       )}

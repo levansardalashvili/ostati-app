@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Check } from 'lucide-react-native';
+import { ArrowLeft, Check } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
 import { ProgressBar } from '../components/ProgressBar';
@@ -43,7 +43,9 @@ export function CustomerSetupScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <View style={styles.headerSpacer} />
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+            <ArrowLeft size={18} color={colors.foreground} />
+          </Pressable>
           <ProgressBar step={2} total={2} />
           <View style={styles.headerSpacer} />
         </View>
@@ -94,6 +96,14 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 36,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: colors.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     ...typography.h1,

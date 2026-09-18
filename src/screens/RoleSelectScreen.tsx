@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, radius, spacing, typography } from '../theme';
 import type { Role, RootStackParamList } from '../navigation/types';
@@ -18,15 +18,13 @@ const ROLES: {
     role: 'customer',
     emoji: '🏠',
     title: 'მომხმარებელი',
-    description:
-      'ვეძებ ოსტატს სახლის სამუშაოებისთვის. ვაქვეყნებ განცხადებებს და ვირჩევ საუკეთესოს.',
+    description: 'ვეძებ ოსტატს სამუშაოსთვის',
   },
   {
     role: 'provider',
     emoji: '🔧',
     title: 'ოსტატი',
-    description:
-      'ვარ პროფესიონალი. ვქმნი პროფილს, ვათვალიერებ განცხადებებს და ვასრულებ სამუშაოებს.',
+    description: 'ვასრულებ სამუშაოს',
   },
 ];
 
@@ -73,7 +71,6 @@ export function RoleSelectScreen({ navigation }: Props) {
                 <Text style={styles.cardTitle}>{title}</Text>
                 <Text style={styles.cardDescription}>{description}</Text>
               </View>
-              <ChevronRight size={18} color={colors.mutedForeground} />
             </Pressable>
           ))}
         </View>
@@ -115,19 +112,20 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.mutedForeground,
     marginBottom: spacing.xs,
+    textAlign: 'center',
   },
   title: {
     ...typography.h1,
     color: colors.foreground,
     marginBottom: spacing.xl,
+    textAlign: 'center',
   },
   cards: {
     gap: spacing.md,
   },
   card: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
+    alignItems: 'center',
+    gap: spacing.sm + 2,
     backgroundColor: colors.secondary,
     borderWidth: 1,
     borderColor: colors.border,
@@ -154,16 +152,18 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   cardText: {
-    flex: 1,
+    alignItems: 'center',
   },
   cardTitle: {
     ...typography.bodyMedium,
     color: colors.foreground,
     marginBottom: spacing.xs / 2,
+    textAlign: 'center',
   },
   cardDescription: {
     ...typography.caption,
     color: colors.mutedForeground,
+    textAlign: 'center',
   },
   loginRow: {
     flexDirection: 'row',

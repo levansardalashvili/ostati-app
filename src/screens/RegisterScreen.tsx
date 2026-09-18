@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,7 +9,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Check, Mail } from 'lucide-react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { ArrowLeft, Check, Mail, Phone } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AddressAutocompleteField } from '../components/AddressAutocompleteField';
 import { Button } from '../components/Button';
@@ -51,7 +52,13 @@ export function RegisterScreen({ navigation, route }: Props) {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [gLoading, setGLoading] = useState(false);
+  const [aLoading, setALoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const [submitError, setSubmitError] = useState('');
+
+  useEffect(() => {
+    AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
+  }, []);
 
   const touch = (field: string) => setTouched((t) => ({ ...t, [field]: true }));
 
@@ -81,7 +88,12 @@ export function RegisterScreen({ navigation, route }: Props) {
 
   const nameValid = !!firstName.trim() && !!lastName.trim();
   const allValid =
-    nameValid && isEmail(email) && (isProvider || address.trim()) && pass.length >= 8 && pass === confirm && agreed;
+    nameValid &&
+    isEmail(email) &&
+    (isProvider || address.trim()) &&
+    pass.length >= 8 &&
+    pass === confirm &&
+    (isProvider || agreed);
 
   const handleSubmit = async () => {
     setTouched({ firstName: true, lastName: true, email: true, address: !isProvider, pass: true, confirm: true });
@@ -98,10 +110,24 @@ export function RegisterScreen({ navigation, route }: Props) {
         lastName: lastName.trim(),
         email: email.trim(),
         defaultAddress: isProvider ? '' : address.trim(),
+        phone: '',
       });
+      // Task — უკან-ისრით ამ ეკრანზე დაბრუნებისას ღილაკი "რეგისტრაცია..."-ზე
+      // ჩარჩენილი აღარ დარჩეს (`navigate`-ის, არა `replace`-ის შემდეგ ეს
+      // ეკრანი აღარ იშლება, `loading`-ის reset კი მანამდე მხოლოდ catch-ში
+      // ხდებოდა — წარმატებაზე screen უბრალოდ ქრებოდა, state-ს არავინ
+      // კითხულობდა).
+      setLoading(false);
       if (role === 'provider') {
         setProviderProfile({ firstName: firstName.trim(), lastName: lastName.trim() });
-        navigation.replace('ProviderSetup');
+        // `navigate` (არა `replace`), რომ ეს ეკრანი სტეკში დარჩეს:
+        // ProviderSetup-ის ახალი უკან-ისარი (`navigation.goBack()`) ამ
+        // ზუსტად ამ ეკრანზე დაბრუნდეს, ზუსტად ისე, როგორც
+        // Google/Apple/Phone-ის რეგისტრაციის გზებზეც უკვე მუშაობდა
+        // (იქ `navigation.navigate('GoogleComplete'|...)`-ით მისული
+        // შუალედური ეკრანი `replace`-ავს საკუთარ თავს ProviderSetup-ით,
+        // Register კი სტეკში ხელუხლებელი რჩება).
+        navigation.navigate('ProviderSetup');
       } else {
         setProfile({
           firstName: firstName.trim(),
@@ -109,7 +135,7 @@ export function RegisterScreen({ navigation, route }: Props) {
           email: email.trim(),
           defaultAddress: address.trim(),
         });
-        navigation.replace('CustomerSetup', { userName: `${firstName.trim()} ${lastName.trim()}` });
+        navigation.navigate('CustomerSetup', { userName: `${firstName.trim()} ${lastName.trim()}` });
       }
     } catch (error) {
       setSubmitError(getAuthErrorMessage(error));
@@ -127,6 +153,19 @@ export function RegisterScreen({ navigation, route }: Props) {
       setSubmitError(getAuthErrorMessage(error));
     } finally {
       setGLoading(false);
+    }
+  };
+
+  const handleApple = async () => {
+    setSubmitError('');
+    setALoading(true);
+    try {
+      const { appleFullName } = await authService.signInWithApple();
+      navigation.navigate('AppleComplete', { role, appleFullName });
+    } catch (error) {
+      setSubmitError(getAuthErrorMessage(error));
+    } finally {
+      setALoading(false);
     }
   };
 
@@ -157,7 +196,7 @@ export function RegisterScreen({ navigation, route }: Props) {
           </View>
 
           <Text style={styles.title}>ანგარიშის შექმნა</Text>
-          <Text style={styles.subtitle}>შეიყვანე შენი მონაცემები რეგისტრაციის გასაგრძელებლად.</Text>
+          <Text style={styles.subtitle}>შეიყვანეთ თქვენი მონაცემები რეგისტრაციის გასაგრძელებლად.</Text>
 
           {submitError ? (
             <View style={styles.errorBanner}>
@@ -171,6 +210,7 @@ export function RegisterScreen({ navigation, route }: Props) {
                 <TextField
                   testID="register-first-name"
                   label="სახელი"
+                  required
                   value={firstName}
                   onChangeText={setFirstName}
                   onBlur={() => touch('firstName')}
@@ -182,6 +222,7 @@ export function RegisterScreen({ navigation, route }: Props) {
                 <TextField
                   testID="register-last-name"
                   label="გვარი"
+                  required
                   value={lastName}
                   onChangeText={setLastName}
                   onBlur={() => touch('lastName')}
@@ -193,6 +234,7 @@ export function RegisterScreen({ navigation, route }: Props) {
             <TextField
               testID="register-email"
               label="ელ. ფოსტა"
+              required
               value={email}
               onChangeText={setEmail}
               onBlur={() => touch('email')}
@@ -205,6 +247,7 @@ export function RegisterScreen({ navigation, route }: Props) {
             {!isProvider && (
               <AddressAutocompleteField
                 label="მისამართი"
+                required
                 value={address}
                 onChangeText={setAddress}
                 onBlur={() => touch('address')}
@@ -215,6 +258,7 @@ export function RegisterScreen({ navigation, route }: Props) {
             <TextField
               testID="register-password"
               label="პაროლი"
+              required
               value={pass}
               onChangeText={setPass}
               onBlur={() => touch('pass')}
@@ -227,6 +271,7 @@ export function RegisterScreen({ navigation, route }: Props) {
             <TextField
               testID="register-confirm-password"
               label="გაიმეორე პაროლი"
+              required
               value={confirm}
               onChangeText={setConfirm}
               onBlur={() => touch('confirm')}
@@ -236,23 +281,31 @@ export function RegisterScreen({ navigation, route }: Props) {
               autoCapitalize="none"
             />
 
-            <View style={styles.termsRow}>
-              <Pressable
-                testID="register-terms-checkbox"
-                style={[styles.checkbox, agreed && styles.checkboxChecked]}
-                onPress={() => setAgreed((a) => !a)}
-              >
-                {agreed && <Check size={11} color={colors.primaryForeground} strokeWidth={3} />}
-              </Pressable>
-              <Text style={styles.termsText}>
-                ვეთანხმები <Text style={styles.termsLink}>მომსახურების პირობებს</Text> და{' '}
-                <Text style={styles.termsLink}>კონფიდენციალურობის პოლიტიკას</Text>
-              </Text>
-            </View>
+            {/* Task — Provider-ისთვის მომსახურების პირობების დათანხმება
+                გადატანილია ProviderSetupScreen-ის (მეორე გვერდის) ბოლოში —
+                იქ ჩნდება მხოლოდ იმ ეკრანის სავალდებულო ველების შევსების
+                შემდეგ. Customer-ისთვის (ცალკე მოთხოვნილი არ ყოფილა, და
+                CustomerSetupScreen-ს საერთოდ არ აქვს სავალდებულო ველი,
+                რასაც ეს გეითი დაეყრდნობოდა) აქვე, უცვლელად რჩება. */}
+            {!isProvider && (
+              <View style={styles.termsRow}>
+                <Pressable
+                  testID="register-terms-checkbox"
+                  style={[styles.checkbox, agreed && styles.checkboxChecked]}
+                  onPress={() => setAgreed((a) => !a)}
+                >
+                  {agreed && <Check size={11} color={colors.primaryForeground} strokeWidth={3} />}
+                </Pressable>
+                <Text style={styles.termsText}>
+                  ვეთანხმები <Text style={styles.termsLink}>მომსახურების პირობებს</Text> და{' '}
+                  <Text style={styles.termsLink}>კონფიდენციალურობის პოლიტიკას</Text>
+                </Text>
+              </View>
+            )}
 
             <Button
-              label="რეგისტრაცია"
-              loadingLabel="რეგისტრაცია..."
+              label={isProvider ? 'გაგრძელება' : 'რეგისტრაცია'}
+              loadingLabel={isProvider ? 'გაგრძელება...' : 'რეგისტრაცია...'}
               onPress={handleSubmit}
               disabled={!allValid}
               loading={loading}
@@ -265,6 +318,25 @@ export function RegisterScreen({ navigation, route }: Props) {
             </View>
 
             <GoogleButton loading={gLoading} onPress={handleGoogle} />
+
+            {appleAvailable && (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={radius.md}
+                style={styles.appleButton}
+                onPress={handleApple}
+              />
+            )}
+            {aLoading && <Text style={styles.appleLoadingText}>Apple-ით გაგრძელება...</Text>}
+
+            <Pressable
+              style={({ pressed }) => [styles.phoneButton, pressed && styles.phoneButtonPressed]}
+              onPress={() => navigation.navigate('PhoneRegister', { role })}
+            >
+              <Phone size={18} color={colors.foreground} />
+              <Text style={styles.phoneButtonText}>ტელეფონით გაგრძელება</Text>
+            </Pressable>
 
             <View style={styles.loginRow}>
               <Text style={styles.loginText}>უკვე გაქვს ანგარიში? </Text>
@@ -313,11 +385,13 @@ const styles = StyleSheet.create({
     ...typography.h1,
     color: colors.foreground,
     marginBottom: spacing.xs,
+    textAlign: 'center',
   },
   subtitle: {
     ...typography.caption,
     color: colors.mutedForeground,
     marginBottom: spacing.lg,
+    textAlign: 'center',
   },
   errorBanner: {
     backgroundColor: colors.dangerBackground,
@@ -392,5 +466,36 @@ const styles = StyleSheet.create({
   loginLink: {
     ...typography.captionMedium,
     color: colors.primary,
+  },
+  appleButton: {
+    minHeight: 52,
+    width: '100%',
+  },
+  appleLoadingText: {
+    ...typography.caption,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+  },
+  // Task — GoogleButton-ის ზუსტად იგივე ზომა/ვიზუალი (minHeight/radius/
+  // border/background), რომ ორივე ღილაკი ერთნაირად გამოიყურებოდეს —
+  // ცალკე კომპონენტად არ გატანილა, რადგან მისი აიქონი (Phone, არა Google
+  // ლოგო) ერთადერთი განსხვავებაა და მხოლოდ აქ გამოიყენება.
+  phoneButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    minHeight: 52,
+    borderRadius: radius.md,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  phoneButtonPressed: {
+    opacity: 0.85,
+  },
+  phoneButtonText: {
+    ...typography.bodyMedium,
+    color: colors.foreground,
   },
 });

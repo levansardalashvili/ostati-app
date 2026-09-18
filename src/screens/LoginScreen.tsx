@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,7 +9,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Mail } from 'lucide-react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { ArrowLeft, Mail, Phone } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
 import { GoogleButton } from '../components/GoogleButton';
@@ -32,9 +33,15 @@ export function LoginScreen({ navigation }: Props) {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [gLoading, setGLoading] = useState(false);
+  const [aLoading, setALoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const [credError, setCredError] = useState('');
   const { setProfile } = useCustomerProfile();
   const { setProfile: setProviderProfile } = useProviderProfile();
+
+  useEffect(() => {
+    AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
+  }, []);
 
   const emailError = touched.email
     ? !email
@@ -73,6 +80,7 @@ export function LoginScreen({ navigation }: Props) {
         lastName: record.lastName,
         email: record.email,
         defaultAddress: record.defaultAddress,
+        phone: record.phone,
       });
       navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
     }
@@ -103,6 +111,19 @@ export function LoginScreen({ navigation }: Props) {
       setCredError(getAuthErrorMessage(error));
     } finally {
       setGLoading(false);
+    }
+  };
+
+  const handleApple = async () => {
+    setCredError('');
+    setALoading(true);
+    try {
+      await authService.signInWithApple();
+      await completeSignIn();
+    } catch (error) {
+      setCredError(getAuthErrorMessage(error));
+    } finally {
+      setALoading(false);
     }
   };
 
@@ -180,6 +201,25 @@ export function LoginScreen({ navigation }: Props) {
             </View>
 
             <GoogleButton loading={gLoading} onPress={handleGoogle} />
+
+            {appleAvailable && (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={radius.md}
+                style={styles.appleButton}
+                onPress={handleApple}
+              />
+            )}
+            {aLoading && <Text style={styles.appleLoadingText}>Apple-ით შესვლა...</Text>}
+
+            <Pressable
+              style={({ pressed }) => [styles.phoneButton, pressed && styles.phoneButtonPressed]}
+              onPress={() => navigation.navigate('PhoneLogin')}
+            >
+              <Phone size={18} color={colors.foreground} />
+              <Text style={styles.phoneButtonText}>ტელეფონით გაგრძელება</Text>
+            </Pressable>
 
             <View style={styles.registerRow}>
               <Text style={styles.registerText}>არ გაქვს ანგარიში? </Text>
@@ -273,5 +313,34 @@ const styles = StyleSheet.create({
   registerLink: {
     ...typography.captionMedium,
     color: colors.primary,
+  },
+  appleButton: {
+    minHeight: 52,
+    width: '100%',
+  },
+  appleLoadingText: {
+    ...typography.caption,
+    color: colors.mutedForeground,
+    textAlign: 'center',
+  },
+  // Task — RegisterScreen.tsx-ის იგივე ცვლილება: GoogleButton-ის ზუსტად
+  // იგივე ზომა/ვიზუალი, Phone აიქონით.
+  phoneButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    minHeight: 52,
+    borderRadius: radius.md,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  phoneButtonPressed: {
+    opacity: 0.85,
+  },
+  phoneButtonText: {
+    ...typography.bodyMedium,
+    color: colors.foreground,
   },
 });

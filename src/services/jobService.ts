@@ -243,6 +243,13 @@ export interface JobService {
   // of waiting on a refetch.
   expireStaleJobConfirmation(jobId: string): Promise<boolean>;
 
+  // supabase/migrations/0082 — Customer-ის მხარეს იგივე lazy/opportunistic
+  // პატერნი: თუ job >=48სთ `pending`-ია ნულოვანი job_responses-ით და ჯერ
+  // არასდროს გაგზავნილა შეხსენება, ერთხელ (და მხოლოდ ერთხელ, სერვერზე
+  // stamp-ილი) ატყობინებს Customer-ს "ჯერ არავინ დაინტერესებულა". Job-ის
+  // სტატუსს არ ცვლის — ავტომატური გადაწყვეტა ამ შემთხვევაში არ არსებობს.
+  checkStaleJobInterest(jobId: string): Promise<boolean>;
+
   // Second hardening pass, item 4 — job-ის ფოტოების ცალკე მიმაგრება
   // `create_job`-ის შემდეგ (`private-media/job/{jobId}/...`-ს job-ის
   // id სჭირდება, რომელიც შექმნამდე არ არსებობს). Owner-only, მხოლოდ
@@ -427,6 +434,11 @@ export const jobService: JobService = {
   },
   async expireStaleJobConfirmation(jobId) {
     const { data, error } = await supabase.rpc('expire_stale_job_confirmation', { p_job_id: jobId });
+    if (error) throw error;
+    return !!data;
+  },
+  async checkStaleJobInterest(jobId) {
+    const { data, error } = await supabase.rpc('check_stale_job_interest', { p_job_id: jobId });
     if (error) throw error;
     return !!data;
   },

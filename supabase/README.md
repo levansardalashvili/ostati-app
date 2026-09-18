@@ -103,6 +103,16 @@ before applying them. None of the files drop tables.
 | `0072_admin_verification_and_reports.sql` | Third admin-panel milestone — Provider verification approval and job_reports moderation (both previously "future service_role tool", 0025/0034/0051). New `is_admin()` SECURITY DEFINER helper — needed because the new admin-read policy on `users` itself would otherwise be a self-referencing RLS subquery (the exact recursion footgun 0026 moved away from); 0070/0071's inline `role='admin'` subqueries are also swapped to call it, no behavior change. `admin_review_provider_verification(provider_id, approve, rejection_reason)` RPC is the only way pending -> verified/rejected (RPC, not a grant, since provider_profiles already has a permissive self-serve UPDATE policy a broad grant could collide with). `job_reports` gets a direct admin-only UPDATE(status) grant+policy instead (no existing user-facing UPDATE policy to collide with) |
 | `0073_categories_public_read.sql` | Opens `categories`' existing SELECT policy to `anon` (was `to authenticated` only, 0043) — the new public marketing site's `/services` page has no Supabase session at all, same situation site_pages/site_settings were in before 0071 |
 | `0074_site_blocks.sql` | Converts the last hardcoded marketing-site content into admin-editable data. New `site_blocks` table (block_key/sort_order/icon_key/title/description) for the two ORDERED-LIST sections that don't fit `site_pages`' single-title+body shape — home page's 4 feature cards (`block_key='home_features'`) and the 3 how-it-works steps (`block_key='how_it_works_steps'`, shared between the home preview and the full page). Same public-read/admin-write pattern as 0071/0073. Also seeds a new ordinary `site_pages` row (`slug='home_cta'`) for the home page's "დაიწყე დღესვე" CTA heading+subtext — that one IS just title+body, no new table needed for it |
+| `0075_chat_offer_auto_select.sql` | Accepting a chat price offer now auto-selects the Provider (assigns `job_posts.provider_id`/`agreed_price`/`status` directly) instead of requiring a separate `select_provider()` trip from Job Detail; new internal helper `assign_job_provider()` factors the shared state-transition+notification logic out of both `select_provider()` and `respond_to_chat_offer()` |
+| `0076_fix_job_area_label_masking.sql` | Privacy bug fix — `job_safe_area_label()` (0052) was leaving the street name in the "coarse" label shown to non-assigned Providers (only the house-number segment was stripped); now only trusts the LAST comma segment as the area name (with a ≥3-segment guard, and a second pass for untrimmed Nominatim strings that also carry postcode/country) |
+| `0077_cold_dm_provider_reply_fix.sql` | `StartJobChatSheet`'s cold-DM flow (Customer messages a Provider directly, no prior `job_responses`) left the Provider unable to reply or send a price offer — `messages` INSERT policy and `respond_to_chat_offer()` now also treat "Customer already messaged this Provider directly" as a valid relationship, on par with `job_responses`/assignment; `respond_to_chat_offer()` creates the missing `job_responses` row itself on acceptance |
+| `0078_admin_dispute_resolution.sql` | New `admin_resolve_job_dispute(job_id, resolution)` RPC — the first (and only) way out of `job_posts.status='disputed'`, which every prior migration could write but none could leave; `'reopen'` → `awaiting_customer_confirmation` (sides with the Provider), `'cancel'` → `cancelled` with `cancellation_actor='admin'` (sides with the Customer); both notify both parties |
+| `0079_stale_confirmation_expiry.sql` | New lazy/opportunistic RPC `expire_stale_job_confirmation(job_id)` — any participant can call it; only acts once `job_posts.updated_at` is ≥72h old while `status='awaiting_customer_confirmation'`, moving the job to `confirmed_awaiting_rating` (never straight to `completed` — rating stays mandatory, #18/#47) |
+| `0080_admin_job_posts_read.sql` | New `is_admin()`-gated SELECT policy on `job_posts` — it never had one, so the admin disputes UI (`0078`) silently saw nothing despite real disputed rows existing; write access is still RPC-only, unchanged |
+| `0081_job_taking_improvements.sql` | Extends the shared `assign_job_provider()` helper (0075) to also notify every *other* `job_responses` provider on assignment ("job went to someone else"); new `withdraw_interest(job_id)` RPC (row-locked, `pending`-only) lets a Provider retract their expressed interest |
+| `0082_offer_supersede_and_stale_interest.sql` | New `AFTER INSERT` trigger `supersede_prior_offers()` — a Provider's new chat price offer on a job now marks their own older `pending` offer on that same job as `'superseded'` (new `messages.offer_status` value) instead of leaving it stuck accept/decline-able forever; new lazy RPC `check_stale_job_interest(job_id)` sends the job's Customer at most one reminder (`job_posts.stale_interest_reminder_sent_at`) once a job has sat `pending` with zero responses for ≥48h |
+| `0083_users_phone_column.sql` | `users`: +`phone text not null default ''` — backing column for phone/SMS-OTP registration and login (additive alongside the existing Email/Password + Google flow, see CLAUDE.md decision #107); no RLS change needed, the existing owner-only row policies already cover the whole row |
+| `0084_provider_verification_gate.sql` | Product decision — an unverified Provider can no longer express interest in a job. `express_interest()` now requires the caller's own `provider_profiles.verification_status = 'verified'` (raises `PROVIDER_NOT_VERIFIED` otherwise); the `messages` INSERT policy's `type='offer'` branch gets the same check, closing the cold-DM chat-offer bypass (0077) that could otherwise let an unverified Provider originate a price without ever calling `express_interest()` |
 
 See `supabase/functions/send-push-notifications/README.md` for the Edge Function that actually sends pushes (deploy + Database Webhook setup — both manual, cannot be done from a migration).
 
@@ -567,3 +577,118 @@ does not attempt to backfill the missing 0031–0074 writeups.)
   (not just direct SQL): clicking "ოსტატს ვემხრობი" on the one real
   disputed test job correctly transitioned it to
   `awaiting_customer_confirmation` with `dispute_reason` cleared.
+
+## Job-taking improvements (0081)
+
+- **`0081`** — two gaps in the "Provider takes a job" flow
+  (`express_interest` -> `select_provider`), found the same way as
+  0078/0079: reading the actual code, not guessing. (1) A Provider who
+  expressed interest but was NOT selected was never told —
+  `select_provider()`/`assign_job_provider()` (0075) only ever notified
+  the WINNING Provider; the job just silently vanished from every other
+  interested Provider's feed (`get_open_provider_feed()`, 0052, hard-
+  filters to `status='pending'`). Fixed inside the shared
+  `assign_job_provider()` helper (used by both `select_provider()` and
+  `respond_to_chat_offer()`'s chat-offer-acceptance auto-select, 0075) so
+  both assignment paths get it for free — one `INSERT ... SELECT`
+  notifies every other `job_responses` row on that job
+  (`type='job_status_change'`, `target` intentionally `null`: once
+  `active`, a non-selected Provider is neither the job's `customer_id`
+  nor `provider_id`, so there's no screen left that would actually show
+  it to them — `navigateToNotificationTarget()` already no-ops on a null
+  target). (2) No way to withdraw an expressed interest at all —
+  `express_interest()` was the only writer to `job_responses`, nothing
+  ever deleted a row. New `withdraw_interest(job_id)` RPC — same locking
+  pattern as `express_interest()`'s own 0066 race fix (`job_posts` locked
+  `for update` before checking `status='pending'`, so this can't race a
+  concurrent `select_provider()` on the same job), only allowed while
+  still `pending` (raises `'Interest can no longer be withdrawn once a
+  provider is selected'` otherwise). Client: `quoteService.withdrawInterest()`,
+  a small "X" button next to the expressed-interest footer button on
+  `ProviderJobDetailScreen` (`variant === 'browse'` only — the same
+  state the RPC itself requires), confirm dialog before calling. Verified
+  live against real data: selecting a Provider on a job with 2 responses
+  correctly notified both the winner (`job_selected`) and the loser
+  (`job_status_change`); withdrawing removed the `job_responses` row and
+  a second withdrawal attempt correctly raised "no response on file";
+  attempting to withdraw on a job that had just gone `active` correctly
+  raised "no longer pending".
+
+## Offer superseding and stale-interest nudge (0082)
+
+- **`0082`** — two more findings from the same job-taking review, both
+  user-approved before starting. (A) A Provider could send a new chat
+  price offer while an older one on the same job was still
+  `offer_status='pending'` — nothing prevented it (offers are direct
+  client INSERTs under RLS, 0066, not funneled through one RPC), and
+  accepting the new one never touched the old row, leaving a stale,
+  still-"actionable-looking" offer card in chat history forever. New
+  `AFTER INSERT` trigger `supersede_prior_offers()` (SECURITY DEFINER —
+  the UPDATE it performs, a Provider's own prior offer, is exactly what
+  "Participant can update messages" forbids a Provider from doing
+  directly, 0028/0097) marks a Provider's own still-pending prior offers
+  on the same `(job_id, provider_id)` as `'superseded'` whenever they send
+  a new one — scoped to `(job_id, provider_id)` together, not `job_id`
+  alone, since multiple different Providers can each run their own
+  separate offer thread on one open job. `messages_offer_status_check`
+  extended to allow the new value; client (`ChatConversationScreen`)
+  renders it with the existing muted/pending-style badge, new label
+  "მოძველებულია — ახალი შეთავაზება გაიგზავნა", accept/decline buttons
+  correctly hidden (`canRespond` already only matches `'pending'`).
+  (B) A job with ZERO interest just sat `pending` forever with no signal
+  to the Customer — contrast with a job that DOES get a response, which
+  already notifies the Customer every time (0021). Same lazy/opportunistic
+  pattern as 0079/0081 (no cron infrastructure in this project): new RPC
+  `check_stale_job_interest(job_id)`, callable only by the job's own
+  customer_id, sends **at most one** reminder ever per job — idempotency
+  via a new `job_posts.stale_interest_reminder_sent_at` timestamp, not a
+  notifications-table dedupe query — once `>=48h` old, still `pending`,
+  and zero `job_responses` exist. Does not change `job_posts.status` at
+  all (unlike 0078/0079) — there is no automatic resolution for "nobody
+  is interested," only a nudge. Client: `CustomerJobDetailScreen` calls it
+  fire-and-forget whenever it loads a `pending` job. Verified live against
+  real data: a genuinely-old (created 2026-09-04), zero-response job
+  correctly returned `true` and created the notification on first call,
+  `false` on a second call (no duplicate), and a non-owner caller was
+  correctly rejected. The offer-supersede trigger was verified by
+  inserting a second real offer message on a job with an existing
+  pending one from the same Provider — the old message flipped to
+  `superseded`, the new one stayed `pending`, and a different Provider's
+  unrelated offer on the same job was left untouched.
+
+## Phone/SMS-OTP auth column (0083) — REQUIRES manual Dashboard/Twilio setup
+
+- **`0083`** — pure additive column, `users.phone text not null default
+  ''` — backs the new phone-number registration/login flow (Sign in with
+  Apple was added alongside it; Apple needs no schema change since it
+  reuses `signInWithIdToken()` exactly like Google, see CLAUDE.md #107).
+  No RLS change: the existing owner-only row policies on `users` already
+  cover this column like every other one on the row. `UserRecord`/
+  `CustomerProfile` (TS) and `userService.ts`'s row-mapping gained a
+  matching `phone`/`row.phone` field, mirrored on `email` exactly.
+
+  **This column alone does not make phone auth work** — Supabase's Phone
+  provider (backed by Twilio Verify, not plain Twilio Messaging) has to
+  be configured in the Dashboard before `authService.sendPhoneOtp()`/
+  `verifyPhoneOtp()` (`supabase.auth.signInWithOtp({phone})`/
+  `verifyOtp({phone, token, type:'sms'})`) can succeed:
+  1. Create a Twilio account + a **Verify Service** (this, not plain
+     Messaging, is what Supabase's Phone provider expects).
+  2. Dashboard → Authentication → Providers → Phone: enable it, select
+     Twilio Verify, paste Account SID / Auth Token / Verify Service SID.
+
+  Until this is done, `sendPhoneOtp()` fails gracefully (mapped Georgian
+  error banner, confirmed live on the emulator — no crash) rather than
+  silently succeeding. Georgia-only app: phone numbers are always
+  `+995`-prefixed, validated client-side against `/^5\d{8}$/` before ever
+  calling the RPC.
+
+  Sign in with Apple similarly needs `expo-apple-authentication` +
+  `usesAppleSignIn: true` (already in `app.json`) plus, on Apple's/
+  Supabase's side: Sign in with Apple capability on the `com.ostati.app`
+  identifier, a Services ID + private key, and Dashboard → Authentication
+  → Providers → Apple configured with them — none of which can be done
+  from a migration. It also needs a new native rebuild (`eas build`) for
+  the native module to actually function — the Android JS-level fallback
+  (`isAvailableAsync()` returning `false`, hiding the button) already
+  works today without a rebuild, confirmed live on the emulator.

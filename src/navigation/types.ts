@@ -16,6 +16,31 @@ export type RootStackParamList = {
   Login: undefined;
   ForgotPassword: undefined;
   GoogleComplete: { role: Role };
+  // #107 — Apple Sign-In + ტელეფონის OTP, email-ის/Google-ის გვერდით.
+  AppleComplete: { role: Role; appleFullName?: { givenName: string | null; familyName: string | null } | null };
+  PhoneRegister: { role: Role };
+  // Task — login-ისთვის აღარ სჭირდება ცალკე OTP-ვერიფიკაციის ეკრანი
+  // (PhoneLoginVerify მოცილებულია) — უკვე დარეგისტრირებული ტელეფონის
+  // ანგარიში პირდაპირ ტელეფონი+პაროლით შედის, ისევე, როგორც Email/Password.
+  PhoneLogin: undefined;
+  PhoneRegisterVerify: {
+    role: Role;
+    phone: string;
+    firstName: string;
+    lastName: string;
+    defaultAddress: string;
+    // OTP-ვერიფიკაციის წარმატების შემდეგ ახალ ანგარიშზე ეყენება
+    // (authService.setPhonePassword) — მანამდე ამ ანგარიშს
+    // საერთოდ არ ჰქონდა პაროლის ცნება.
+    password: string;
+  };
+  // Task — ForgotPassword-ის (email) ანალოგიური, ტელეფონის ანგარიშისთვის:
+  // OTP-ით დასტურდება ვინაობა, ამის შემდეგ ახალი პაროლი ეყენება
+  // (ForgotPassword-ის "ბმულის გაგზავნის" ნაცვლად — ტელეფონს ბმული
+  // ფიზიკურად არ შეესაბამება, OTP-ის ვერიფიკაცია თავად წარმოადგენს
+  // დამადასტურებელ ნაბიჯს).
+  PhoneForgotPassword: undefined;
+  PhoneForgotPasswordVerify: { phone: string };
   CustomerSetup: { userName: string };
   ProviderSetup: undefined;
   CustomerHome: undefined;

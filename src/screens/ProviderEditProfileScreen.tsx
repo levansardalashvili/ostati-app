@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
+import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { ExperiencePickerField } from '../components/ExperiencePickerField';
 import { InlineBanner } from '../components/InlineBanner';
@@ -54,6 +55,12 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
   const [sqmPrices, setSqmPrices] = useState<Record<string, string>>(profile.sqmPrices);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  // Task — badge-ზე დაჭერისას აღარ იხსნება პირდაპირ კამერა, ჯერ ჩნდება
+  // არჩევანის sheet ("გალერიიდან არჩევა"/"ფოტოს გადაღება") — ProviderSetupScreen-ის
+  // (რეგისტრაცია) ორ ცალკე, მუდმივად ხილულ ღილაკს არ ვიმეორებთ აქ, რადგან
+  // ეს ეკრანი უკვე გადატვირთულია ველებით — ერთი, ჩამალული sheet ვიზუალურად
+  // უფრო სუფთაა.
+  const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
 
   const sqmSpecialties = specialty.filter((s) => isSqmPriced(s.id));
 
@@ -109,6 +116,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
     );
 
   const pickProfilePhoto = async (source: 'camera' | 'gallery') => {
+    setPhotoSheetOpen(false);
     const perm =
       source === 'camera'
         ? await ImagePicker.requestCameraPermissionsAsync()
@@ -196,11 +204,22 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
               size={88}
               uri={photoUri ?? undefined}
             />
-            <Pressable style={styles.cameraBadge} onPress={() => pickProfilePhoto('camera')}>
+            <Pressable style={styles.cameraBadge} onPress={() => setPhotoSheetOpen(true)}>
               <Camera size={14} color={colors.primaryForeground} />
             </Pressable>
           </View>
         </View>
+
+        <BottomSheet visible={photoSheetOpen} onClose={() => setPhotoSheetOpen(false)}>
+          <Pressable style={styles.photoSheetRow} onPress={() => pickProfilePhoto('gallery')}>
+            <ImageIcon size={18} color={colors.foreground} />
+            <Text style={styles.photoSheetRowText}>გალერიიდან არჩევა</Text>
+          </Pressable>
+          <Pressable style={styles.photoSheetRow} onPress={() => pickProfilePhoto('camera')}>
+            <Camera size={18} color={colors.foreground} />
+            <Text style={styles.photoSheetRowText}>ფოტოს გადაღება</Text>
+          </Pressable>
+        </BottomSheet>
 
         <View style={{ gap: spacing.lg }}>
           <View style={styles.nameRow}>
@@ -254,7 +273,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
             <TextInput
               value={about}
               onChangeText={setAbout}
-              placeholder="მოგვიყევი შენ შესახებ..."
+              placeholder="მოკლედ აღწერეთ თქვენი გამოცდილება, სამუშაო სტილი..."
               placeholderTextColor={colors.mutedForeground}
               multiline
               numberOfLines={4}
@@ -345,6 +364,16 @@ const styles = StyleSheet.create({
     borderColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  photoSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  photoSheetRowText: {
+    ...typography.captionMedium,
+    color: colors.foreground,
   },
   nameRow: {
     flexDirection: 'row',

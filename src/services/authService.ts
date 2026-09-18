@@ -1,4 +1,6 @@
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { Platform } from 'react-native';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 import { pushTokenService } from './pushTokenService';
@@ -6,18 +8,55 @@ import type { Role } from '../types/user';
 
 export type EmailCredentials = { email: string; password: string };
 export type RegisterInput = EmailCredentials & { role: Role };
-export type AuthResult = { uid: string; email: string | null };
+// #107 — `appleFullName` მხოლოდ `signInWithApple()`-ის შედეგზეა შევსებული
+// (Apple `fullName`-ს მხოლოდ ამ ერთი, პირველი ავტორიზაციის პასუხში
+// აბრუნებს — არასდროს მეორედ, არც `getCurrentUser()`/`cachedUser`-იდან) —
+// ყველა დანარჩენი auth მეთოდი უბრალოდ `undefined`-ს ტოვებს, non-breaking.
+export type AuthResult = {
+  uid: string;
+  email: string | null;
+  appleFullName?: { givenName: string | null; familyName: string | null } | null;
+};
 
 // FirebaseUser-ის მსუბუქი შესატყვისი — GoogleCompleteScreen-ს displayName
 // სჭირდება (Google-ის სახელი/გვარის გასაყოფად), CustomerEditProfileScreen-ს
 // მხოლოდ uid. Supabase-ის signInWithIdToken (Google) user_metadata-ში
-// დებს Google-ის id token-ის claim-ებს (full_name/name).
-export type AppUser = { uid: string; email: string | null; displayName: string | null };
+// დებს Google-ის id token-ის claim-ებს (full_name/name). `phone` — #107,
+// ტელეფონის OTP ანგარიშებისთვის (Supabase-ის `auth.users.phone`).
+export type AppUser = { uid: string; email: string | null; phone: string | null; displayName: string | null };
 
 export interface AuthService {
   registerWithEmail(input: RegisterInput): Promise<AuthResult>;
   signInWithEmail(credentials: EmailCredentials): Promise<AuthResult>;
   signInWithGoogle(): Promise<AuthResult>;
+  // #107 — `signInWithGoogle()`-ის ზუსტად იგივე ნიმუშით (native identity
+  // token → Supabase `signInWithIdToken`). iOS-only — `Platform.OS`-ის
+  // საკუთარი დაცვაც აქვს (defensive, UI-ის `isAvailableAsync()`-გეითის
+  // გვერდით), რომ სერვისმა არასდროს ჩუმად არასწორად არ იმოქმედოს, თუ
+  // მომავალში ვინმემ UI-გეითი დაივიწყა.
+  signInWithApple(): Promise<AuthResult>;
+  // #107 — Supabase-ის Phone/SMS OTP (Twilio Verify provider). `phone`
+  // ყოველთვის უკვე ნორმალიზებული E.164 (`+995...`) სტრიქონია — სერვისი
+  // თავად არ ამატებს/ამოწმებს ქვეყნის კოდს (ეკრანების საქმეა, ისევე
+  // როგორც `signInWithEmail` არ trim-ავს/lowercase-ავს ელფოსტას).
+  // ერთი და იგივე call ემსახურება რეგისტრაციასაც და login-საც — "ახალი
+  // uid-ია თუ არსებული" client-ის მხარეს დგინდება (`getUserRecord`-ით),
+  // ზუსტად ისე, როგორც Google-ისთვისაც ხდება `LoginScreen`-ში.
+  sendPhoneOtp(phone: string): Promise<void>;
+  verifyPhoneOtp(phone: string, token: string): Promise<AuthResult>;
+  // Task — დარეგისტრირებული ტელეფონის ანგარიშისთვის login ყოველ ჯერზე
+  // აღარ ითხოვს ახალ SMS-კოდს — Supabase-ის `signInWithPassword` `phone`-ს
+  // `email`-ის ტოლფასად იღებს. საჭიროებს, რომ ანგარიშს უკვე ჰქონდეს
+  // პაროლი დაყენებული (`setPhonePassword`, რეგისტრაციისას, ერთხელ).
+  signInWithPhonePassword(phone: string, password: string): Promise<AuthResult>;
+  // OTP-ით ახლახან ვერიფიცირებული ტელეფონის სესიაზე პაროლის (თავიდან)
+  // დაყენება — არსებული პაროლის ხელახლა-დადასტურება აქ საჭირო არაა
+  // (updatePassword-ისგან განსხვავებით, სადაც ეს რეაუთენთიფიკაციაა),
+  // რადგან თავად OTP-ის ვერიფიკაცია უკვე საკმარისი დამტკიცებაა ვინაობის.
+  // ორი გამომძახებელი: PhoneRegisterVerifyScreen (ახალი ანგარიშისთვის,
+  // პაროლი პირველად ეყენება) და PhoneForgotPasswordVerifyScreen
+  // (არსებული ანგარიშისთვის, პაროლის აღდგენისას — ძველს გადაწერს).
+  setPhonePassword(password: string): Promise<void>;
   sendPasswordReset(email: string): Promise<void>;
   // Re-authenticates with the current password first (Supabase's
   // updateUser() itself does not verify it — only the active session is
@@ -58,7 +97,7 @@ function ensureGoogleConfigured() {
 function toAppUser(user: SupabaseUser): AppUser {
   const meta = user.user_metadata as Record<string, unknown> | undefined;
   const displayName = (meta?.full_name as string) || (meta?.name as string) || null;
-  return { uid: user.id, email: user.email ?? null, displayName };
+  return { uid: user.id, email: user.email ?? null, phone: user.phone ?? null, displayName };
 }
 
 function toAuthResult(user: SupabaseUser): AuthResult {
@@ -92,11 +131,25 @@ const sessionReadyPromise: Promise<AppUser | null> = supabase.auth
 // ტექსტად — ეკრანების არსებული error-banner-ების მიერ გამოსაყენებელი.
 const ERROR_MESSAGES: Record<string, string> = {
   'User already registered': 'ეს ელ. ფოსტა უკვე დარეგისტრირებულია.',
-  'Invalid login credentials': 'ელ. ფოსტა ან პაროლი არასწორია.',
+  // საერთო ტექსტი Email+Password და Phone+Password login-ის ორივე
+  // ფორმისთვის — Supabase ორივე შემთხვევაში იდენტურ შეცდომას აბრუნებს,
+  // ამ ტექსტს კონკრეტული ველის შესახებ ინფორმაცია არ სჭირდება.
+  'Invalid login credentials': 'შეყვანილი მონაცემები არასწორია.',
   'Email not confirmed': 'ჯერ დაადასტურე ელ. ფოსტა — შემოწმდი ინბოქსი.',
   'Password should be at least 6 characters': 'პაროლი ძალიან მარტივია — აირჩიე უფრო საიმედო პაროლი.',
   'Unable to validate email address: invalid format': 'შეიყვანე სწორი ელ. ფოსტა.',
   'New password should be different from the old password.': 'ახალი პაროლი ძველისგან განსხვავებული უნდა იყოს.',
+  // #107 — ტელეფონის OTP-ის Twilio Verify/GoTrue შეცდომები. ეს ზუსტი
+  // სტრიქონები ვერაფიცირებულია ჯერ ცოცხლად (რეალურ ტესტვას სჭირდება,
+  // იხ. თანდართული გეგმის Verification-სექცია) — საუკეთესო-შეფასებული
+  // მიახლოებაა; ქვემოთ fallback ტექსტი (`დაფიქსირდა შეცდომა`) მაინც
+  // დაფარავს არადამთხვეულ შემთხვევებს უსაფრთხოდ.
+  'For security purposes, you can only request this after 60 seconds.':
+    'ძალიან ხშირად სცადე — დაელოდე და თავიდან სცადე.',
+  'Token has expired or is invalid': 'კოდი არასწორია ან ვადაგასულია — სცადე თავიდან.',
+  'Invalid token': 'კოდი არასწორია — გადაამოწმე და სცადე თავიდან.',
+  'Unable to validate phone number: invalid format': 'შეიყვანე სწორი ტელეფონის ნომერი.',
+  'Signups not allowed for this instance': 'რეგისტრაცია ამ მეთოდით ამჟამად დახურულია.',
 };
 
 export function getAuthErrorMessage(error: unknown): string {
@@ -133,6 +186,60 @@ export const authService: AuthService = {
     if (error) throw error;
     cachedUser = data.user;
     return toAuthResult(data.user);
+  },
+  async signInWithApple() {
+    if (Platform.OS !== 'ios') {
+      throw new Error('Apple-ით შესვლა მხოლოდ iOS-ზეა ხელმისაწვდომი.');
+    }
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+    if (!credential.identityToken) {
+      throw new Error('Apple Sign-In გაუქმდა.');
+    }
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'apple',
+      token: credential.identityToken,
+    });
+    if (error) throw error;
+    cachedUser = data.user;
+    // მომავალი სესიისთვის ბექაფად (best-effort) — AppleCompleteScreen
+    // თავად credential.fullName-ს იღებს პირდაპირ ამ call-ის დაბრუნებული
+    // მნიშვნელობიდან, არა აქედან.
+    if (credential.fullName?.givenName || credential.fullName?.familyName) {
+      const fullName = `${credential.fullName.givenName ?? ''} ${credential.fullName.familyName ?? ''}`.trim();
+      supabase.auth.updateUser({ data: { full_name: fullName } }).catch(() => {});
+    }
+    return {
+      ...toAuthResult(data.user),
+      appleFullName: credential.fullName
+        ? { givenName: credential.fullName.givenName, familyName: credential.fullName.familyName }
+        : null,
+    };
+  },
+  async sendPhoneOtp(phone) {
+    const { error } = await supabase.auth.signInWithOtp({ phone });
+    if (error) throw error;
+  },
+  async verifyPhoneOtp(phone, token) {
+    const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
+    if (error) throw error;
+    if (!data.user) throw new Error('ვერიფიკაცია ვერ დასრულდა.');
+    cachedUser = data.user;
+    return toAuthResult(data.user);
+  },
+  async signInWithPhonePassword(phone, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({ phone, password });
+    if (error) throw error;
+    cachedUser = data.user;
+    return toAuthResult(data.user);
+  },
+  async setPhonePassword(password) {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
   },
   async sendPasswordReset(email) {
     const { error } = await supabase.auth.resetPasswordForEmail(email);

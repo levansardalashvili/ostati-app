@@ -3,7 +3,11 @@ import type { Provider } from './provider';
 // ფასის შეთავაზების სტატუსი — ორივე გამოვლინებისთვის საერთო (იხ. ქვემოთ).
 // src/types/chat.ts-ის `OfferStatus` ამის ალიასია (ChatMsg-ის 'offer' ტიპის
 // შეტყობინების status ველისთვის, `messages.offer_status`-ის ანარეკლი).
-export type QuoteStatus = 'pending' | 'accepted' | 'declined';
+// 'superseded' — ახალი migration: Provider-ის ახალი შეთავაზება ავტომატურად
+// (DB trigger) ამ სტატუსზე გადაჰყავს იმავე job-ზე მისივე ძველ, ჯერ-კიდევ-
+// pending შეთავაზებას, რომ ჩატის ისტორიაში "პასუხგაუცემელი" offer-card
+// სამუდამოდ არ დარჩეს ჩამორჩენილი.
+export type QuoteStatus = 'pending' | 'accepted' | 'declined' | 'superseded';
 
 // Provider-ის მიერ კონკრეტულ job-ზე გამოთქმული ინტერესი + სავალდებულო,
 // კონკრეტული რიცხვითი ფასი ("დაინტერესებისას", ProviderJobDetailScreen-ის

@@ -31,6 +31,7 @@ import { jobService } from '../services/jobService';
 import { quoteService } from '../services/quoteService';
 import { reviewService } from '../services/reviewService';
 import { useJobStatus } from '../state/JobStatusContext';
+import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { FeedJob } from '../types/job';
 import type { RatingData } from '../types/review';
 import type { RootStackParamList } from '../navigation/types';
@@ -94,6 +95,12 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     };
   }, [passedJob, id]);
 
+  // Task — Provider ვერ გამოხატავს ინტერესს job-ზე ვერიფიკაციის გავლამდე
+  // (supabase/migrations/0084) — client-side check აქ მხოლოდ UX-ისთვისაა
+  // (ცარიელი sheet-ის გახსნის თავიდან ასაცილებლად), რეალური გეითი RPC-ის
+  // შიგნითაა (`express_interest()` raise-ავს `PROVIDER_NOT_VERIFIED`-ს).
+  const { profile: providerProfile } = useProviderProfile();
+  const isVerified = providerProfile.verificationStatus === 'verified';
   const [expressed, setExpressed] = useState(false);
   // Feed-ის ბარათის "დაინტ. ვარ" ღილაკი (ProviderHomeScreen/
   // ProviderJobFeedScreen) აღარ ხსნის ფასის sheet-ს ბარათიდანვე პირდაპირ —
@@ -321,11 +328,48 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       if (job.customerId) {
         chatService.sendRealOffer(job.customerId, uid, uid, priceNum, undefined, job.id).catch(() => {});
       }
-    } catch {
-      Alert.alert('ვერ მოხერხდა', 'ინტერესის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
+    } catch (err) {
+      const message = (err as { message?: string } | null)?.message ?? '';
+      if (message.includes('PROVIDER_NOT_VERIFIED')) {
+        setOfferSheetOpen(false);
+        Alert.alert(
+          'საჭიროა ვერიფიკაცია',
+          'სამუშაოზე ინტერესის გამოსახატად ჯერ საჭიროა ვერიფიკაციის გავლა — შეამოწმე პროფილის ტაბი.',
+        );
+      } else {
+        Alert.alert('ვერ მოხერხდა', 'ინტერესის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
+      }
     } finally {
       setSendingInterest(false);
     }
+  };
+
+  // supabase/migrations/0081 — გადაფიქრების/შეცდომით-გაგზავნილი ფასის
+  // უკან წაღება, სანამ job კვლავ `pending`-ია (RPC თავად ამოწმებს
+  // სერვერზე; client-ის `variant === 'browse'` მხოლოდ ღილაკის ჩვენებას
+  // განსაზღვრავს).
+  const [withdrawing, setWithdrawing] = useState(false);
+  const handleWithdraw = () => {
+    if (withdrawing) return;
+    Alert.alert('დაინტერესების გაუქმება', 'ნამდვილად გინდა ამ job-ზე გამოხატული ინტერესის გაუქმება?', [
+      { text: 'არა', style: 'cancel' },
+      {
+        text: 'დიახ, გავაუქმებ',
+        style: 'destructive',
+        onPress: async () => {
+          setWithdrawing(true);
+          try {
+            await quoteService.withdrawInterest(job.id);
+            setExpressed(false);
+            setOfferPrice('');
+          } catch {
+            Alert.alert('ვერ მოხერხდა', 'ვერ გავაუქმეთ — job შეიძლება უკვე მინიჭებული იყოს, სცადე ხელახლა.');
+          } finally {
+            setWithdrawing(false);
+          }
+        },
+      },
+    ]);
   };
 
   // ერთი მუდმივი JSX ხე jobLoading→loaded გადასვლისას (Fabric-ის "child
@@ -532,7 +576,17 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
           )}
           <Pressable
             style={[styles.interestButton, expressed && styles.interestButtonExpressed]}
-            onPress={() => !expressed && setOfferSheetOpen(true)}
+            onPress={() => {
+              if (expressed) return;
+              if (!isVerified) {
+                Alert.alert(
+                  'საჭიროა ვერიფიკაცია',
+                  'სამუშაოზე ინტერესის გამოსახატად ჯერ საჭიროა ვერიფიკაციის გავლა — შეამოწმე პროფილის ტაბი.',
+                );
+                return;
+              }
+              setOfferSheetOpen(true);
+            }}
           >
             {expressed ? (
               <CheckCircle size={17} color={colors.primaryForeground} />
@@ -543,6 +597,19 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               {expressed ? (offerPrice ? `შეთავაზდა: ${offerPrice} ₾` : 'დაინტ. ხარ') : 'დაინტერესება'}
             </Text>
           </Pressable>
+          {/* supabase/migrations/0081 — გადაფიქრების გზა, job კვლავ
+              `pending`-ია სანამ ეს ღილაკი ჩანს (`variant === 'browse'`
+              მხოლოდ ამ სტატუსზეა). */}
+          {expressed && (
+            <Pressable
+              style={styles.withdrawButton}
+              onPress={handleWithdraw}
+              disabled={withdrawing}
+              accessibilityLabel="დაინტერესების გაუქმება"
+            >
+              <X size={17} color={colors.mutedForeground} />
+            </Pressable>
+          )}
         </View>
       )}
       {variant === 'active' && (
@@ -954,6 +1021,14 @@ const styles = StyleSheet.create({
   },
   interestButtonExpressed: {
     backgroundColor: colors.success,
+  },
+  withdrawButton: {
+    width: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.muted,
+    borderRadius: radius.md,
+    minHeight: 52,
   },
   interestButtonText: {
     ...typography.bodyMedium,

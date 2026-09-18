@@ -14,27 +14,28 @@ import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'GoogleComplete'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'AppleComplete'>;
 
-// A3 — Google-ის ანგარიშით პროფილის დასრულება (product-spec.md, create-account-form.md).
-// Provider-ისთვის მისამართის ველი არ ჩანს/არ სავალდებულოა — RegisterScreen-ის
-// იგივე წესით (Provider-ს საცხოვრებელი მისამართი საერთოდ არ სჭირდება,
-// სამუშაო არეალს მოგვიანებით ProviderSetup-ზე ირჩევს). Google-ის რეალური
-// ავტორიზაცია უკვე მოხდა წინა ეკრანზე (RegisterScreen-ის Google ღილაკი) —
-// აქ უბრალოდ ვკითხულობთ უკვე შესულ Supabase Auth მომხმარებელს
-// (authService.getCurrentUser()) და ვასრულებთ პროფილს.
-export function GoogleCompleteScreen({ navigation, route }: Props) {
-  const { role } = route.params;
+// #107 — Apple-ის ანგარიშით პროფილის დასრულება, GoogleCompleteScreen.tsx-ის
+// ზუსტი სარკე (ცალკე კონკრეტული ეკრანი, არა გაზიარებული "SocialComplete" —
+// კოდბაზის დამკვიდრებული პატერნით). ერთადერთი რეალური განსხვავება: Apple
+// `fullName`/`email`-ს მხოლოდ **პირველივე** ავტორიზაციაზე აბრუნებს —
+// `authService.getCurrentUser()`-იდან ხელახლა ამოღება შეუძლებელია (მეორედ
+// `null` იქნება), ამიტომ ეს მონაცემი route param-ითაა გადმოცემული
+// (RegisterScreen-ის Apple-ღილაკის handler-იდან, პირდაპირ signInWithApple()-ის
+// დაბრუნებული მნიშვნელობიდან).
+export function AppleCompleteScreen({ navigation, route }: Props) {
+  const { role, appleFullName } = route.params;
   const isProvider = role === 'provider';
   const { setProfile } = useCustomerProfile();
   const { setProfile: setProviderProfile } = useProviderProfile();
 
-  const googleUser = authService.getCurrentUser();
-  const displayName = googleUser?.displayName?.trim() || 'ახალი მომხმარებელი';
-  const [googleFirstName, ...googleLastNameParts] = displayName.split(' ');
-  const googleLastName = googleLastNameParts.join(' ');
-  const googleEmail = googleUser?.email ?? '';
-  const initials = `${googleFirstName.charAt(0)}${googleLastName.charAt(0) || ''}`.toUpperCase();
+  const appleUser = authService.getCurrentUser();
+  const firstName = appleFullName?.givenName?.trim() || '';
+  const lastName = appleFullName?.familyName?.trim() || '';
+  const displayName = [firstName, lastName].filter(Boolean).join(' ') || 'ახალი მომხმარებელი';
+  const appleEmail = appleUser?.email ?? '';
+  const initials = `${firstName.charAt(0)}${lastName.charAt(0) || ''}`.toUpperCase() || 'A';
 
   const [address, setAddress] = useState('');
   const [touched, setTouched] = useState(false);
@@ -48,31 +49,26 @@ export function GoogleCompleteScreen({ navigation, route }: Props) {
     setTouched(true);
     setSubmitError('');
     if (!isProvider && !address.trim()) return;
-    if (!googleUser) {
-      setSubmitError('Google სესია ვერ მოიძებნა — დაბრუნდი და სცადე თავიდან.');
+    if (!appleUser) {
+      setSubmitError('Apple სესია ვერ მოიძებნა — დაბრუნდი და სცადე თავიდან.');
       return;
     }
     setLoading(true);
     try {
       const defaultAddress = isProvider ? '' : address.trim();
-      await userService.createUserRecord(googleUser.uid, {
+      await userService.createUserRecord(appleUser.uid, {
         role,
-        firstName: googleFirstName,
-        lastName: googleLastName,
-        email: googleEmail,
+        firstName,
+        lastName,
+        email: appleEmail,
         defaultAddress,
-        phone: '',
+        phone: appleUser.phone ?? '',
       });
       if (role === 'provider') {
-        setProviderProfile({ firstName: googleFirstName, lastName: googleLastName });
+        setProviderProfile({ firstName, lastName });
         navigation.replace('ProviderSetup');
       } else {
-        setProfile({
-          firstName: googleFirstName,
-          lastName: googleLastName,
-          email: googleEmail,
-          defaultAddress,
-        });
+        setProfile({ firstName, lastName, email: appleEmail, defaultAddress, phone: '' });
         navigation.replace('CustomerSetup', { userName: displayName });
       }
     } catch (error) {
@@ -93,13 +89,13 @@ export function GoogleCompleteScreen({ navigation, route }: Props) {
         <Text style={styles.title}>დაასრულე პროფილის შექმნა</Text>
         <Text style={styles.subtitle}>დაგვჭირდება კიდევ რამდენიმე ინფორმაცია.</Text>
 
-        <View style={styles.googleCard}>
-          <Text style={styles.googleCardLabel}>Google-ის ანგარიშიდან</Text>
-          <View style={styles.googleCardRow}>
+        <View style={styles.appleCard}>
+          <Text style={styles.appleCardLabel}>Apple-ის ანგარიშიდან</Text>
+          <View style={styles.appleCardRow}>
             <Avatar initials={initials} size={52} />
-            <View style={styles.googleCardText}>
-              <Text style={styles.googleCardName}>{displayName}</Text>
-              <Text style={styles.googleCardEmail}>{googleEmail}</Text>
+            <View style={styles.appleCardText}>
+              <Text style={styles.appleCardName}>{displayName}</Text>
+              {!!appleEmail && <Text style={styles.appleCardEmail}>{appleEmail}</Text>}
             </View>
             <View style={styles.checkBadge}>
               <Check size={13} color={colors.success} strokeWidth={3} />
@@ -120,7 +116,7 @@ export function GoogleCompleteScreen({ navigation, route }: Props) {
               value={address}
               onChangeText={setAddress}
               onBlur={() => setTouched(true)}
-              placeholder="მაგ. ჭავჭავაძის 48"
+              placeholder="მაგ. ჭავჭავაძე 48"
               error={addressError}
             />
           </View>
@@ -167,7 +163,7 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     marginBottom: spacing.lg,
   },
-  googleCard: {
+  appleCard: {
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
@@ -175,26 +171,26 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
-  googleCardLabel: {
+  appleCardLabel: {
     ...typography.small,
     color: colors.mutedForeground,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     marginBottom: spacing.sm,
   },
-  googleCardRow: {
+  appleCardRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
   },
-  googleCardText: {
+  appleCardText: {
     flex: 1,
   },
-  googleCardName: {
+  appleCardName: {
     ...typography.bodyMedium,
     color: colors.foreground,
   },
-  googleCardEmail: {
+  appleCardEmail: {
     ...typography.caption,
     color: colors.mutedForeground,
   },
