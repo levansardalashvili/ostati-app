@@ -125,7 +125,7 @@ export function RatingScreen({ navigation, route }: Props) {
             <CheckCircle size={38} color={colors.success} />
           </View>
           <Text style={styles.doneTitle}>მადლობა შეფასებისთვის!</Text>
-          <Text style={styles.doneSubtitle}>შენი მოსაზრება ეხმარება სხვა მომხმარებლებს სწორი ოსტატის არჩევაში.</Text>
+          <Text style={styles.doneSubtitle}>თქვენი მოსაზრება ეხმარება სხვა მომხმარებლებს სწორი ოსტატის არჩევაში.</Text>
           <View style={styles.doneStars}>
             {[1, 2, 3, 4, 5].map((s) => (
               <Star key={s} size={22} color="#FBBF24" fill={stars >= s ? '#FBBF24' : 'transparent'} />
@@ -156,7 +156,7 @@ export function RatingScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitleCenter}>შეაფასე სამუშაო</Text>
+          <Text style={styles.cardTitleCenter}>შეაფასეთ სამუშაო</Text>
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((s) => (
               <Pressable key={s} testID={`rating-star-${s}`} onPress={() => setStars(s)} hitSlop={4}>
@@ -183,12 +183,12 @@ export function RatingScreen({ navigation, route }: Props) {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>
-            დაწერე კომენტარი <Text style={styles.optionalText}>(სურვილისამებრ)</Text>
+            დაწერეთ კომენტარი <Text style={styles.optionalText}>(სურვილისამებრ)</Text>
           </Text>
           <TextInput
             value={review}
             onChangeText={setReview}
-            placeholder="რა მოგეწონა? რა შეიძლება გაუმჯობესდეს?..."
+            placeholder="რა მოგეწონათ? რა შეიძლება გაუმჯობესდეს?..."
             placeholderTextColor={colors.mutedForeground}
             multiline
             numberOfLines={4}

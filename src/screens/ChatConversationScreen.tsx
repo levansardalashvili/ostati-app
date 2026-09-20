@@ -769,14 +769,14 @@ if (
 
                       {canRespond ? (
                         <View style={styles.offerActionsRow}>
-                          <Pressable style={styles.offerDeclineButton} onPress={() => respondToOffer(m.id, 'declined')}>
-                            <Text style={styles.offerDeclineText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                              უარყოფა
-                            </Text>
-                          </Pressable>
                           <Pressable style={styles.offerAcceptButton} onPress={() => respondToOffer(m.id, 'accepted')}>
                             <Text style={styles.offerAcceptText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                               დათანხმება
+                            </Text>
+                          </Pressable>
+                          <Pressable style={styles.offerDeclineButton} onPress={() => respondToOffer(m.id, 'declined')}>
+                            <Text style={styles.offerDeclineText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                              უარყოფა
                             </Text>
                           </Pressable>
                         </View>
@@ -1433,10 +1433,12 @@ const styles = StyleSheet.create({
   offerActionsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
   },
   offerDeclineButton: {
     flex: 1,
+    minHeight: 44,
+    paddingHorizontal: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.muted,
@@ -1450,6 +1452,8 @@ const styles = StyleSheet.create({
   },
   offerAcceptButton: {
     flex: 1,
+    minHeight: 44,
+    paddingHorizontal: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,

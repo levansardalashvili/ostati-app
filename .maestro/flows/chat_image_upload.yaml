@@ -1,8 +1,7 @@
 appId: com.ostati.app
 ---
 # Chat image upload — Customer messages a real Provider directly from
-# their public profile (no job required, #97 item 2 — this path is
-# deliberately unrestricted) and sends a photo via "გალერეიდან არჩევა".
+# their public profile (first contact goes through StartJobChatSheet, #99) and sends a photo via "გალერეიდან არჩევა".
 # Requires a test image already pushed to the emulator's gallery before
 # running:
 #   adb push assets/icon.png //sdcard/Pictures/e2e_test_photo.png
@@ -172,26 +171,69 @@ appId: com.ostati.app
     text: ".*${output.providerFirstName} Test.*"
 - assertVisible: ".*ოსტატის პროფილი.*"
 - tapOn: ".*მიწერა.*"
+# #99: first message to a Provider with no prior conversation opens the
+# StartJobChatSheet (creates a real job + auto-sends the first message).
+# No hideKeyboard here — it would dismiss the BottomSheet.
+- assertVisible: ".*რისი გაკეთება გჭირდებათ.*"
+- tapOn: ".*ნათურის შეცვლა.*"
+- inputText: "Kitchen light needs replacing, e2e test"
+- tapOn: "^გაგზავნა$"
+- extendedWaitUntil:
+    visible: ".*გამარჯობა.*"
+    timeout: 20000
 
-# --- Phase 3: Send a photo via the gallery picker -----------------------
+# --- Phase 3: Customer cannot attach photos until the Provider replies (#99,
+# attach button is disabled while awaiting the first Provider response), so
+# the Provider replies first, then sends a photo via the gallery picker.
+- back
+- assertVisible: ".*ოსტატის პროფილი.*"
+- back
+- tapOn: "^პროფილი$"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.providerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+- tapOn: ".*ჩატები.*"
+- tapOn: ".*ImgCustomer.*"
 - tapOn:
     id: "chat-attach-button"
 - tapOn: ".*გალერეიდან არჩევა.*"
-# Android's system Photo Picker (no READ_MEDIA_IMAGES permission dialog —
-# that's the point of this modern picker API) opens directly. Tap the
-# pushed test image, shown first under "Recent".
+# Android system Photo Picker (no permission dialog). Tap the pushed test
+# image, shown first under "Recent".
 - extendedWaitUntil:
     visible: "Recent"
     timeout: 10000
 - tapOn:
     point: "16%, 34%"
-- assertVisible: ".*ახლა.*"
+# Sent message shows its real time once confirmed ("ახლა" is only the optimistic
+# label); a failed upload would show the retry link instead.
+- extendedWaitUntil:
+    visible: '.*\d{2}:\d{2}.*'
+    timeout: 15000
 - assertNotVisible: ".*ხელახლა.*"
 
 - back
-- assertVisible: ".*ოსტატის პროფილი.*"
-- back
 - tapOn: "^პროფილი$"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"

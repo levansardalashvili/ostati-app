@@ -121,12 +121,13 @@ export function ProviderHomeScreen({ navigation }: Props) {
   const currentJobCandidate =
     assignedJobs.find((j) => {
       const liveStatus = j.customerJobId ? (getStatus(j.customerJobId) ?? j.status) : j.status;
-      return liveStatus !== 'completed' && liveStatus !== 'cancelled';
+      // confirmed_awaiting_rating = ორივე მხარემ დაადასტურა დასრულება — აღარ არის "მიმდინარე"
+      return liveStatus !== 'completed' && liveStatus !== 'cancelled' && liveStatus !== 'confirmed_awaiting_rating';
     }) ?? null;
   const currentJobStatus = currentJobCandidate?.customerJobId
     ? (getStatus(currentJobCandidate.customerJobId) ?? currentJobCandidate.status)
     : currentJobCandidate?.status;
-  const currentJob = currentJobStatus === 'completed' ? null : currentJobCandidate;
+  const currentJob = currentJobCandidate;
   const currentJobCategory = currentJob ? CATEGORIES.find((c) => c.id === currentJob.category) : null;
 
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);

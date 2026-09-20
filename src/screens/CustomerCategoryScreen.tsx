@@ -1,17 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Briefcase, MapPin, Search, Star } from 'lucide-react-native';
+import { Search } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
-import { VerifiedBadge } from '../components/VerifiedBadge';
+import { ProviderCard } from '../components/ProviderCard';
+import { StartJobChatSheet } from '../components/StartJobChatSheet';
 import { colors, radius, spacing, typography } from '../theme';
-import { SPECIALTY_LABEL } from '../data/categories';
 import { categoryService } from '../services/categoryService';
 import { userService } from '../services/userService';
 import type { Provider } from '../types/provider';
-import { isNewProvider } from '../utils/providerRank';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerCategory'>;
@@ -53,6 +51,23 @@ export function CustomerCategoryScreen({ navigation, route }: Props) {
     [allProviders, route.params.id],
   );
 
+  // StartJobChatSheet-ის wiring — CustomerProviderListScreen-ის იგივე (#99)
+  const [startChatProvider, setStartChatProvider] = useState<Provider | null>(null);
+  const openChatWithJob = (jobId: string | null, draftMessage?: string) => {
+    if (!startChatProvider) return;
+    const provider = startChatProvider;
+    setStartChatProvider(null);
+    navigation.navigate('ChatConversation', {
+      chatId: provider.id,
+      name: provider.name,
+      initials: provider.initials,
+      color: provider.color,
+      role: 'customer',
+      jobId: jobId ?? undefined,
+      draftMessage,
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader title={categoryName ?? 'ყველა ოსტატი'} onBack={() => navigation.goBack()} />
@@ -66,52 +81,21 @@ export function CustomerCategoryScreen({ navigation, route }: Props) {
         </View>
       ) : (
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          {providers.map((p) => {
-            const specialty = SPECIALTY_LABEL[p.category] ?? p.category;
-            const district = p.location.replace(', თბილისი', '');
-            return (
-              <Pressable
-                key={p.id}
-                style={styles.card}
-                onPress={() => navigation.navigate('ViewProviderProfile', { id: p.id })}
-              >
-                <View style={styles.cardTop}>
-                  <Avatar initials={p.initials} color={p.color} size={52} online={p.online} uri={p.photoUrl} />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <View style={styles.nameRow}>
-                      <Text style={styles.name} numberOfLines={1}>
-                        {p.name}
-                      </Text>
-                      {p.verified && <VerifiedBadge size={14} />}
-                    </View>
-                    <Text style={styles.specialty}>{specialty}</Text>
-                  </View>
-                </View>
-                <View style={styles.statsRow}>
-                  {isNewProvider(p) ? (
-                    <Text style={styles.newProviderText}>ახალი ოსტატი</Text>
-                  ) : (
-                    <View style={styles.statItem}>
-                      <Star size={12} color="#FBBF24" fill="#FBBF24" />
-                      <Text style={styles.statValue}>{p.rating}</Text>
-                      <Text style={styles.statMuted}>({p.reviews} შეფ.)</Text>
-                    </View>
-                  )}
-                  <Text style={styles.dot}>·</Text>
-                  <View style={styles.statItem}>
-                    <Briefcase size={11} color={colors.mutedForeground} />
-                    <Text style={styles.statMuted}>{p.jobs} სამ.</Text>
-                  </View>
-                </View>
-                <View style={styles.statItem}>
-                  <MapPin size={12} color={colors.mutedForeground} />
-                  <Text style={styles.statMuted}>{district}</Text>
-                </View>
-              </Pressable>
-            );
-          })}
+          {providers.map((p) => (
+            <ProviderCard
+              key={p.id}
+              provider={p}
+              onOpenProfile={() => navigation.navigate('ViewProviderProfile', { id: p.id })}
+              onMessage={() => setStartChatProvider(p)}
+            />
+          ))}
         </ScrollView>
       )}
+      <StartJobChatSheet
+        provider={startChatProvider}
+        onClose={() => setStartChatProvider(null)}
+        onReady={openChatWithJob}
+      />
     </SafeAreaView>
   );
 }
@@ -126,63 +110,7 @@ const styles = StyleSheet.create({
   },
   bodyContent: {
     padding: spacing.lg,
-    gap: spacing.sm + 4,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm + 4,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  name: {
-    ...typography.bodyMedium,
-    color: colors.foreground,
-    flexShrink: 1,
-  },
-  specialty: {
-    ...typography.small,
-    color: colors.mutedForeground,
-    marginTop: 2,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs + 2,
-    marginTop: spacing.xs,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statValue: {
-    ...typography.small,
-    color: colors.foreground,
-    fontWeight: '700',
-  },
-  statMuted: {
-    ...typography.small,
-    color: colors.mutedForeground,
-  },
-  newProviderText: {
-    ...typography.small,
-    color: colors.secondaryForeground,
-    fontWeight: '700',
-  },
-  dot: {
-    color: colors.border,
+    gap: spacing.md,
   },
   emptyState: {
     flex: 1,

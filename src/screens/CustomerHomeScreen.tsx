@@ -203,7 +203,8 @@ export function CustomerHomeScreen({ navigation }: Props) {
       };
     }, []),
   );
-  const currentJob = myJobs.find((j) => j.status === 'active') ?? null;
+  // active + ოსტატმა დასრულება მონიშნა და მომხმარებლის დადასტურებას ელოდება; დადასტურების (ორივე მხარე) შემდეგ ბარათი ქრება
+  const currentJob = myJobs.find((j) => j.status === 'active' || j.status === 'awaiting_customer_confirmation') ?? null;
 
   // ბელის წითელი წერტილი (#70) — mock ნაგულისხმებია, სანამ session
   // ცოცხალი Realtime subscription-ით (`notificationService`) რეალურ

@@ -470,7 +470,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
               <Clock size={15} color={colors.warning} />
               <Text style={styles.completionTitle}>ოსტატმა სამუშაო დასრულებულად მონიშნა</Text>
             </View>
-            <Text style={styles.completionSubtitle}>დაადასტურე დასრულება, ან შეატყობინე პრობლემის შესახებ.</Text>
+            <Text style={styles.completionSubtitle}>დაადასტურეთ დასრულება ან შეგვატყობინეთ პრობლემის შესახებ</Text>
             {selectedProvider && (
               <View style={styles.completionProviderRow}>
                 <Avatar initials={selectedProvider.initials} color={selectedProvider.color} size={38} />
@@ -484,14 +484,14 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
               </View>
             )}
             <View style={styles.completionActionsRow}>
-              <Pressable style={styles.problemButton} onPress={() => setProblemSheetOpen(true)} disabled={confirming}>
-                <Text style={styles.problemButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                  პრობლემა მაქვს
-                </Text>
-              </Pressable>
               <Pressable style={[styles.completeButton, confirming && styles.completeButtonDisabled]} onPress={confirmCompletion} disabled={confirming}>
                 <Text style={styles.completeButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                   {confirming ? 'დადასტურდება...' : 'დადასტურება'}
+                </Text>
+              </Pressable>
+              <Pressable style={styles.problemButton} onPress={() => setProblemSheetOpen(true)} disabled={confirming}>
+                <Text style={styles.problemButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  პრობლემა მაქვს
                 </Text>
               </Pressable>
             </View>
@@ -527,7 +527,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
           <View style={styles.section}>
             {ratingData ? (
               <>
-                <Text style={styles.sectionTitle}>შენი შეფასება</Text>
+                <Text style={styles.sectionTitle}>თქვენი შეფასება</Text>
                 <View style={styles.ratingStarsRow}>
                   {[1, 2, 3, 4, 5].map((s) => (
                     <Star key={s} size={20} color="#FBBF24" fill={ratingData.stars >= s ? '#FBBF24' : 'transparent'} />
@@ -568,8 +568,8 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
 
         <View style={styles.interestedSection}>
           <View style={styles.interestedHeaderRow}>
-            <Text style={styles.interestedTitle}>დაინტერესებული ოსტატები</Text>
-            {visibleInterestedList.length > 0 && (
+            <Text style={styles.interestedTitle}>{selectedProvider ? 'არჩეული ოსტატი' : 'დაინტერესებული ოსტატები'}</Text>
+            {!selectedProvider && visibleInterestedList.length > 0 && (
               <View style={styles.interestedCountBadge}>
                 <Text style={styles.interestedCountText}>{visibleInterestedList.length}</Text>
               </View>
@@ -1340,7 +1340,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   completeButton: {
-    flex: 2,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.success,
