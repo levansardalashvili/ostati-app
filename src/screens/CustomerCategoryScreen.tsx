@@ -86,9 +86,6 @@ export function CustomerCategoryScreen({ navigation, route }: Props) {
                     </View>
                     <Text style={styles.specialty}>{specialty}</Text>
                   </View>
-                  <Text style={styles.price} numberOfLines={1}>
-                    {p.price}
-                  </Text>
                 </View>
                 <View style={styles.statsRow}>
                   {isNewProvider(p) ? (
@@ -158,11 +155,6 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
     marginTop: 2,
-  },
-  price: {
-    ...typography.captionMedium,
-    color: colors.primary,
-    fontWeight: '700',
   },
   statsRow: {
     flexDirection: 'row',

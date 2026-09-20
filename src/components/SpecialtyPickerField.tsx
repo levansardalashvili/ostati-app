@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Briefcase, Check, ChevronRight, X } from 'lucide-react-native';
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
 import { getCategoryIcon } from './CategoryIcon';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
-import { SPECIALTIES, specialtyIdToCategoryId } from '../data/specialties';
 
 export type SpecialtyOption = { id: string; label: string };
 export type SelectedSpecialty = SpecialtyOption[];
@@ -63,24 +62,17 @@ export function SpecialtyPickerField({ value, onChange }: Props) {
         <Text style={styles.sheetTitle}>სპეციალობა</Text>
         <Text style={styles.sheetHint}>შეგიძლია აირჩიო რამდენიმე</Text>
 
-        {SPECIALTIES.map((sp) => {
+        <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+        {CATEGORIES.map((sp) => {
           const on = isSelected(sp.id);
           const SpecialtyIcon = getCategoryIcon(sp.id);
-          // `sp.id` ჯერ პირდაპირ უნდა შემოწმდეს — ნახევარ SPECIALTIES-ს
-          // (tile/flooring/furniture/ac) CATEGORIES-ის იგივე id აქვს,
-          // ალიასის გარეშე (getCategoryIcon()-ის იგივე fallback-ჯაჭვი,
-          // იხ. CategoryIcon.tsx).
-          const iconColor =
-            CATEGORIES.find((c) => c.id === sp.id)?.dot ??
-            CATEGORIES.find((c) => c.id === specialtyIdToCategoryId(sp.id))?.dot ??
-            colors.mutedForeground;
           return (
             <Pressable key={sp.id} style={styles.row} onPress={() => toggle(sp.id, sp.label)}>
               <View style={[styles.checkbox, on && styles.checkboxOn]}>
                 {on && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
               </View>
               <View style={styles.rowIconWrap}>
-                <SpecialtyIcon size={18} color={iconColor} strokeWidth={2} />
+                <SpecialtyIcon size={18} color={sp.dot} strokeWidth={2} />
               </View>
               <Text style={styles.rowLabel}>{sp.label}</Text>
             </Pressable>
@@ -91,6 +83,7 @@ export function SpecialtyPickerField({ value, onChange }: Props) {
           <Text style={styles.rowIcon}>❓</Text>
           <Text style={styles.rowLabel}>სხვა</Text>
         </Pressable>
+        </ScrollView>
 
         {showCustomInput && (
           <View style={styles.customWrap}>
@@ -146,6 +139,9 @@ const styles = StyleSheet.create({
   },
   fieldPlaceholder: {
     color: colors.mutedForeground,
+  },
+  list: {
+    maxHeight: 420,
   },
   sheetTitle: {
     ...typography.h3,

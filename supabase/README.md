@@ -656,7 +656,7 @@ does not attempt to backfill the missing 0031–0074 writeups.)
   `superseded`, the new one stayed `pending`, and a different Provider's
   unrelated offer on the same job was left untouched.
 
-## Phone/SMS-OTP auth column (0083) — REQUIRES manual Dashboard/Twilio setup
+## Phone/SMS-OTP auth column (0083) — SMS via `functions/send-sms-hook`
 
 - **`0083`** — pure additive column, `users.phone text not null default
   ''` — backs the new phone-number registration/login flow (Sign in with
@@ -667,23 +667,12 @@ does not attempt to backfill the missing 0031–0074 writeups.)
   `CustomerProfile` (TS) and `userService.ts`'s row-mapping gained a
   matching `phone`/`row.phone` field, mirrored on `email` exactly.
 
-  **This column alone does not make phone auth work** — Supabase's Phone
-  provider (backed by Twilio Verify, not plain Twilio Messaging) has to
-  be configured in the Dashboard before `authService.sendPhoneOtp()`/
-  `verifyPhoneOtp()` (`supabase.auth.signInWithOtp({phone})`/
-  `verifyOtp({phone, token, type:'sms'})`) can succeed:
-  1. Create a Twilio account + a **Verify Service** (this, not plain
-     Messaging, is what Supabase's Phone provider expects).
-  2. Dashboard → Authentication → Providers → Phone: enable it, select
-     Twilio Verify, paste Account SID / Auth Token / Verify Service SID.
+  **This column alone does not make phone auth work** — SMS is sent by the
+  Send SMS Hook Edge Function, see `functions/send-sms-hook/README.md`.
+  Georgia-only app: numbers are always `+995`-prefixed, validated
+  client-side against `/^5d{8}$/`.
 
-  Until this is done, `sendPhoneOtp()` fails gracefully (mapped Georgian
-  error banner, confirmed live on the emulator — no crash) rather than
-  silently succeeding. Georgia-only app: phone numbers are always
-  `+995`-prefixed, validated client-side against `/^5\d{8}$/` before ever
-  calling the RPC.
-
-  Sign in with Apple similarly needs `expo-apple-authentication` +
+  Sign in with Apple needs `expo-apple-authentication` +
   `usesAppleSignIn: true` (already in `app.json`) plus, on Apple's/
   Supabase's side: Sign in with Apple capability on the `com.ostati.app`
   identifier, a Services ID + private key, and Dashboard → Authentication

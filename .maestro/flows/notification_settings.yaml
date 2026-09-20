@@ -17,7 +17,8 @@ appId: com.ostati.app
 # toggle key (`notif-toggle-<key>`) so each row's switch can be targeted
 # individually.
 
-- launchApp
+- launchApp:
+    stopApp: false
 - extendedWaitUntil:
     notVisible: "Loading from"
     timeout: 20000
@@ -26,6 +27,17 @@ appId: com.ostati.app
 # restarts the process each time, so this reappears on every single run).
 # It does NOT auto-dismiss; it must be tapped, or it sits there blocking
 # everything underneath forever.
+- extendedWaitUntil:
+    visible: "DEVELOPMENT SERVERS|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 30000
+    optional: true
+- tapOn:
+    point: "37%,28%"
+    optional: true
+- extendedWaitUntil:
+    visible: "Loading from|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 90000
+    optional: true
 - extendedWaitUntil:
     visible: "Continue"
     timeout: 6000
@@ -44,11 +56,11 @@ appId: com.ostati.app
       - back
 - extendedWaitUntil:
     visible: ".*(პროფილი|დაწყება).*"
-    timeout: 25000
+    timeout: 90000
 
 # Leftover-session cleanup, in case a previous run crashed mid-flow.
 - tapOn:
-    text: ".*პროფილი.*"
+    text: "^პროფილი$"
     optional: true
 - scrollUntilVisible:
     element: ".*გასვლა.*"
@@ -85,9 +97,7 @@ appId: com.ostati.app
     id: "register-confirm-password"
 - inputText: "TestPass123"
 - hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
+- tapOn: "^გაგრძელება$"
 - tapOn:
     text: "Not now"
     optional: true
@@ -96,6 +106,9 @@ appId: com.ostati.app
     optional: true
 
 - assertVisible: ".*პროფილის დასრულება.*"
+- tapOn:
+    id: "setup-terms-checkbox"
+    optional: true
 - tapOn: "^დასრულება$"
 - assertVisible: ".*სერვისები.*"
 
@@ -140,7 +153,7 @@ appId: com.ostati.app
 # screen must load the REAL persisted prefs from Supabase, not defaults. -
 - back
 - back
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
@@ -182,7 +195,7 @@ appId: com.ostati.app
 # --- Cleanup: logout -------------------------------------------------------
 - back
 - back
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"

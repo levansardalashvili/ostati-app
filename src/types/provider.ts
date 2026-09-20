@@ -26,7 +26,6 @@ export type Provider = {
   reviews: number;
   location: string;
   areas: string[];
-  price: string;
   jobs: number;
   verified: boolean;
   verificationStatus: VerificationStatus;

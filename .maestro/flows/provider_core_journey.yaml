@@ -11,7 +11,8 @@ appId: com.ostati.app
 # leaves one behind ("სანტექნიკა"), so run that flow at least once before
 # this one if the dev database is otherwise empty.
 
-- launchApp
+- launchApp:
+    stopApp: false
 - extendedWaitUntil:
     notVisible: "Loading from"
     timeout: 20000
@@ -20,6 +21,17 @@ appId: com.ostati.app
 # restarts the process each time, so this reappears on every single run,
 # not just after `pm clear`/reinstall). It does NOT auto-dismiss; it must
 # be tapped, or it sits there blocking everything underneath forever.
+- extendedWaitUntil:
+    visible: "DEVELOPMENT SERVERS|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 30000
+    optional: true
+- tapOn:
+    point: "37%,28%"
+    optional: true
+- extendedWaitUntil:
+    visible: "Loading from|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 90000
+    optional: true
 - extendedWaitUntil:
     visible: "Continue"
     timeout: 6000
@@ -40,10 +52,10 @@ appId: com.ostati.app
       - back
 - extendedWaitUntil:
     visible: ".*(პროფილი|დაწყება).*"
-    timeout: 25000
+    timeout: 90000
 
 - tapOn:
-    text: ".*პროფილი.*"
+    text: "^პროფილი$"
     optional: true
 # ProviderProfileScreen has more content above "გასვლა" than
 # CustomerProfileScreen (profile-completeness card, verification card,
@@ -85,9 +97,7 @@ appId: com.ostati.app
     id: "register-confirm-password"
 - inputText: "TestPass123"
 - hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
+- tapOn: "^გაგრძელება$"
 
 - tapOn:
     text: "Not now"
@@ -99,9 +109,15 @@ appId: com.ostati.app
 # --- ProviderSetup (mandatory — no skip option exists by product rule) -----
 - assertVisible: ".*შექმენი ოსტატის პროფილი.*"
 - tapOn: ".*აირჩიე სპეციალობა.*"
-- tapOn: ".*სანტექნიკოსი.*"
+- tapOn: ".*სანტექნიკა.*"
 - tapOn: "^არჩევა$"
 
+- tapOn:
+    text: ".*აირჩიე გამოცდილება.*"
+    optional: true
+- tapOn:
+    text: "3–5 წელი"
+    optional: true
 - tapOn: ".*აირჩიე არეალი.*"
 - assertVisible: ".*სამუშაო არეალი.*"
 - tapOn: ".*ყველას მონიშვნა.*"
@@ -111,6 +127,9 @@ appId: com.ostati.app
 # is "პროფილის შექმნა"; no substring overlap today, but anchoring here too
 # since both share the root "პროფილის შექმნა/შექმენი" and this is exactly
 # the class of bug already hit twice on the customer flow.
+- tapOn:
+    id: "setup-terms-checkbox"
+    optional: true
 - tapOn: "^პროფილის შექმნა$"
 
 # --- Provider Home -------------------------------------------------------
@@ -126,24 +145,17 @@ appId: com.ostati.app
 # button (opens the same OfferPriceSheet, no longer auto-opened via a
 # navigation param).
 - tapOn:
-    text: ".*დეტ\\. ნახვა.*"
+    text: ".*დეტალების ნახვა.*"
     index: 0
-- tapOn: ".*დაინტერესება.*"
-- tapOn: ".*ჩაწერეთ თანხა.*"
-- inputText: "150"
-- hideKeyboard
-- tapOn:
-    id: "offer-price-submit"
-# The confirmation text lives on that screen's footer button
-# ("შეთავაზდა: <price> ₾"), not the feed card's "sent" strip
-# ("ინტერესი გაგზავნილია"). `back` returns to the feed/tab underneath
-# (ProviderJobDetail is a root-stack screen, so the tab bar isn't
-# reachable until we pop back).
-- assertVisible: ".*შეთავაზდა:.*"
+# A freshly registered Provider is unverified — the price-offer button must
+# open the verification sheet instead of the price sheet (gate, 0084).
+- tapOn: ".*ფასის შეთავაზება.*"
+- assertVisible: ".*ფასის შესათავაზებლად საჭიროა ვერიფიკაციის გავლა.*"
+- tapOn: "^დახურვა$"
 - back
 
 # --- Edit profile ----------------------------------------------------------
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - tapOn: ".*პროფილის რედაქტირება.*"
 - tapOn:
     id: "provider-edit-last-name"
@@ -154,7 +166,7 @@ appId: com.ostati.app
 - assertVisible: ".*TestProvider Edited.*"
 
 # --- Logout ------------------------------------------------------------
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - scrollUntilVisible:
     element: ".*გასვლა.*"
     direction: DOWN

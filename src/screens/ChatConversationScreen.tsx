@@ -61,7 +61,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ChatConversation'>;
 // ბანერზე "სამუშაოს დეტალების ნახვა" (jobId-ის არსებობისას) იხსნის
 // შესაბამის Job Detail ეკრანს პირდაპირ ჩატიდან.
 export function ChatConversationScreen({ navigation, route }: Props) {
-  const { chatId, name, initials, color, role, jobId, jobStatus, draftMessage } = route.params;
+  const { chatId, name, initials, color, role, jobId, draftMessage } = route.params;
   // ყველა navigation call site (#71) რეალურ Supabase UUID-ს გადასცემს
   // chatId-ად (მეორე მხარის auth.users.id) — mock chat-ის კუნძული
   // მთლიანად წაშლილია, ეს ეკრანი აღარ საჭიროებს mock/real branching-ს.

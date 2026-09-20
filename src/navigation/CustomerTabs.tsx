@@ -116,6 +116,7 @@ export function CustomerTabs() {
         component={CustomerHomeScreen}
         options={{
           tabBarLabel: 'მთავარი',
+          tabBarAccessibilityLabel: 'მთავარი',
           tabBarIcon: ({ color, focused }) => <Home size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />,
         }}
       />
@@ -124,6 +125,7 @@ export function CustomerTabs() {
         component={CustomerJobsScreen}
         options={{
           tabBarLabel: 'განცხადებები',
+          tabBarAccessibilityLabel: 'განცხადებები',
           tabBarIcon: ({ color, focused }) => <FilePlus2 size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />,
         }}
       />
@@ -131,6 +133,7 @@ export function CustomerTabs() {
         name="Chats"
         options={{
           tabBarLabel: 'ჩატები',
+          tabBarAccessibilityLabel: 'ჩატები',
           tabBarIcon: ({ color, focused }) => (
             <View>
               <MessageCircle size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
@@ -146,6 +149,7 @@ export function CustomerTabs() {
         component={CustomerProfileScreen}
         options={{
           tabBarLabel: 'პროფილი',
+          tabBarAccessibilityLabel: 'პროფილი',
           tabBarIcon: ({ color, focused }) => <User size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />,
         }}
       />

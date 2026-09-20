@@ -95,17 +95,52 @@ export function RegisterScreen({ navigation, route }: Props) {
     if (!allValid || loading) return;
     setLoading(true);
     try {
-      const { uid } = await authService.registerWithEmail({ email: email.trim(), password: pass, role });
+      // ნახევრად დასრულებული წინა მცდელობა: signUp გავიდა, მაგრამ `users`-ის row
+      // ვერ ჩაიწერა (მაგ. ქსელი გაწყდა) — ანგარიში არსებობს, პროფილი არა, და
+      // ხელახალი რეგისტრაცია "უკვე დარეგისტრირებულია"-ს ამბობდა სამუდამოდ.
+      // იგივე მონაცემებით შესვლა და row-ს დასრულება მას აღადგენს; სრულად
+      // დარეგისტრირებულ ანგარიშზე (row უკვე არსებობს) ჩვეულებრივი შეცდომა რჩება.
+      const resumeIncomplete = async (): Promise<string | null> => {
+        try {
+          const { uid: existing } = await authService.signInWithEmail({ email: email.trim(), password: pass });
+          if (await userService.getUserRecord(existing)) {
+            await authService.signOut().catch(() => {});
+            return null;
+          }
+          return existing;
+        } catch {
+          return null;
+        }
+      };
+      let uid: string;
+      try {
+        uid = (await authService.registerWithEmail({ email: email.trim(), password: pass, role })).uid;
+      } catch (registerError) {
+        // მხოლოდ "უკვე დარეგისტრირებულია"-ზე — სხვა შეცდომაზე (ქსელი, სუსტი პაროლი) resume უადგილოა
+        const resumed =
+          (registerError as { message?: string } | null)?.message === 'User already registered'
+            ? await resumeIncomplete()
+            : null;
+        if (!resumed) throw registerError;
+        uid = resumed;
+      }
       // Supabase-ის `users` ცხრილის row — Login-ს დასჭირდება role-ის
       // წასაკითხად (რომელ Home-ზე გადაიყვანოს ავტორიზაციის შემდეგ).
-      await userService.createUserRecord(uid, {
+      const record = {
         role,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
         defaultAddress: isProvider ? '' : address.trim(),
         phone: '',
-      });
+      };
+      try {
+        await userService.createUserRecord(uid, record);
+      } catch {
+        // ერთი ხელახალი ცდა მოკლე ქსელური შეფერხების გადასატანად
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        await userService.createUserRecord(uid, record);
+      }
       // Task — უკან-ისრით ამ ეკრანზე დაბრუნებისას ღილაკი "რეგისტრაცია..."-ზე
       // ჩარჩენილი აღარ დარჩეს (`navigate`-ის, არა `replace`-ის შემდეგ ეს
       // ეკრანი აღარ იშლება, `loading`-ის reset კი მანამდე მხოლოდ catch-ში

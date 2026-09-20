@@ -61,7 +61,8 @@ export const reviewService: ReviewService = {
       chips: data.chips,
       photos: data.photos ?? null,
     });
-    if (error) throw error;
+    // 23505 = ეს job უკვე შეფასებულია (წინა ცდის პასუხი დაიკარგა) — წარმატებად ითვლება
+    if (error && error.code !== '23505') throw error;
   },
   async listRealReviewsForProvider(providerId) {
     const { data, error } = await supabase.rpc('get_provider_reviews', { p_provider_id: providerId });

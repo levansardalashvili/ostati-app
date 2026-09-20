@@ -37,7 +37,8 @@ appId: com.ostati.app
 # mechanisms fighting each other in edge cases) but isn't independently
 # regression-testable the same way.
 
-- launchApp
+- launchApp:
+    stopApp: false
 - extendedWaitUntil:
     notVisible: "Loading from"
     timeout: 20000
@@ -46,6 +47,17 @@ appId: com.ostati.app
 # restarts the process each time, so this reappears on every single run).
 # It does NOT auto-dismiss; it must be tapped, or it sits there blocking
 # everything underneath forever.
+- extendedWaitUntil:
+    visible: "DEVELOPMENT SERVERS|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 30000
+    optional: true
+- tapOn:
+    point: "37%,28%"
+    optional: true
+- extendedWaitUntil:
+    visible: "Loading from|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 90000
+    optional: true
 - extendedWaitUntil:
     visible: "Continue"
     timeout: 6000
@@ -64,11 +76,11 @@ appId: com.ostati.app
       - back
 - extendedWaitUntil:
     visible: ".*(პროფილი|დაწყება).*"
-    timeout: 25000
+    timeout: 90000
 
 # Leftover-session cleanup, in case a previous run crashed mid-flow.
 - tapOn:
-    text: ".*პროფილი.*"
+    text: "^პროფილი$"
     optional: true
 - scrollUntilVisible:
     element: ".*გასვლა.*"
@@ -81,87 +93,16 @@ appId: com.ostati.app
     id: "logout-confirm-button"
     optional: true
 
-# --- Phase 1: register a Provider (just account setup — no keyboard
-# assertion here, see the note above). -------------------------------------
-- evalScript: ${output.providerEmail = 'e2e.kbvis.provider.' + Date.now() + '@example.com'}
+# --- Phase 1: Customer registers and posts a job -----------------------
 - evalScript: ${output.customerEmail = 'e2e.kbvis.customer.' + Date.now() + '@example.com'}
+- evalScript: ${output.providerEmail = 'verified.provider@e2e.example.com'}
+- evalScript: ${output.jobMarker = 'KbVisE2E' + Date.now()}
 
-- tapOn: ".*დაწყება.*"
-- tapOn: ".*ოსტატი.*"
-- tapOn:
-    id: "register-first-name"
-- inputText: "KbVisProvider"
-- tapOn:
-    id: "register-last-name"
-- inputText: "Test"
-- tapOn:
-    id: "register-email"
-- inputText: "${output.providerEmail}"
-- hideKeyboard
-- tapOn:
-    id: "register-password"
-- inputText: "TestPass123"
-- tapOn:
-    id: "register-confirm-password"
-- inputText: "TestPass123"
-- hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
-- tapOn:
-    text: "Not now"
-    optional: true
-- tapOn:
-    text: "Never"
-    optional: true
-
-- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
-- tapOn: ".*აირჩიე სპეციალობა.*"
-- tapOn: ".*სანტექნიკოსი.*"
-- tapOn: "^არჩევა$"
-- tapOn: ".*აირჩიე არეალი.*"
-- assertVisible: ".*სამუშაო არეალი.*"
-- tapOn: ".*ყველას მონიშვნა.*"
-- tapOn: "^შენახვა$"
-- tapOn: "^პროფილის შექმნა$"
-- assertVisible: ".*ახალი მოთხოვნები.*"
-
-# --- Phase 2: OfferPriceSheet (BottomSheet-hosted, autoFocus) — the
-# central BottomSheet.tsx fix. The sheet opens with the keyboard already
-# showing (autoFocus); both the typed price and the submit button must
-# stay visible above it. -----------------------------------------------
-- tapOn:
-    text: ".*დეტ\\. ნახვა.*"
-    index: 0
-- tapOn: ".*დაინტერესება.*"
-- assertVisible: ".*ჩაწერეთ თანხა.*"
-- tapOn: ".*ჩაწერეთ თანხა.*"
-- inputText: "555"
-- assertVisible: ".*555.*"
-- assertVisible:
-    id: "offer-price-submit"
-- hideKeyboard
-- tapOn:
-    id: "offer-price-submit"
-- assertVisible: ".*შეთავაზდა:.*"
-- back
-
-- tapOn: ".*პროფილი.*"
-- scrollUntilVisible:
-    element: ".*გასვლა.*"
-    direction: DOWN
-- tapOn: ".*გასვლა.*"
-- tapOn:
-    id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
-
-# --- Phase 3: ChatConversationScreen composer — the exact screen/bug the
-# user originally reported. -----------------------------------------------
 - tapOn: ".*დაწყება.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
-- inputText: "KbVisCustomer"
+- inputText: "KbCustomer"
 - tapOn:
     id: "register-last-name"
 - inputText: "E2E"
@@ -179,9 +120,7 @@ appId: com.ostati.app
     id: "register-confirm-password"
 - inputText: "TestPass123"
 - hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
+- tapOn: "^გაგრძელება$"
 - tapOn:
     text: "Not now"
     optional: true
@@ -190,14 +129,97 @@ appId: com.ostati.app
     optional: true
 
 - assertVisible: ".*პროფილის დასრულება.*"
+- tapOn:
+    id: "setup-terms-checkbox"
+    optional: true
 - tapOn: "^დასრულება$"
 - assertVisible: ".*სერვისები.*"
 
-- tapOn: ".*მოძებნე ოსტატი.*"
-- inputText: "KbVisProvider"
+- tapOn: ".*განცხადებები.*"
+- tapOn:
+    point: "91%, 7%"
+- assertVisible: ".*მოთხოვნის გამოქვეყნება.*"
+- tapOn: ".*აირჩიეთ კატეგორია.*"
+- tapOn: ".*ელექტროობა.*"
+- tapOn:
+    id: "post-job-description"
+- inputText: "${output.jobMarker} - bathroom outlet sparking, needs an electrician urgently please"
+- hideKeyboard
+- tapOn: "^გამოქვეყნება$"
+- assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
+- tapOn: ".*მთავარზე დაბრუნება.*"
+
+- tapOn: "^პროფილი$"
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 2 prelude: log in as the verified Provider ---------------------
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.providerEmail}"
 - hideKeyboard
 - tapOn:
-    text: ".*KbVisProvider Test.*"
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*ახალი მოთხოვნები.*"
+
+# --- Phase 2: OfferPriceSheet (BottomSheet-hosted, autoFocus) — the
+# central BottomSheet.tsx fix. The sheet opens with the keyboard already
+# showing (autoFocus); both the typed price and the submit button must
+# stay visible above it. -----------------------------------------------
+- tapOn:
+    text: ".*დეტალების ნახვა.*"
+    below: ".*${output.jobMarker}.*"
+- tapOn: ".*ფასის შეთავაზება.*"
+- assertVisible: ".*ჩაწერეთ თანხა.*"
+- tapOn: ".*ჩაწერეთ თანხა.*"
+- inputText: "555"
+- assertVisible: ".*555.*"
+- assertVisible:
+    id: "offer-price-submit"
+- hideKeyboard
+- tapOn:
+    id: "offer-price-submit"
+- assertVisible: ".*შეთავაზდა:.*"
+- back
+
+- tapOn: "^პროფილი$"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
+
+# --- Phase 3: ChatConversationScreen composer — the exact screen/bug the
+# user originally reported. -----------------------------------------------
+# The customer already exists from Phase 1 — log back in (registering again
+# with the same email would collide).
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.customerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*სერვისები.*"
+
+- tapOn: ".*მოძებნე ოსტატი.*"
+- inputText: "VerifiedProvider"
+- hideKeyboard
+- tapOn:
+    text: ".*VerifiedProvider E2E.*"
 - assertVisible: ".*ოსტატის პროფილი.*"
 - tapOn: ".*მიწერა.*"
 
@@ -222,7 +244,7 @@ appId: com.ostati.app
 # second is what actually reaches the tab bar underneath.
 - back
 - back
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"

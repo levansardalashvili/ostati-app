@@ -16,7 +16,7 @@ import { SpecialtyPickerField, type SpecialtyOption } from '../components/Specia
 import { SqmPriceField } from '../components/SqmPriceField';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
-import { isSqmPriced } from '../data/specialties';
+import { isSqmPriced } from '../data/categories';
 import { authService } from '../services/authService';
 import { storageService, type UserMediaKind } from '../services/storageService';
 import { userService } from '../services/userService';

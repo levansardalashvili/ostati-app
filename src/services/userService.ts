@@ -1,5 +1,4 @@
 import { supabase } from './supabaseClient';
-import { specialtyIdToCategoryId } from '../data/specialties';
 import type { CustomerProfile, UserRecord } from '../types/user';
 import type { Provider, ProviderProfile, VerificationStatus } from '../types/provider';
 
@@ -128,34 +127,19 @@ function fromProviderProfileRowToPublicProvider(row: ProviderProfileRow, stats?:
   const name = `${firstName} ${lastName}`.trim();
   const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   const sqmValues = Object.values(row.sqm_prices);
-  // Profile-fix pass, task 3/4 — root cause #1: `row.specialty[0].id` is a
-  // SPECIALTIES id (e.g. 'plumber', src/data/specialties.ts), but every
-  // consumer of `Provider.category` (SPECIALTY_LABEL lookups for display,
-  // CustomerHomeScreen's category-chip filtering, CustomerCategoryScreen's
-  // `p.category === route.params.id`, CategoryIcon) expects a CATEGORIES
-  // id (e.g. 'plumbing', src/data/categories.ts). Writing the raw
-  // specialty id here — with no alias applied — meant `SPECIALTY_LABEL[
-  // p.category]` failed to resolve for exactly the 4 specialties whose id
-  // differs from its category (plumber/electrician/painter/drywall), and
-  // every display fell back to the raw internal id itself ("plumber"
-  // instead of "სანტექნიკოსი"). Category-based filtering silently failed
-  // the same way. specialtyIdToCategoryId() is the SAME alias
-  // CategoryIcon.tsx already used for icon lookup — now the single source
-  // for this too, so `category` itself is always in the right id-space.
   const specialtyId = row.specialty[0]?.id ?? '';
   return {
     id: row.id,
     name,
-    category: specialtyIdToCategoryId(specialtyId) ?? specialtyId,
+    category: specialtyId,
     categories: row.specialty
       .filter((s) => !s.id.startsWith('custom:'))
-      .map((s) => specialtyIdToCategoryId(s.id) ?? s.id),
+      .map((s) => s.id),
     years: row.experience ? (EXPERIENCE_YEARS[row.experience] ?? 0) : 0,
     rating: stats?.avg_rating ?? 0,
     reviews: stats?.review_count ?? 0,
     location: row.areas[0] ?? '',
     areas: row.areas,
-    price: '',
     jobs: stats?.completed_jobs ?? 0,
     verified: row.verification_status === 'verified',
     verificationStatus: row.verification_status,
@@ -177,34 +161,22 @@ function fromProviderProfileRowToPublicProvider(row: ProviderProfileRow, stats?:
 }
 
 const DEFAULT_CUSTOMER_PROFILE: CustomerProfile = {
-  firstName: 'ნინო',
-  lastName: 'სულაბერიძე',
-  email: 'nino.sulaberidze@gmail.com',
-  defaultAddress: 'ვაკე, თბილისი',
+  firstName: '',
+  lastName: '',
+  email: '',
+  defaultAddress: '',
   phone: '',
 };
 
 const DEFAULT_PROVIDER_PROFILE: ProviderProfile = {
-  firstName: 'გიორგი',
-  lastName: 'ბერიძე',
-  specialty: [{ id: 'plumber', label: 'სანტექნიკოსი' }],
-  areas: ['ვაკე', 'საბურთალო', 'ვერა'],
-  experience: '10plus',
-  about: 'ვარ სანტექნიკოსი 15 წლიანი გამოცდილებით. ვასრულებ ყველა სახის სანტექნიკის სამუშაოს სწრაფად და ხარისხიანად.',
-  // Profile-fix pass, task 2 — these ids were previously 1 (certificates)
-  // and 1/2/3 (portfolio), overlapping across the two arrays. Not the
-  // actual visual bug (React scopes list-reconciliation keys per parent,
-  // not globally, so this specific overlap could not by itself hide
-  // portfolio from certificates), but a genuine data-hygiene defect —
-  // `MediaItem.id` should never collide anywhere in this model. Given
-  // distinct ranges here, and `nextMediaItem()` (MediaUploadGrid.tsx) now
-  // guarantees every id it generates afterward is globally unique too.
-  certificates: [{ id: 101, bg: '#DBEAFE' }],
-  portfolio: [
-    { id: 201, bg: '#D1FAE5' },
-    { id: 202, bg: '#FEF3C7' },
-    { id: 203, bg: '#FCE7F3' },
-  ],
+  firstName: '',
+  lastName: '',
+  specialty: [],
+  areas: [],
+  experience: null,
+  about: '',
+  certificates: [],
+  portfolio: [],
   sqmPrices: {},
   verificationStatus: 'unverified',
   verificationRequestedAt: null,

@@ -9,7 +9,7 @@ import { usePressScale } from '../utils/usePressScale';
 // თუ არსებობს, რეალური სურათი რენდერდება ფერადი placeholder-ის ნაცვლად.
 export type MediaItem = { id: number; bg: string; uri?: string };
 
-export const MEDIA_BG = ['#DBEAFE', '#D1FAE5', '#FEF3C7', '#FCE7F3', '#EDE9FE'];
+const MEDIA_BG = ['#DBEAFE', '#D1FAE5', '#FEF3C7', '#FCE7F3', '#EDE9FE'];
 
 // Profile-fix pass, task 2 — `id: Date.now() + items.length` could produce
 // the SAME id from two INDEPENDENT calls (e.g. one for `certificates`, one

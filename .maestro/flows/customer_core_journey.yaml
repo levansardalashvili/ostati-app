@@ -18,7 +18,8 @@ appId: com.ostati.app
 # an exact-match lookup even though the same text is plainly on screen.
 # Partial matching is a strictly safer default for this app.
 
-- launchApp
+- launchApp:
+    stopApp: false
 # Expo dev-client: `launchApp` restarts the process from scratch, which
 # always re-fetches the JS bundle from Metro over LAN ("Loading from
 # 192.168.x.x:8081...") before any app screen renders — a plain
@@ -33,6 +34,17 @@ appId: com.ostati.app
 # restarts the process each time, so this reappears on every single run,
 # not just after `pm clear`/reinstall). It does NOT auto-dismiss; it must
 # be tapped, or it sits there blocking everything underneath forever.
+- extendedWaitUntil:
+    visible: "DEVELOPMENT SERVERS|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 30000
+    optional: true
+- tapOn:
+    point: "37%,28%"
+    optional: true
+- extendedWaitUntil:
+    visible: "Loading from|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 90000
+    optional: true
 - extendedWaitUntil:
     visible: "Continue"
     timeout: 6000
@@ -60,14 +72,14 @@ appId: com.ostati.app
 # optional taps below aren't racing that gap and silently no-op'ing.
 - extendedWaitUntil:
     visible: ".*(პროფილი|დაწყება).*"
-    timeout: 25000
+    timeout: 90000
 
 # If a previous run (or a manual session) left an active login, log out
 # first so this flow always starts from a clean, logged-out Welcome screen.
 # Independently-optional taps: on an already-logged-out Welcome screen none
 # of them find anything and all three no-op harmlessly.
 - tapOn:
-    text: ".*პროფილი.*"
+    text: "^პროფილი$"
     optional: true
 - tapOn:
     text: ".*გასვლა.*"
@@ -103,9 +115,7 @@ appId: com.ostati.app
     id: "register-confirm-password"
 - inputText: "TestPass123"
 - hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
+- tapOn: "^გაგრძელება$"
 
 # Google Password Manager sometimes offers to save the new credentials —
 # not part of the app, dismiss it if it shows up.
@@ -122,6 +132,9 @@ appId: com.ostati.app
 # screen's own "პროფილის დასრულება" header text (confirmed via a failed
 # run: the tap landed on the non-interactive header, not the button, and
 # the flow silently never left this screen).
+- tapOn:
+    id: "setup-terms-checkbox"
+    optional: true
 - tapOn: "^დასრულება$"
 
 # --- Home --------------------------------------------------------------
@@ -132,7 +145,7 @@ appId: com.ostati.app
 - tapOn:
     point: "91%, 7%"
 - assertVisible: ".*მოთხოვნის გამოქვეყნება.*"
-- tapOn: ".*აირჩიე კატეგორია.*"
+- tapOn: ".*აირჩიეთ კატეგორია.*"
 - tapOn: ".*სანტექნიკა.*"
 - tapOn:
     id: "post-job-description"
@@ -149,7 +162,7 @@ appId: com.ostati.app
 - assertVisible: ".*სანტექნიკა.*"
 
 # --- Edit profile ----------------------------------------------------------
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - tapOn: ".*პროფილის რედაქტირება.*"
 - tapOn:
     id: "customer-edit-last-name"
@@ -160,7 +173,7 @@ appId: com.ostati.app
 - assertVisible: ".*TestUser Edited.*"
 
 # --- Logout ------------------------------------------------------------
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"

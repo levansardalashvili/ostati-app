@@ -209,11 +209,8 @@ function SavedProviderCard({
             <Text style={styles.viewProfileLinkText}>პროფილის ნახვა</Text>
             <ChevronRight size={12} color={colors.primary} />
           </Pressable>
-          <Text style={styles.priceText} numberOfLines={1}>
-            {p.price}
-          </Text>
         </View>
-        <Animated.View style={{ transform: [{ scale: message.scale }] }}>
+        <Animated.View style={{ flex: 1, alignItems: 'center', transform: [{ scale: message.scale }] }}>
           <Pressable style={styles.messageButton} onPress={onMessage} onPressIn={message.onPressIn} onPressOut={message.onPressOut}>
             <MessageCircle size={14} color={colors.primaryForeground} />
             <Text style={styles.messageButtonText}>მიწერა</Text>
@@ -333,24 +330,17 @@ const styles = StyleSheet.create({
   actionLeft: {
     flex: 1,
     minWidth: 0,
-    gap: 2,
+    alignItems: 'center',
   },
   viewProfileLink: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    alignSelf: 'flex-start',
   },
   viewProfileLinkText: {
     ...typography.small,
     color: colors.primary,
     fontWeight: '700',
-  },
-  priceText: {
-    ...typography.captionMedium,
-    color: colors.primary,
-    fontWeight: '700',
-    flexShrink: 1,
   },
   messageButton: {
     flexDirection: 'row',

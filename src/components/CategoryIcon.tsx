@@ -20,7 +20,6 @@ import {
 } from 'lucide-react-native';
 import { radius } from '../theme';
 import { CATEGORIES } from '../data/categories';
-import { specialtyIdToCategoryId } from '../data/specialties';
 
 // ერთადერთი ცენტრალიზებული კატეგორია → Lucide ვექტორული აიქონის მაპინგი
 // მთელი აპისთვის (ემოჯის ნაცვლად) — Customer-ის და Provider-ის ეკრანები
@@ -50,12 +49,9 @@ const DEFAULT_ICON: LucideIcon = Wrench;
 // კატეგორია/სპეციალობის id-სთვის შესაბამისი Lucide აიქონის კომპონენტი —
 // გამოსაყენებელია, როცა უკვე არსებული ფონის კონტეინერის სტილში (ფორმა,
 // ზომა, border radius) მხოლოდ თავად აიქონის ჩასმაა საჭირო, `CategoryIcon`-ის
-// საკუთარი კონტეინერის გარეშე. სპეციალობის (`plumber`) → კატეგორიის
-// (`plumbing`) ალიასი გატანილია src/data/specialties.ts-ში, ერთადერთი
-// წყაროდ (userService.ts-იც ამავე ფუნქციას იყენებს Provider.category-ის
-// derivation-ისთვის).
+// საკუთარი კონტეინერის გარეშე.
 export function getCategoryIcon(categoryId: string): LucideIcon {
-  return CATEGORY_ICON_MAP[categoryId] ?? CATEGORY_ICON_MAP[specialtyIdToCategoryId(categoryId) ?? ''] ?? DEFAULT_ICON;
+  return CATEGORY_ICON_MAP[categoryId] ?? DEFAULT_ICON;
 }
 
 type Props = {

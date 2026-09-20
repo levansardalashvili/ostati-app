@@ -7,7 +7,8 @@ appId: com.ostati.app
 # `job_reports` via `create_job_report()`. Covers both role entry points
 # and both the fixed-reason and "other + required free text" paths.
 
-- launchApp
+- launchApp:
+    stopApp: false
 - extendedWaitUntil:
     notVisible: "Loading from"
     timeout: 20000
@@ -16,6 +17,17 @@ appId: com.ostati.app
 # restarts the process each time, so this reappears on every single run,
 # not just after `pm clear`/reinstall). It does NOT auto-dismiss; it must
 # be tapped, or it sits there blocking everything underneath forever.
+- extendedWaitUntil:
+    visible: "DEVELOPMENT SERVERS|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 30000
+    optional: true
+- tapOn:
+    point: "37%,28%"
+    optional: true
+- extendedWaitUntil:
+    visible: "Loading from|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 90000
+    optional: true
 - extendedWaitUntil:
     visible: "Continue"
     timeout: 6000
@@ -36,10 +48,10 @@ appId: com.ostati.app
       - back
 - extendedWaitUntil:
     visible: ".*(პროფილი|დაწყება).*"
-    timeout: 25000
+    timeout: 90000
 
 - tapOn:
-    text: ".*პროფილი.*"
+    text: "^პროფილი$"
     optional: true
 - scrollUntilVisible:
     element: ".*გასვლა.*"
@@ -54,7 +66,7 @@ appId: com.ostati.app
 
 # --- Phase 1: Customer registers, posts a job -------------------------
 - evalScript: ${output.customerEmail = 'e2e.report.customer.' + Date.now() + '@example.com'}
-- evalScript: ${output.providerEmail = 'e2e.report.provider.' + Date.now() + '@example.com'}
+- evalScript: ${output.providerEmail = 'verified.provider@e2e.example.com'}
 - evalScript: ${output.jobMarker = 'ReportJobE2E' + Date.now()}
 
 - tapOn: ".*დაწყება.*"
@@ -79,9 +91,7 @@ appId: com.ostati.app
     id: "register-confirm-password"
 - inputText: "TestPass123"
 - hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
+- tapOn: "^გაგრძელება$"
 - tapOn:
     text: "Not now"
     optional: true
@@ -90,6 +100,9 @@ appId: com.ostati.app
     optional: true
 
 - assertVisible: ".*პროფილის დასრულება.*"
+- tapOn:
+    id: "setup-terms-checkbox"
+    optional: true
 - tapOn: "^დასრულება$"
 - assertVisible: ".*სერვისები.*"
 
@@ -101,7 +114,7 @@ appId: com.ostati.app
 # lands on the real button instead.
 - tapOn:
     point: "91%, 7%"
-- tapOn: ".*აირჩიე კატეგორია.*"
+- tapOn: ".*აირჩიეთ კატეგორია.*"
 - tapOn: ".*სანტექნიკა.*"
 - tapOn:
     id: "post-job-description"
@@ -112,61 +125,33 @@ appId: com.ostati.app
 - tapOn: ".*მთავარზე დაბრუნება.*"
 - assertVisible: ".*სერვისები.*"
 
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
 - assertVisible: ".*დაწყება.*"
 
 # --- Phase 2: Provider registers, expresses interest -------------------
-- tapOn: ".*დაწყება.*"
-- tapOn: ".*ოსტატი.*"
+- tapOn: ".*შესვლა.*"
 - tapOn:
-    id: "register-first-name"
-- inputText: "ReportProvider"
-- tapOn:
-    id: "register-last-name"
-- inputText: "E2E"
-- tapOn:
-    id: "register-email"
+    id: "login-email"
 - inputText: "${output.providerEmail}"
 - hideKeyboard
 - tapOn:
-    id: "register-password"
+    id: "login-password"
 - inputText: "TestPass123"
 - hideKeyboard
 - tapOn:
-    id: "register-confirm-password"
-- inputText: "TestPass123"
-- hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
-- tapOn:
-    text: "Not now"
-    optional: true
-- tapOn:
-    text: "Never"
-    optional: true
-
-- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
-- tapOn: ".*აირჩიე სპეციალობა.*"
-- tapOn: ".*სანტექნიკოსი.*"
-- tapOn: "^არჩევა$"
-- tapOn: ".*აირჩიე არეალი.*"
-- assertVisible: ".*სამუშაო არეალი.*"
-- tapOn: ".*ყველას მონიშვნა.*"
-- tapOn: "^შენახვა$"
-- tapOn: "^პროფილის შექმნა$"
+    id: "login-submit-button"
 - assertVisible: ".*ახალი მოთხოვნები.*"
 - extendedWaitUntil:
     visible: ".*${output.jobMarker}.*"
     timeout: 15000
 
 - tapOn:
-    text: ".*დეტ\\. ნახვა.*"
+    text: ".*დეტალების ნახვა.*"
     below: ".*${output.jobMarker}.*"
-- tapOn: ".*დაინტერესება.*"
+- tapOn: ".*ფასის შეთავაზება.*"
 - tapOn: ".*ჩაწერეთ თანხა.*"
 - inputText: "100"
 - hideKeyboard
@@ -179,7 +164,7 @@ appId: com.ostati.app
 - assertVisible: ".*შეთავაზდა:.*"
 - back
 
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - scrollUntilVisible:
     element: ".*გასვლა.*"
     direction: DOWN
@@ -226,7 +211,7 @@ appId: com.ostati.app
 - tapOn: "^დახურვა$"
 
 - back
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
@@ -268,7 +253,7 @@ appId: com.ostati.app
 - tapOn: "^დახურვა$"
 
 - back
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - scrollUntilVisible:
     element: ".*გასვლა.*"
     direction: DOWN

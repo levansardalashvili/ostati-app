@@ -47,7 +47,7 @@ import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-type BootRoute = 'Welcome' | 'CustomerHome' | 'ProviderHome';
+type BootRoute = 'Welcome' | 'CustomerHome' | 'ProviderHome' | 'ProviderSetup';
 
 // Task 1 — cold-start auth session restore. Supabase-ის session AsyncStorage-
 // იდან აღდგება ასინქრონულად (authService.waitForSession) — მანამ, სანამ ეს
@@ -86,9 +86,12 @@ export function RootNavigator() {
             await authService.signOut().catch(() => {});
           } else if (record.role === 'provider') {
             setProviderProfile({ firstName: record.firstName, lastName: record.lastName });
-            const providerProfile = await userService.getProviderProfileRecord(user.uid).catch(() => null);
+            // პროფილის row არარსებობა = სავალდებულო setup არ დასრულებულა (#13) —
+            // Home-ის ნაცვლად setup-ზე ვაბრუნებთ. ქსელის შეცდომა Home-ზე ტოვებს.
+            // ქსელის შეცდომა ≠ "row არ არსებობს": ამ შემთხვევაში Home-ზე ვრჩებით (undefined), setup-ზე არა
+            const providerProfile = await userService.getProviderProfileRecord(user.uid).catch(() => undefined);
             if (providerProfile && !cancelled) setProviderProfile(providerProfile);
-            route = 'ProviderHome';
+            route = providerProfile === null ? 'ProviderSetup' : 'ProviderHome';
           } else {
             setCustomerProfile({
               firstName: record.firstName,

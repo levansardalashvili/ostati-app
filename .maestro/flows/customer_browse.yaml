@@ -13,7 +13,8 @@ appId: com.ostati.app
 # maps this to the `electrical`/"ელექტროობა" CATEGORIES entry, so this
 # Provider must show up under that specific category everywhere below.
 
-- launchApp
+- launchApp:
+    stopApp: false
 - extendedWaitUntil:
     notVisible: "Loading from"
     timeout: 20000
@@ -22,6 +23,17 @@ appId: com.ostati.app
 # restarts the process each time, so this reappears on every single run).
 # It does NOT auto-dismiss; it must be tapped, or it sits there blocking
 # everything underneath forever.
+- extendedWaitUntil:
+    visible: "DEVELOPMENT SERVERS|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 30000
+    optional: true
+- tapOn:
+    point: "37%,28%"
+    optional: true
+- extendedWaitUntil:
+    visible: "Loading from|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 90000
+    optional: true
 - extendedWaitUntil:
     visible: "Continue"
     timeout: 6000
@@ -40,11 +52,11 @@ appId: com.ostati.app
       - back
 - extendedWaitUntil:
     visible: ".*(პროფილი|დაწყება).*"
-    timeout: 25000
+    timeout: 90000
 
 # Leftover-session cleanup, in case a previous run crashed mid-flow.
 - tapOn:
-    text: ".*პროფილი.*"
+    text: "^პროფილი$"
     optional: true
 - scrollUntilVisible:
     element: ".*გასვლა.*"
@@ -83,9 +95,7 @@ appId: com.ostati.app
     id: "register-confirm-password"
 - inputText: "TestPass123"
 - hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
+- tapOn: "^გაგრძელება$"
 - tapOn:
     text: "Not now"
     optional: true
@@ -95,16 +105,25 @@ appId: com.ostati.app
 
 - assertVisible: ".*შექმენი ოსტატის პროფილი.*"
 - tapOn: ".*აირჩიე სპეციალობა.*"
-- tapOn: ".*ელექტრიკოსი.*"
+- tapOn: ".*ელექტროობა.*"
 - tapOn: "^არჩევა$"
+- tapOn:
+    text: ".*აირჩიე გამოცდილება.*"
+    optional: true
+- tapOn:
+    text: "3–5 წელი"
+    optional: true
 - tapOn: ".*აირჩიე არეალი.*"
 - assertVisible: ".*სამუშაო არეალი.*"
 - tapOn: ".*ყველას მონიშვნა.*"
 - tapOn: "^შენახვა$"
+- tapOn:
+    id: "setup-terms-checkbox"
+    optional: true
 - tapOn: "^პროფილის შექმნა$"
 - assertVisible: ".*ახალი მოთხოვნები.*"
 
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - scrollUntilVisible:
     element: ".*გასვლა.*"
     direction: DOWN
@@ -136,9 +155,7 @@ appId: com.ostati.app
     id: "register-confirm-password"
 - inputText: "TestPass123"
 - hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
+- tapOn: "^გაგრძელება$"
 - tapOn:
     text: "Not now"
     optional: true
@@ -147,6 +164,9 @@ appId: com.ostati.app
     optional: true
 
 - assertVisible: ".*პროფილის დასრულება.*"
+- tapOn:
+    id: "setup-terms-checkbox"
+    optional: true
 - tapOn: "^დასრულება$"
 - assertVisible: ".*სერვისები.*"
 
@@ -165,7 +185,8 @@ appId: com.ostati.app
 - scrollUntilVisible:
     element: ".*${output.providerFirstName} Test.*"
     direction: DOWN
-    timeout: 15000
+    speed: 90
+    timeout: 90000
 - back
 - back
 - assertVisible: ".*სერვისები.*"
@@ -189,18 +210,10 @@ appId: com.ostati.app
 - hideKeyboard
 - assertVisible: ".*${output.providerFirstName} Test.*"
 
-# Category chip filter — selecting the matching category keeps the
-# Provider visible (search text from above stays active too — both
-# conditions are AND'd, and this Provider satisfies both). The chip lives
-# in a horizontal scroller so it may not be on-screen without scrolling
-# right first.
-- scrollUntilVisible:
-    element: ".*ელექტროობა.*"
-    direction: RIGHT
-    optional: true
-- tapOn: ".*ელექტროობა.*"
+# Category filter is a single-select dropdown (field + bottom sheet), not chips.
+- tapOn: ".*აირჩიე სერვისი.*"
+- tapOn: "^ელექტროობა$"
 - assertVisible: ".*${output.providerFirstName} Test.*"
-- tapOn: ".*ელექტროობა.*"
 
 - back
 # Not "სერვისები" here — Home's own scroll position was left wherever the
@@ -210,7 +223,7 @@ appId: com.ostati.app
 - assertVisible: ".*მოძებნე ოსტატი.*"
 
 # --- Cleanup: logout -------------------------------------------------------
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"

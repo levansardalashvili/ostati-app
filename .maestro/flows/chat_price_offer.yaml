@@ -8,7 +8,8 @@ appId: com.ostati.app
 # ("select_provider") შემდეგ, აქ კი პირიქით — არჩევამდე, სანამ job
 # ჯერ კიდევ ღიაა.
 
-- launchApp
+- launchApp:
+    stopApp: false
 - extendedWaitUntil:
     notVisible: "Loading from"
     timeout: 20000
@@ -17,6 +18,17 @@ appId: com.ostati.app
 # restarts the process each time, so this reappears on every single run,
 # not just after `pm clear`/reinstall). It does NOT auto-dismiss; it must
 # be tapped, or it sits there blocking everything underneath forever.
+- extendedWaitUntil:
+    visible: "DEVELOPMENT SERVERS|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 30000
+    optional: true
+- tapOn:
+    point: "37%,28%"
+    optional: true
+- extendedWaitUntil:
+    visible: "Loading from|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 90000
+    optional: true
 - extendedWaitUntil:
     visible: "Continue"
     timeout: 6000
@@ -37,10 +49,10 @@ appId: com.ostati.app
       - back
 - extendedWaitUntil:
     visible: ".*(პროფილი|დაწყება).*"
-    timeout: 25000
+    timeout: 90000
 
 - tapOn:
-    text: ".*პროფილი.*"
+    text: "^პროფილი$"
     optional: true
 - scrollUntilVisible:
     element: ".*გასვლა.*"
@@ -55,7 +67,7 @@ appId: com.ostati.app
 
 # --- Phase 1: Customer registers and posts a job -----------------------
 - evalScript: ${output.customerEmail = 'e2e.offer.customer.' + Date.now() + '@example.com'}
-- evalScript: ${output.providerEmail = 'e2e.offer.provider.' + Date.now() + '@example.com'}
+- evalScript: ${output.providerEmail = 'verified.provider@e2e.example.com'}
 - evalScript: ${output.jobMarker = 'ChatOfferE2E' + Date.now()}
 
 - tapOn: ".*დაწყება.*"
@@ -80,9 +92,7 @@ appId: com.ostati.app
     id: "register-confirm-password"
 - inputText: "TestPass123"
 - hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
+- tapOn: "^გაგრძელება$"
 - tapOn:
     text: "Not now"
     optional: true
@@ -91,6 +101,9 @@ appId: com.ostati.app
     optional: true
 
 - assertVisible: ".*პროფილის დასრულება.*"
+- tapOn:
+    id: "setup-terms-checkbox"
+    optional: true
 - tapOn: "^დასრულება$"
 - assertVisible: ".*სერვისები.*"
 
@@ -98,7 +111,7 @@ appId: com.ostati.app
 - tapOn:
     point: "91%, 7%"
 - assertVisible: ".*მოთხოვნის გამოქვეყნება.*"
-- tapOn: ".*აირჩიე კატეგორია.*"
+- tapOn: ".*აირჩიეთ კატეგორია.*"
 - tapOn: ".*ელექტროობა.*"
 - tapOn:
     id: "post-job-description"
@@ -108,58 +121,30 @@ appId: com.ostati.app
 - assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
 - tapOn: ".*მთავარზე დაბრუნება.*"
 
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
 - assertVisible: ".*დაწყება.*"
 
 # --- Phase 2: Provider registers, expresses interest, sends a chat offer
-- tapOn: ".*დაწყება.*"
-- tapOn: ".*ოსტატი.*"
+- tapOn: ".*შესვლა.*"
 - tapOn:
-    id: "register-first-name"
-- inputText: "OfferProvider"
-- tapOn:
-    id: "register-last-name"
-- inputText: "E2E"
-- tapOn:
-    id: "register-email"
+    id: "login-email"
 - inputText: "${output.providerEmail}"
 - hideKeyboard
 - tapOn:
-    id: "register-password"
+    id: "login-password"
 - inputText: "TestPass123"
 - hideKeyboard
 - tapOn:
-    id: "register-confirm-password"
-- inputText: "TestPass123"
-- hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
-- tapOn:
-    text: "Not now"
-    optional: true
-- tapOn:
-    text: "Never"
-    optional: true
-
-- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
-- tapOn: ".*აირჩიე სპეციალობა.*"
-- tapOn: ".*ელექტრიკოსი.*"
-- tapOn: "^არჩევა$"
-- tapOn: ".*აირჩიე არეალი.*"
-- assertVisible: ".*სამუშაო არეალი.*"
-- tapOn: ".*ყველას მონიშვნა.*"
-- tapOn: "^შენახვა$"
-- tapOn: "^პროფილის შექმნა$"
+    id: "login-submit-button"
 - assertVisible: ".*ახალი მოთხოვნები.*"
 
 - tapOn:
-    text: ".*დეტ\\. ნახვა.*"
+    text: ".*დეტალების ნახვა.*"
     below: ".*${output.jobMarker}.*"
-- tapOn: ".*დაინტერესება.*"
+- tapOn: ".*ფასის შეთავაზება.*"
 - tapOn: ".*ჩაწერეთ თანხა.*"
 - inputText: "100"
 - hideKeyboard
@@ -190,13 +175,19 @@ appId: com.ostati.app
 - hideKeyboard
 - tapOn: "^გაგზავნა$"
 - assertVisible: ".*180 ₾.*"
+# Let the insert finish before the session is torn down below (the bubble shows
+# optimistically the instant it is sent).
+- extendedWaitUntil:
+    visible: "__never_visible__"
+    timeout: 4000
+    optional: true
 
 # Chat was opened directly from the ProviderHomeScreen tab (not from a
 # root-stack job-detail screen), so a single `back` already lands on the
 # tab bar — unlike the CustomerJobDetail→Chat hop in Phase 3 below, which
 # needs two.
 - back
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - scrollUntilVisible:
     element: ".*გასვლა.*"
     direction: DOWN
@@ -230,7 +221,7 @@ appId: com.ostati.app
 
 - back
 - back
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"

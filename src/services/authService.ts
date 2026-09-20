@@ -75,9 +75,7 @@ export interface AuthService {
   waitForSession(): Promise<AppUser | null>;
 }
 
-// Web OAuth Client ID — იგივე, რაც Firebase-ის დროს გამოვიყენეთ Google
-// Sign-In-ისთვის (docs/firebase-setup.md-ის მსგავსი Google Cloud Console
-// კონფიგურაცია, Supabase-ს არაფერი ეხება). Supabase-ს ცალკე სჭირდება ეს
+// Web OAuth Client ID Google Sign-In-ისთვის. Supabase-ს ცალკე სჭირდება ეს
 // Client ID დარეგისტრირებული Authentication → Providers → Google-ში, რომ
 // id token-ის audience-ს დაუშვას.
 const GOOGLE_WEB_CLIENT_ID = '463055179499-khj88vj0ts6l2ufvaarnbdgn4f55snkj.apps.googleusercontent.com';

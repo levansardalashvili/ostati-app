@@ -54,7 +54,7 @@ type JobPostRow = {
 // fallback-ით) — კატეგორიის სახელი ახლა ბექენდიდანაა სანდო, ძველი
 // job-ების ჩვენებაც ისევე მუშაობს (fallback ზუსტად ძველ მონაცემს
 // იმეორებს).
-export function deriveJobTitle(category: string): string {
+function deriveJobTitle(category: string): string {
   return categoryService.getCategoryName(category);
 }
 
@@ -416,7 +416,15 @@ export const jobService: JobService = {
       .in('id', jobIds)
       .order('created_at', { ascending: false })
       .limit(1);
-    return (posts?.[0] as { id: string } | undefined)?.id ?? null;
+    if (posts?.[0]) return (posts[0] as { id: string }).id;
+
+    // Provider side: pending jobs are no longer directly readable (address privacy, 0092) —
+    // resolve through the masked feed RPC instead. Errors (e.g. Customer caller) → null.
+    const { data: feed } = await supabase.rpc('get_open_provider_feed');
+    const match = ((feed ?? []) as { id: string; customer_id: string }[]).find(
+      (r) => r.customer_id === customerId && jobIds.includes(r.id),
+    );
+    return match?.id ?? null;
   },
   async selectProvider(jobId, providerId) {
     const { error } = await supabase.rpc('select_provider', { p_job_id: jobId, p_provider_id: providerId });

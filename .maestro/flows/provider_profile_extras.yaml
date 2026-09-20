@@ -28,7 +28,8 @@ appId: com.ostati.app
 # instead of trying to assert on media thumbnails directly, this flow
 # just confirms that card is gone after saving + a fresh login.
 
-- launchApp
+- launchApp:
+    stopApp: false
 - extendedWaitUntil:
     notVisible: "Loading from"
     timeout: 20000
@@ -37,6 +38,17 @@ appId: com.ostati.app
 # restarts the process each time, so this reappears on every single run).
 # It does NOT auto-dismiss; it must be tapped, or it sits there blocking
 # everything underneath forever.
+- extendedWaitUntil:
+    visible: "DEVELOPMENT SERVERS|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 30000
+    optional: true
+- tapOn:
+    point: "37%,28%"
+    optional: true
+- extendedWaitUntil:
+    visible: "Loading from|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 90000
+    optional: true
 - extendedWaitUntil:
     visible: "Continue"
     timeout: 6000
@@ -55,11 +67,11 @@ appId: com.ostati.app
       - back
 - extendedWaitUntil:
     visible: ".*(პროფილი|დაწყება).*"
-    timeout: 25000
+    timeout: 90000
 
 # Leftover-session cleanup, in case a previous run crashed mid-flow.
 - tapOn:
-    text: ".*პროფილი.*"
+    text: "^პროფილი$"
     optional: true
 - scrollUntilVisible:
     element: ".*გასვლა.*"
@@ -99,9 +111,7 @@ appId: com.ostati.app
     id: "register-confirm-password"
 - inputText: "TestPass123"
 - hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
+- tapOn: "^გაგრძელება$"
 - tapOn:
     text: "Not now"
     optional: true
@@ -113,12 +123,16 @@ appId: com.ostati.app
 # "სხვა" entry + sqm price + profile photo + area. ------------------------
 - assertVisible: ".*შექმენი ოსტატის პროფილი.*"
 - tapOn: ".*აირჩიე სპეციალობა.*"
-- tapOn: ".*სანტექნიკოსი.*"
-- tapOn: ".*მღებავი.*"
+- tapOn: ".*სანტექნიკა.*"
+- tapOn: ".*შეღებვა.*"
+- scrollUntilVisible:
+    element: ".*სხვა.*"
+    direction: DOWN
 - tapOn: ".*სხვა.*"
 - tapOn: ".*მიუთითე შენი პროფესია.*"
 - inputText: "დურგალი"
-- hideKeyboard
+# No hideKeyboard here: with the keyboard already resolved Maestro's hideKeyboard
+# sends Back, which closes this BottomSheet. The add button stays reachable.
 - tapOn: ".*დამატება.*"
 - assertVisible: ".*დურგალი.*"
 - tapOn: "^არჩევა$"
@@ -136,24 +150,34 @@ appId: com.ostati.app
 - tapOn:
     point: "16%, 34%"
 
+- tapOn:
+    text: ".*აირჩიე გამოცდილება.*"
+    optional: true
+- tapOn:
+    text: "3–5 წელი"
+    optional: true
 - tapOn: ".*აირჩიე არეალი.*"
 - assertVisible: ".*სამუშაო არეალი.*"
 - tapOn: ".*ყველას მონიშვნა.*"
 - tapOn: "^შენახვა$"
+- tapOn:
+    id: "setup-terms-checkbox"
+    optional: true
 - tapOn: "^პროფილის შექმნა$"
 - assertVisible: ".*ახალი მოთხოვნები.*"
 
 # --- Phase 3: verify the public profile shows all 3 specialties + the
 # real sqm price (not a hardcoded/mock display). --------------------------
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - scrollUntilVisible:
     element: ".*ნახე ჩემი პროფილი.*"
     direction: DOWN
 - tapOn: ".*ნახე ჩემი პროფილი.*"
-- assertVisible: ".*სანტექნიკოსი.*"
-- assertVisible: ".*მღებავი.*"
+- assertVisible: ".*სანტექნიკა.*"
+- assertVisible: ".*შეღებვა.*"
 - assertVisible: ".*დურგალი.*"
-- assertVisible: ".*ფასი კვ.მ-ზე: 45.*"
+# (The public profile intentionally no longer shows a price section — removed in
+# 834b90a; the sqm price itself is still saved and edited privately.)
 - back
 
 # --- Phase 4: ProviderEditProfileScreen — its OWN area picker entry
@@ -166,7 +190,7 @@ appId: com.ostati.app
 - tapOn: "^შენახვა$"
 - assertVisible: ".*ბათუმი.*"
 
-- tapOn: ".*მოგვიყევი შენ შესახებ.*"
+- tapOn: ".*მოკლედ აღწერეთ.*"
 - inputText: "ვმუშაობ პასუხისმგებლობით და ხარისხიანად ყოველთვის."
 - hideKeyboard
 
@@ -221,7 +245,7 @@ appId: com.ostati.app
     id: "login-submit-button"
 - assertVisible: ".*ახალი მოთხოვნები.*"
 
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - assertNotVisible: ".*პროფილის სისრულე.*"
 - tapOn: ".*პროფილის რედაქტირება.*"
 - assertVisible: ".*ბათუმი.*"

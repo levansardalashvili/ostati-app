@@ -38,7 +38,6 @@ import type { Provider } from '../types/provider';
 import type { JobQuote } from '../types/quote';
 import type { RatingData } from '../types/review';
 import { isNewProvider, weightedRating } from '../utils/providerRank';
-import { isUuid } from '../utils/isUuid';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerJobDetail'>;
@@ -144,9 +143,13 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   // already-set value back to null.
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   useEffect(() => {
-    const match = interestedList.find((entry) => entry.provider.name === job.provider)?.provider;
+    // id-ით (job_posts.provider_id) — სახელით შედარება მყიფეა და მარცხის შემთხვევაში
+    // selectedProvider null რჩებოდა, რაც შეფასების ჩუმ დაკარგვას იწვევდა.
+    const match =
+      interestedList.find((entry) => !!job.providerId && entry.provider.id === job.providerId)?.provider ??
+      interestedList.find((entry) => entry.provider.name === job.provider)?.provider;
     if (match) setSelectedProvider(match);
-  }, [interestedList, job.provider]);
+  }, [interestedList, job.provider, job.providerId]);
   const [sortBy, setSortBy] = useState<'price' | 'rating' | 'experience' | null>(null);
 
   // #72: Provider ყოველთვის კონკრეტულ რიცხვს წარადგენს — "ფასი სამუშაოს
@@ -331,30 +334,22 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       providerColor: selectedProvider?.color ?? colors.primary,
       onRate: async (data) => {
         const uid = authService.getCurrentUser()?.uid;
-        if (!uid || !selectedProvider || !isUuid(selectedProvider.id) || !isUuid(job.id)) return;
-        try {
-          // reviews-ის INSERT-ს job_posts.status-ს "completed"-ზე გადაჰყავს
-          // (0015_review_completion_trigger.sql) — ეს ერთადერთი გზაა
-          // completed-მდე მისასვლელად, ამიტომ ლოკალურ state-საც მხოლოდ
-          // ამ insert-ის წარმატების შემდეგ ვცვლით.
-          await reviewService.submitReview(
-            job.id,
-            uid,
-            selectedProvider.id,
-            data,
-          );
-          setRatingData(data);
-          setStatus(job.id, 'completed');
-          // #73: "სამუშაო დასრულებულად დადასტურდა" ახლა reviews-ის INSERT
-          // trigger-ის (handle_review_completion) მხრიდან იგზავნება, იმავე
-          // transaction-ში, სადაც status "completed"-ზე გადადის — იხ.
-          // supabase/migrations/0023.
-        } catch {
-          // RatingScreen უკვე "submitted" ეკრანზეა გადასული (optimistic,
-          // RatingScreen.tsx-ის საკუთარი ქცევა) — job-ის დეტალის ეკრანზე
-          // დაბრუნებისას ratingData/effectiveStatus კვლავ "ელოდება
-          // შეფასებას"-ს აჩვენებს, არასწორად "დასრულებულს" არ ვცვლით.
-        }
+        // სერვერი provider_id-ს მაინც job-იდან ადგენს (set_review_identity), ამიტომ
+        // selectedProvider-ის გარეშეც შეგვიძლია გაგზავნა — ადრე აქ ჩუმად ვბრუნდებოდით
+        // და RatingScreen "მადლობას" აჩვენებდა, შეფასება კი არ ინახებოდა.
+        const ratedProviderId = selectedProvider?.id ?? job.providerId;
+        if (!uid || !ratedProviderId) throw new Error('rating: missing user or provider');
+        // reviews-ის INSERT-ს job_posts.status-ს "completed"-ზე გადაჰყავს
+        // (0015_review_completion_trigger.sql) — ეს ერთადერთი გზაა
+        // completed-მდე მისასვლელად, ამიტომ ლოკალურ state-საც მხოლოდ
+        // ამ insert-ის წარმატების შემდეგ ვცვლით. შეცდომა განზრახ არ ჩაიხშობა:
+        // RatingScreen ცდის თავიდან და მომხმარებელს ეუბნება, რომ ვერ გაიგზავნა.
+        await reviewService.submitReview(job.id, uid, ratedProviderId, data);
+        setRatingData(data);
+        setStatus(job.id, 'completed');
+        // #73: "სამუშაო დასრულებულად დადასტურდა" reviews-ის INSERT trigger-იდან
+        // (handle_review_completion) იგზავნება იმავე transaction-ში —
+        // იხ. supabase/migrations/0023.
       },
     });
   };

@@ -114,7 +114,8 @@ export type RootStackParamList = {
     providerName: string;
     providerInitials: string;
     providerColor: string;
-    onRate?: (data: RatingData) => void;
+    // უნდა დაარეჯექთოს, თუ შეფასება ვერ ჩაიწერა — RatingScreen მაშინ შეცდომას აჩვენებს
+    onRate?: (data: RatingData) => void | Promise<void>;
   };
 };
 

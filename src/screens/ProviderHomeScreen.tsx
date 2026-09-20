@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Briefcase, ChevronRight, Clock, MapPin, ShieldAlert, User } from 'lucide-react-native';
+import { Bell, Briefcase, ChevronRight, Clock, MapPin, ShieldAlert } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { type CompositeScreenProps, useFocusEffect } from '@react-navigation/native';

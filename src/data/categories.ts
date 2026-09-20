@@ -48,3 +48,5 @@ export const SPECIALTY_LABEL: Record<string, string> = {
   cleaning: 'დამლაგებელი',
   moving: 'გადამზიდავი',
 };
+
+export const isSqmPriced = (id: string) => ['painting', 'tile', 'flooring', 'renovation'].includes(id);

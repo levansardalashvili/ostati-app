@@ -12,7 +12,6 @@ import {
   MessageCircle,
   MoreVertical,
   ShieldCheck,
-  Star,
   ThumbsUp,
   X,
 } from 'lucide-react-native';

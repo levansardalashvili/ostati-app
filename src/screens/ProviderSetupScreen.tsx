@@ -23,7 +23,7 @@ import { ProgressBar } from '../components/ProgressBar';
 import { SpecialtyPickerField, type SpecialtyOption } from '../components/SpecialtyPickerField';
 import { SqmPriceField } from '../components/SqmPriceField';
 import { colors, radius, spacing, typography } from '../theme';
-import { isSqmPriced } from '../data/specialties';
+import { isSqmPriced } from '../data/categories';
 import { authService } from '../services/authService';
 import { storageService, type UserMediaKind } from '../services/storageService';
 import { userService } from '../services/userService';
@@ -304,6 +304,7 @@ export function ProviderSetupScreen({ navigation }: Props) {
         )}
         <View style={styles.termsRow}>
           <Pressable
+            testID="setup-terms-checkbox"
             style={[
               styles.checkbox,
               agreed && styles.checkboxChecked,

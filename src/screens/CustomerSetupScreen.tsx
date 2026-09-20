@@ -75,6 +75,7 @@ export function CustomerSetupScreen({ navigation, route }: Props) {
       <View style={styles.footer}>
         <View style={styles.termsRow}>
           <Pressable
+            testID="setup-terms-checkbox"
             style={[styles.checkbox, agreed && styles.checkboxChecked]}
             onPress={() => setAgreed((a) => !a)}
           >

@@ -22,7 +22,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PhoneRegisterVerify'>;
 // მსგავსი, აქ საჭირო არაა — აღარაფერია დასრულებული).
 export function PhoneRegisterVerifyScreen({ navigation, route }: Props) {
   const { role, phone, firstName, lastName, defaultAddress, password } = route.params;
-  const isProvider = role === 'provider';
   const { setProfile } = useCustomerProfile();
   const { setProfile: setProviderProfile } = useProviderProfile();
   const { secondsLeft, canResend, restart } = useResendCooldown(60);

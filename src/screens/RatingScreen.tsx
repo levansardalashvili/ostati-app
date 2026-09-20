@@ -7,6 +7,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
 import { Button } from '../components/Button';
+import { InlineBanner } from '../components/InlineBanner';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
 import { MediaUploadGrid, nextMediaItem, type MediaItem } from '../components/MediaUploadGrid';
 import { colors, radius, spacing, typography } from '../theme';
@@ -39,6 +40,7 @@ export function RatingScreen({ navigation, route }: Props) {
   const [previewPhoto, setPreviewPhoto] = useState<MediaItem | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
 
   useLayoutEffect(() => {
     navigation.setOptions({ gestureEnabled: false });
@@ -74,6 +76,7 @@ export function RatingScreen({ navigation, route }: Props) {
   const handleSubmit = async () => {
     if (stars === 0 || submitting) return;
     setSubmitting(true);
+    setSubmitError(false);
     const uid = authService.getCurrentUser()?.uid;
     let uploadedPhotos = photos;
     if (uid && photos.length > 0) {
@@ -96,7 +99,16 @@ export function RatingScreen({ navigation, route }: Props) {
       // ინახება, თუნდაც სხვა რომელიმემ ვერ იტვირთოს.
       uploadedPhotos = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
     }
-    onRate?.({ stars, review, chips, photos: uploadedPhotos.length > 0 ? uploadedPhotos : undefined });
+    try {
+      await onRate?.({ stars, review, chips, photos: uploadedPhotos.length > 0 ? uploadedPhotos : undefined });
+    } catch {
+      // ჩაწერა ვერ მოხერხდა — "მადლობას" არ ვაჩვენებთ, შეფასება უნდა გაიგზავნოს თავიდან
+      // უკვე ატვირთული ფოტოები state-ში ვინახავთ — ხელახალ ცდაზე თავიდან აღარ აიტვირთება
+      setPhotos(uploadedPhotos);
+      setSubmitError(true);
+      setSubmitting(false);
+      return;
+    }
     setSubmitting(false);
     setSubmitted(true);
   };
@@ -200,6 +212,11 @@ export function RatingScreen({ navigation, route }: Props) {
         </ScrollView>
 
         <View style={styles.footer}>
+          {submitError && (
+            <View style={{ marginBottom: spacing.sm }}>
+              <InlineBanner type="error" msg="შეფასება ვერ გაიგზავნა" action="თავიდან ცდა" onAction={handleSubmit} />
+            </View>
+          )}
           <Button
             label="შეფასების გაგზავნა"
             loadingLabel="იგზავნება..."

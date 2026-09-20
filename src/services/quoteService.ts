@@ -42,7 +42,6 @@ function fromJobResponseRowFallback(row: JobResponseRow): JobQuote {
       reviews: 0,
       location: '',
       areas: [],
-      price: '',
       jobs: 0,
       verified: false,
       verificationStatus: 'unverified',

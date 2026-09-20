@@ -33,7 +33,6 @@ const EMPTY_PROVIDER: Provider = {
   reviews: 0,
   location: '',
   areas: [],
-  price: '',
   jobs: 0,
   verified: false,
   verificationStatus: 'unverified',

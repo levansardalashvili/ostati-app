@@ -20,7 +20,8 @@ appId: com.ostati.app
 #      re-opening the screen and seeing the NEW selection, not the old
 #      one and not the fake one.
 
-- launchApp
+- launchApp:
+    stopApp: false
 - extendedWaitUntil:
     notVisible: "Loading from"
     timeout: 20000
@@ -29,6 +30,17 @@ appId: com.ostati.app
 # restarts the process each time, so this reappears on every single run).
 # It does NOT auto-dismiss; it must be tapped, or it sits there blocking
 # everything underneath forever.
+- extendedWaitUntil:
+    visible: "DEVELOPMENT SERVERS|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 30000
+    optional: true
+- tapOn:
+    point: "37%,28%"
+    optional: true
+- extendedWaitUntil:
+    visible: "Loading from|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 90000
+    optional: true
 - extendedWaitUntil:
     visible: "Continue"
     timeout: 6000
@@ -47,11 +59,11 @@ appId: com.ostati.app
       - back
 - extendedWaitUntil:
     visible: ".*(პროფილი|დაწყება).*"
-    timeout: 25000
+    timeout: 90000
 
 # Leftover-session cleanup, in case a previous run crashed mid-flow.
 - tapOn:
-    text: ".*პროფილი.*"
+    text: "^პროფილი$"
     optional: true
 - scrollUntilVisible:
     element: ".*გასვლა.*"
@@ -90,9 +102,7 @@ appId: com.ostati.app
     id: "register-confirm-password"
 - inputText: "TestPass123"
 - hideKeyboard
-- tapOn:
-    id: "register-terms-checkbox"
-- tapOn: ".*რეგისტრაცია.*"
+- tapOn: "^გაგრძელება$"
 
 - tapOn:
     text: "Not now"
@@ -103,9 +113,15 @@ appId: com.ostati.app
 
 - assertVisible: ".*შექმენი ოსტატის პროფილი.*"
 - tapOn: ".*აირჩიე სპეციალობა.*"
-- tapOn: ".*ელექტრიკოსი.*"
+- tapOn: ".*ელექტროობა.*"
 - tapOn: "^არჩევა$"
 
+- tapOn:
+    text: ".*აირჩიე გამოცდილება.*"
+    optional: true
+- tapOn:
+    text: "3–5 წელი"
+    optional: true
 - tapOn: ".*აირჩიე არეალი.*"
 - assertVisible: ".*სამუშაო არეალი.*"
 - tapOn: ".*აჭარა.*"
@@ -113,6 +129,9 @@ appId: com.ostati.app
 - assertVisible: ".*არჩეულია 1 არეალი.*"
 - tapOn: "^შენახვა$"
 
+- tapOn:
+    id: "setup-terms-checkbox"
+    optional: true
 - tapOn: "^პროფილის შექმნა$"
 - assertVisible: ".*ახალი მოთხოვნები.*"
 
@@ -120,7 +139,7 @@ appId: com.ostati.app
 # loaded the REAL saved area (ბათუმი/აჭარა), not the old hardcoded fake
 # ['ვაკე','საბურთალო','ვერა'] (which would show "3 არეალი შერჩეულია"
 # and a Tbilisi selection instead of "1"/Adjara). ------------------------
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - scrollUntilVisible:
     element: ".*სამუშაო არეალი.*"
     direction: DOWN
@@ -167,7 +186,7 @@ appId: com.ostati.app
     id: "login-submit-button"
 - assertVisible: ".*ახალი მოთხოვნები.*"
 
-- tapOn: ".*პროფილი.*"
+- tapOn: "^პროფილი$"
 - scrollUntilVisible:
     element: ".*სამუშაო არეალი.*"
     direction: DOWN

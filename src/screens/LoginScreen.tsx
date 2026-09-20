@@ -73,7 +73,8 @@ export function LoginScreen({ navigation }: Props) {
       setProviderProfile({ firstName: record.firstName, lastName: record.lastName });
       const providerProfile = await userService.getProviderProfileRecord(user.uid);
       if (providerProfile) setProviderProfile(providerProfile);
-      navigation.reset({ index: 0, routes: [{ name: 'ProviderHome' }] });
+      // პროფილის row არ არსებობს = setup არ დასრულებულა, ვაბრუნებთ setup-ზე
+      navigation.reset({ index: 0, routes: [{ name: providerProfile ? 'ProviderHome' : 'ProviderSetup' }] });
     } else {
       setProfile({
         firstName: record.firstName,
