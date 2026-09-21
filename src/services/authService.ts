@@ -65,6 +65,8 @@ export interface AuthService {
   // no signed-in user with an email (e.g. a Google-only account).
   updatePassword(currentPassword: string, newPassword: string): Promise<void>;
   signOut(): Promise<void>;
+  // ანგარიშის სამუდამო წაშლა (delete_my_account RPC, 0095). ACTIVE_JOBS შეცდომას აგდებს, თუ მიმდინარე სამუშაო აქვს.
+  deleteAccount(): Promise<void>;
   getCurrentUser(): AppUser | null;
   subscribeToAuthState(callback: (user: AppUser | null) => void): () => void;
   // Cold-start session restore (Task 1) — resolves once Supabase-ის
@@ -268,6 +270,36 @@ export const authService: AuthService = {
     } catch {
       // GoogleSignin ან არასდროს კონფიგურირებულა (მხოლოდ email/password
       // გამოყენებისას), ან უკვე გამოსული იყო — ორივე შემთხვევა უვნებელია.
+    }
+  },
+  async deleteAccount() {
+    const uid = cachedUser?.id;
+    if (!uid) throw new Error('Authentication required');
+    // ფაილების გასუფთავება — best-effort, სანამ სესია ცოცხალია (RPC-ის შემდეგ ვეღარ ვიქნებით
+    // ავტორიზებულები). private-media-ს ფაილებს Edge Function შლის (SQL-ით storage ობიექტები არ იშლება).
+    await supabase.functions.invoke('delete-account-files').catch(() => {});
+    const targets: [string, string][] = [
+      ...(['profile', 'certificate', 'portfolio', 'rating'] as const).map((k): [string, string] => ['user-media', `${k}/${uid}`]),
+      ['job-photos', uid],
+    ];
+    for (const [bucket, folder] of targets) {
+      try {
+        const { data } = await supabase.storage.from(bucket).list(folder);
+        if (data?.length) await supabase.storage.from(bucket).remove(data.map((f) => `${folder}/${f.name}`));
+      } catch {
+        // საცავის გასუფთავება არ უნდა ბლოკავდეს წაშლას
+      }
+    }
+    await pushTokenService.deactivateCurrentToken().catch(() => {});
+    const { error } = await supabase.rpc('delete_my_account');
+    if (error) throw error;
+    cachedUser = null;
+    // ანგარიში აღარ არსებობს — სესიას მხოლოდ ლოკალურად ვასუფთავებთ (სერვერზე გასვლა ვეღარ შედგება)
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+    try {
+      await GoogleSignin.signOut();
+    } catch {
+      // Google არასდროს გამოგვიყენებია — უვნებელია
     }
   },
   getCurrentUser() {

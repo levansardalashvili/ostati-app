@@ -1,6 +1,8 @@
 // ოსტატის მიღებული ერთი შეფასება
 // ანონიმურია — ავტორის ვინაობა არასდროს ინახება/ჩანს (0085)
 export type Review = {
+  id?: string;
+  reply?: string | null; // ოსტატის პასუხი (0100)
   stars: number;
   date: string;
   text: string;

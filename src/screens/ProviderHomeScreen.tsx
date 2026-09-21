@@ -92,7 +92,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
       // იწვევდა — დანარჩენი ორი query-ის იგივე `uid`-დაცვის ქვეშ ჩავაგდე,
       // პლუს `.catch()`.
       Promise.all([
-        uid ? jobService.getOpenProviderFeedPosts() : Promise.resolve([]),
+        uid ? jobService.getOpenProviderFeedPosts(true) : Promise.resolve([]),
         uid ? quoteService.listMyResponseJobIds(uid) : Promise.resolve(new Set<string>()),
         uid ? jobService.listMyAssignedJobs(uid) : Promise.resolve([]),
       ])

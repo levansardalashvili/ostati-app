@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Briefcase } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -22,6 +22,8 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
   const [interests, setInterests] = useState<Set<string>>(new Set());
   const [filtered, setFiltered] = useState<FeedJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // false — მხოლოდ ჩემი სპეციალობის კატეგორიები (0098), true — ყველა ღია განცხადება
+  const [showAll, setShowAll] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -36,7 +38,7 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
       // get_open_provider_feed" (42501) uncaught rejection-ს იწვევდა —
       // `uid`-ის სხვა ორ query-ის იგივე დაცვის ქვეშ ჩავაგდე, პლუს `.catch()`.
       Promise.all([
-        uid ? jobService.getOpenProviderFeedPosts() : Promise.resolve([]),
+        uid ? jobService.getOpenProviderFeedPosts(!showAll) : Promise.resolve([]),
         uid ? quoteService.listMyResponseJobIds(uid) : Promise.resolve(new Set<string>()),
       ])
         .then(([jobs, myResponses]) => {
@@ -51,7 +53,7 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
       return () => {
         cancelled = true;
       };
-    }, []),
+    }, [showAll]),
   );
 
   const handleJobDetail = (job: FeedJob) => {
@@ -74,6 +76,9 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
       <BackHeader title="ახალი მოთხოვნები" onBack={() => navigation.goBack()} />
 
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+        <Pressable onPress={() => setShowAll((v) => !v)} style={styles.toggle} testID="feed-show-all-toggle">
+          <Text style={styles.toggleText}>{showAll ? 'მხოლოდ ჩემი სპეციალობა' : 'ყველა განცხადების ნახვა'}</Text>
+        </Pressable>
         {isLoading ? (
           <View style={{ gap: spacing.md }}>
             {[0, 1, 2].map((i) => (
@@ -86,7 +91,9 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
               <Briefcase size={20} color={colors.mutedForeground} />
             </View>
             <Text style={styles.emptyTitle}>ახალი მოთხოვნები ჯერ არ არის</Text>
-            <Text style={styles.emptySubtitle}>შენს კატეგორიასა და არეალში ახალი მოთხოვნა გამოჩნდება.</Text>
+            <Text style={styles.emptySubtitle}>
+              {showAll ? 'ახალი მოთხოვნა გამოჩნდება.' : 'თქვენი სპეციალობის ახალი მოთხოვნა გამოჩნდება.'}
+            </Text>
           </View>
         ) : (
           <View style={{ gap: spacing.md }}>
@@ -116,6 +123,15 @@ const styles = StyleSheet.create({
   },
   bodyContent: {
     padding: spacing.lg,
+  },
+  toggle: {
+    alignSelf: 'flex-end',
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  toggleText: {
+    ...typography.captionMedium,
+    color: colors.primary,
   },
   emptyState: {
     backgroundColor: colors.card,

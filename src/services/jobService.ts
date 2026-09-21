@@ -75,6 +75,9 @@ export function getPublishErrorMessage(err: unknown): string {
   if (message.includes('Description must be')) {
     return 'აღწერა უნდა იყოს 20–500 სიმბოლოს ფარგლებში — შეასწორე და სცადე თავიდან.';
   }
+  if (message.includes('TOO_MANY_OPEN_JOBS')) {
+    return 'ერთდროულად მაქსიმუმ 10 ღია განცხადება შეიძლება გქონდეთ — ზედმეტი გააუქმეთ და სცადეთ თავიდან.';
+  }
   if (message.includes('exact address is required')) {
     return 'მისამართი სავალდებულოა — შეავსე ველი და სცადე თავიდან.';
   }
@@ -94,8 +97,10 @@ function fromJobPostRow(row: JobPostRow): CustomerJob {
     desc: row.description,
     photos: row.photos,
     agreedPrice: row.agreed_price,
+    cancellationActor: row.cancellation_actor,
     preferredDate: row.preferred_date,
     timeSlot: row.time_slot,
+    createdAt: row.created_at,
   };
 }
 
@@ -161,6 +166,8 @@ async function fetchFeedJobPostRow(id: string): Promise<JobPostRow | null> {
 // hardening pass, item 4) — job-ის ფოტოები კერძო storage-ში იტვირთება
 // job-ის id-ის ცოდნის შემდეგ, ცალკე `setJobPhotos`-ით.
 export type NewJobPostInput = {
+  // თუ მითითებულია — განცხადება პირადია და მხოლოდ ამ ოსტატს ეჩვენება (0094)
+  invitedProviderId?: string;
   category: string;
   description: string;
   address: string;
@@ -182,7 +189,8 @@ export interface JobService {
   // "ეტაპი B" (Provider-ის Job Feed, ღია job-ების საჯარო წაკითხვა).
   createCustomerJob(customerId: string, input: NewJobPostInput): Promise<CustomerJob>;
   listMyJobPosts(customerId: string): Promise<CustomerJob[]>;
-  getOpenProviderFeedPosts(): Promise<FeedJob[]>;
+  // onlyMine — მხოლოდ ოსტატის საკუთარი სპეციალობების კატეგორიები (0098)
+  getOpenProviderFeedPosts(onlyMine?: boolean): Promise<FeedJob[]>;
 
   // ერთი job-ის პირდაპირი წაკითხვა id-ით (#71) — route param-ში `job`
   // ობიექტის არარსებობისას fallback (მაგ. notification deep-link, სადაც
@@ -222,6 +230,10 @@ export interface JobService {
   // დღეს UI-ს ცალკე ტექსტური ველი გაუქმების მიზეზისთვის არ აქვს
   // (განზრახ, "UI-ს არ ვცვლით" შეზღუდვის ფარგლებში).
   cancelJob(jobId: string, reason?: string): Promise<void>;
+  // ოსტატის მიერ გაუქმებული განცხადების ხელახლა გახსნა დანარჩენი დაინტერესებულებისთვის (0097)
+  reopenJob(jobId: string): Promise<void>;
+  // ვადის ბოლო 3 დღეში განცხადების განახლება (0099)
+  renewJob(jobId: string): Promise<void>;
 
   // Provider-initiated job cancellation — supabase/migrations/0036,
   // ცალკე RPC (`provider_cancel_job`) `cancelJob`-ის (Customer-ის RPC)
@@ -291,6 +303,7 @@ export const jobService: JobService = {
       p_date: input.date,
       p_preferred_date: input.preferredDate ?? null,
       p_time_slot: input.timeSlot ?? null,
+      p_invited_provider_id: input.invitedProviderId ?? null,
     });
     if (error) throw error;
     return fromJobPostRow(data as JobPostRow);
@@ -334,6 +347,8 @@ export const jobService: JobService = {
     // Third hardening pass, priority 2 — drafts (create_job() succeeded
     // but publish was never finalized) must never render as if they were
     // a real posted job.
+    // 30 დღეზე ძველი მომლოდინე განცხადებები ავტომატურად უქმდება (0096) — უშედეგოდ არ ვბლოკავთ სიას
+    await supabase.rpc('expire_my_stale_jobs').then(() => {}, () => {});
     const { data, error } = await supabase
       .from('job_posts')
       .select('*')
@@ -343,13 +358,13 @@ export const jobService: JobService = {
     if (error) throw error;
     return (data as JobPostRow[]).map(fromJobPostRow);
   },
-  async getOpenProviderFeedPosts() {
+  async getOpenProviderFeedPosts(onlyMine = false) {
     // Third hardening pass, priority 1 — `get_open_provider_feed()` RPC
     // (supabase/migrations/0052), not a view over `job_posts` — Providers
     // have no direct base-table read access to pending rows any more, so
     // this RPC (SECURITY DEFINER, masked address, pending-only) is the
     // only way this list can be read at all.
-    const { data, error } = await supabase.rpc('get_open_provider_feed');
+    const { data, error } = await supabase.rpc('get_open_provider_feed', { p_only_mine: onlyMine });
     if (error) throw error;
     return (data as JobPostRow[]).map(fromJobPostRowToFeedJob);
   },
@@ -440,6 +455,14 @@ export const jobService: JobService = {
   },
   async customerReportProblem(jobId, reason) {
     const { error } = await supabase.rpc('customer_report_problem', { p_job_id: jobId, p_reason: reason });
+    if (error) throw error;
+  },
+  async renewJob(jobId) {
+    const { error } = await supabase.rpc('renew_job', { p_job_id: jobId });
+    if (error) throw error;
+  },
+  async reopenJob(jobId) {
+    const { error } = await supabase.rpc('reopen_job', { p_job_id: jobId });
     if (error) throw error;
   },
   async cancelJob(jobId, reason) {

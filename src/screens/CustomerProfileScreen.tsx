@@ -8,6 +8,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
+import { DeleteAccountRow } from '../components/DeleteAccountRow';
 import { ProfileMenuRow } from '../components/ProfileMenuRow';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
@@ -150,6 +151,8 @@ export function CustomerProfileScreen({ navigation }: Props) {
           </View>
           <Text style={styles.logoutText}>გასვლა</Text>
         </Pressable>
+
+        <DeleteAccountRow onDeleted={() => navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Welcome' }] })} />
       </ScrollView>
 
       <BottomSheet visible={logoutSheetOpen} onClose={() => setLogoutSheetOpen(false)}>

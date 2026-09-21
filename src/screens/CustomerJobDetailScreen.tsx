@@ -95,6 +95,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   }, [route.params.job, route.params.jobId]);
 
   const [interestedList, setInterestedList] = useState<JobQuote[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     if (!job.id) return;
     let cancelled = false;
@@ -107,7 +108,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [job.id]);
+  }, [job.id, reloadKey]);
   useEffect(() => {
     if (job.id) notificationService.markJobNotificationsRead(job.id).catch(() => {});
   }, [job.id]);
@@ -283,6 +284,43 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   // მხოლოდ sheet-ს არ ჰქონდა ველი) — "pending" job-ზე (Provider ჯერ არ
   // მინიჭებულა) კვლავ არ მოითხოვება, ზუსტად #79-ის "pending job may be
   // cancelled" / "active job may be cancelled with a reason" წესის მიხედვით.
+  // ოსტატმა გააუქმა → მომხმარებელს შეუძლია განცხადება დანარჩენებისთვის ხელახლა გახსნას (0097)
+  const [reopening, setReopening] = useState(false);
+  const canReopen = effectiveStatus === 'cancelled' && job.cancellationActor === 'provider';
+  const reopenJob = async () => {
+    if (reopening) return;
+    setReopening(true);
+    try {
+      await jobService.reopenJob(job.id);
+      setStatus(job.id, 'pending');
+      setSelectedProvider(null);
+      setJob((prev) => ({ ...prev, status: 'pending', provider: null, providerId: undefined, cancellationActor: null }));
+      setReloadKey((k) => k + 1);
+    } catch (e) {
+      const tooMany = ((e as { message?: string } | null)?.message ?? '').includes('TOO_MANY_OPEN_JOBS');
+      Alert.alert('ვერ მოხერხდა', tooMany ? 'ერთდროულად მაქსიმუმ 10 ღია განცხადება შეიძლება გქონდეთ.' : 'განცხადების ხელახლა გახსნა ვერ მოხერხდა — სცადეთ თავიდან.');
+    } finally {
+      setReopening(false);
+    }
+  };
+  // ვადა იწურება (30 დღე, 0096): ბოლო 3 დღეში განცხადების განახლება შეიძლება (0099)
+  const [renewing, setRenewing] = useState(false);
+  const canRenew =
+    effectiveStatus === 'pending' &&
+    !!job.createdAt &&
+    Date.now() - new Date(job.createdAt).getTime() >= 27 * 24 * 3600 * 1000;
+  const renewJob = async () => {
+    if (renewing) return;
+    setRenewing(true);
+    try {
+      await jobService.renewJob(job.id);
+      setJob((prev) => ({ ...prev, createdAt: new Date().toISOString() }));
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'განცხადების განახლება ვერ მოხერხდა — სცადეთ თავიდან.');
+    } finally {
+      setRenewing(false);
+    }
+  };
   const cancelRequiresReason = effectiveStatus === 'active';
   const confirmCancel = async () => {
     if (cancelling || (cancelRequiresReason && !cancelReason.trim())) return;
@@ -365,8 +403,14 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       setStatus(job.id, 'disputed');
       // #73: "მომხმარებელმა პრობლემა აღნიშნა" ახლა customer_report_problem
       // RPC-ის მხრიდან იგზავნება, სერვერის მხარეს — იხ. supabase/migrations/0022.
-    } catch {
-      Alert.alert('ვერ მოხერხდა', 'პრობლემის შეტყობინება ვერ გაიგზავნა — სცადე თავიდან.');
+    } catch (e) {
+      const limit = ((e as { message?: string } | null)?.message ?? '').includes('DISPUTE_LIMIT_REACHED');
+      Alert.alert(
+        'ვერ მოხერხდა',
+        limit
+          ? 'ამ სამუშაოზე პრობლემა უკვე ორჯერ იქნა აღნიშნული — დაგვიკავშირდით მხარდაჭერის საშუალებით.'
+          : 'პრობლემის შეტყობინება ვერ გაიგზავნა — სცადე თავიდან.',
+      );
     } finally {
       setReportingProblem(false);
     }
@@ -461,6 +505,44 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
                 </View>
               </View>
             ))}
+          </View>
+        )}
+
+        {canRenew && (
+          <View style={styles.completionCard}>
+            <View style={styles.completionHeaderRow}>
+              <Clock size={15} color={colors.warning} />
+              <Text style={styles.completionTitle}>განცხადების ვადა იწურება</Text>
+            </View>
+            <Text style={styles.completionSubtitle}>
+              30 დღის შემდეგ განცხადება ავტომატურად გაუქმდება. თუ ჯერ კიდევ გჭირდებათ, განაახლეთ.
+            </Text>
+            <Button
+              testID="renew-job-button"
+              label="განცხადების განახლება"
+              loadingLabel="მიმდინარეობს..."
+              onPress={renewJob}
+              loading={renewing}
+            />
+          </View>
+        )}
+
+        {canReopen && (
+          <View style={styles.completionCard}>
+            <View style={styles.completionHeaderRow}>
+              <Clock size={15} color={colors.warning} />
+              <Text style={styles.completionTitle}>ოსტატმა სამუშაო გააუქმა</Text>
+            </View>
+            <Text style={styles.completionSubtitle}>
+              დანარჩენი დაინტერესებული ოსტატები ისევ ხელმისაწვდომია — გახსენით განცხადება ხელახლა და აირჩიეთ სხვა.
+            </Text>
+            <Button
+              testID="reopen-job-button"
+              label="გახსენი ხელახლა დანარჩენებისთვის"
+              loadingLabel="იხსნება..."
+              onPress={reopenJob}
+              loading={reopening}
+            />
           </View>
         )}
 
@@ -621,12 +703,6 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
                   const isSelected = selectedProvider?.id === prov.id;
                   return (
                     <View key={prov.id} style={[styles.providerCard, isSelected && styles.providerCardSelected]}>
-                      {isSelected && (
-                        <View style={styles.selectedBadge}>
-                          <Check size={13} color={colors.primary} strokeWidth={2.5} />
-                          <Text style={styles.selectedBadgeText}>შერჩეული ოსტატი</Text>
-                        </View>
-                      )}
                       <View style={styles.providerRow}>
                         <Avatar initials={prov.initials} color={prov.color} size={46} online={prov.online} />
                         <View style={{ flex: 1 }}>
@@ -1135,22 +1211,6 @@ const styles = StyleSheet.create({
   },
   providerCardSelected: {
     borderColor: colors.primary,
-  },
-  selectedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.secondary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs + 2,
-    marginBottom: spacing.sm + 2,
-    alignSelf: 'flex-start',
-  },
-  selectedBadgeText: {
-    ...typography.small,
-    color: colors.secondaryForeground,
-    fontWeight: '700',
   },
   providerRow: {
     flexDirection: 'row',

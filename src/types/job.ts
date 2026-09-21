@@ -144,6 +144,9 @@ export type CustomerJob = {
   photos?: string[];
   // job_posts.agreed_price (#72) — იხ. FeedJob-ის იგივე ველი ზემოთ.
   agreedPrice?: number | null;
+  // ვინ გააუქმა (0036) — Customer-ს "ხელახლა გახსნა" მხოლოდ ოსტატის გაუქმებაზე ეძლევა (0097)
+  cancellationActor?: 'customer' | 'provider' | 'admin' | null;
+  createdAt?: string;
   // job_posts.dispute_reason (#72) — customer_report_problem() RPC-ის
   // მიერ შენახული თავისუფალი ტექსტი, მხოლოდ 'disputed' სტატუსზე.
   disputeReason?: string | null;

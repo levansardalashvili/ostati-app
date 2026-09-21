@@ -17,6 +17,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Camera,
+  Ban,
   Check,
   CheckCircle,
   ChevronRight,
@@ -32,6 +33,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
+import { blockService, type ChatReportReason } from '../services/blockService';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
@@ -368,6 +370,51 @@ export function ChatConversationScreen({ navigation, route }: Props) {
   const awaitingProviderResponse =
     role === 'customer' && !!linkJobId && liveJobStatus === 'pending' && !messages.some((m) => m.from === 'other');
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
+  // დაბლოკვა/დარეპორტება (0095). blockedByMe ბლოკავს კომპოზერს, იმავე გზით რაც composerLocked.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [blockedByMe, setBlockedByMe] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState<ChatReportReason | null>(null);
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportSending, setReportSending] = useState(false);
+  const [reportDone, setReportDone] = useState(false);
+  useEffect(() => {
+    blockService.isBlockedByMe(chatId).then(setBlockedByMe).catch(() => {});
+  }, [chatId]);
+  const toggleBlock = async () => {
+    if (blockBusy) return;
+    setBlockBusy(true);
+    try {
+      if (blockedByMe) await blockService.unblock(chatId);
+      else await blockService.block(chatId);
+      setBlockedByMe(!blockedByMe);
+      setMenuOpen(false);
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'სცადეთ თავიდან.');
+    } finally {
+      setBlockBusy(false);
+    }
+  };
+  const submitReport = async () => {
+    if (!reportReason || reportSending || (reportReason === 'other' && !reportDetails.trim())) return;
+    setReportSending(true);
+    try {
+      await blockService.reportUser(chatId, reportReason, reportDetails.trim() || undefined);
+      setReportDone(true);
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'შეტყობინების გაგზავნა ვერ მოხერხდა. სცადეთ თავიდან.');
+    } finally {
+      setReportSending(false);
+    }
+  };
+  const closeReport = () => {
+    setReportOpen(false);
+    setReportReason(null);
+    setReportDetails('');
+    setReportDone(false);
+  };
+  const composerLocked = awaitingProviderResponse || blockedByMe;
   const [imgPreview, setImgPreview] = useState<string | null>(null);
   const [offerSheetOpen, setOfferSheetOpen] = useState(false);
   const [offerAmount, setOfferAmount] = useState('');
@@ -409,7 +456,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
 
   const sendMsg = () => {
     const text = msgText.trim();
-    if (!text || awaitingProviderResponse) return;
+    if (!text || composerLocked) return;
     const id = `new-${Date.now()}`;
     setMessages((prev) => [...prev, { id, type: 'text', from: 'me', text, t: 'ახლა', state: 'sending', jobId: linkJobId }]);
     setMsgText('');
@@ -559,7 +606,7 @@ if (
           setStatus(msgJobId, 'active');
         }
       })
-      .catch(() => {
+      .catch((e) => {
         // Audit fix — `respond_to_chat_offer()` (0049/0066) legitimately
         // rejects this (e.g. the job stopped being 'pending' between the
         // offer being sent and this tap — the Customer selected a Provider
@@ -568,7 +615,13 @@ if (
         // shows "accepted"/"declined" while the database still has
         // 'pending' — until an unrelated refetch corrects it.
         setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, offerStatus: previous } : m)));
-        Alert.alert('ვერ მოხერხდა', 'ფასზე პასუხის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
+        const expired = ((e as { message?: string } | null)?.message ?? '').includes('OFFER_EXPIRED');
+        Alert.alert(
+          'ვერ მოხერხდა',
+          expired
+            ? 'ეს შეთავაზება 7 დღეზე ძველია და აღარ მოქმედებს — სთხოვეთ ოსტატს ახალი შეთავაზება.'
+            : 'ფასზე პასუხის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.',
+        );
       });
   };
 
@@ -599,10 +652,17 @@ if (
             </Pressable>
           )}
         </View>
-        <Pressable style={styles.backButton}>
+        <Pressable testID="chat-menu-button" style={styles.backButton} onPress={() => setMenuOpen(true)}>
           <MoreVertical size={16} color={colors.foreground} />
         </Pressable>
       </View>
+
+      {blockedByMe && (
+        <View style={styles.awaitingBanner}>
+          <AlertCircle size={16} color={colors.warning} />
+          <Text style={styles.awaitingBannerText}>თქვენ დაბლოკეთ ეს მომხმარებელი. შეტყობინებების გასაგრძელებლად განბლოკეთ.</Text>
+        </View>
+      )}
 
       {awaitingProviderResponse && (
         <View style={styles.awaitingBanner}>
@@ -894,9 +954,9 @@ if (
         <View style={[styles.composer, { paddingBottom: insets.bottom > 0 ? insets.bottom + spacing.xs : spacing.sm + 2 }]}>
           <Pressable
             testID="chat-attach-button"
-            style={[styles.attachButton, awaitingProviderResponse && styles.attachButtonDisabled]}
+            style={[styles.attachButton, composerLocked && styles.attachButtonDisabled]}
             onPress={() => setAttachSheetOpen(true)}
-            disabled={awaitingProviderResponse}
+            disabled={composerLocked}
           >
             <Camera size={17} color={colors.mutedForeground} />
           </Pressable>
@@ -934,19 +994,19 @@ if (
               testID="chat-message-input"
               value={msgText}
               onChangeText={setMsgText}
-              placeholder={awaitingProviderResponse ? 'ოსტატის პასუხს ელოდებით...' : 'დაწერე შეტყობინება...'}
+              placeholder={blockedByMe ? 'მომხმარებელი დაბლოკილია' : awaitingProviderResponse ? 'ოსტატის პასუხს ელოდებით...' : 'დაწერე შეტყობინება...'}
               placeholderTextColor={colors.mutedForeground}
-              style={[styles.textInput, awaitingProviderResponse && styles.textInputLocked]}
+              style={[styles.textInput, composerLocked && styles.textInputLocked]}
               multiline
             />
           </View>
           <Pressable
             testID="chat-send-button"
-            style={[styles.sendButton, msgText.trim() && !awaitingProviderResponse && styles.sendButtonActive]}
+            style={[styles.sendButton, msgText.trim() && !composerLocked && styles.sendButtonActive]}
             onPress={sendMsg}
-            disabled={!msgText.trim() || awaitingProviderResponse}
+            disabled={!msgText.trim() || composerLocked}
           >
-            <Send size={15} color={msgText.trim() && !awaitingProviderResponse ? colors.primaryForeground : colors.mutedForeground} />
+            <Send size={15} color={msgText.trim() && !composerLocked ? colors.primaryForeground : colors.mutedForeground} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -964,6 +1024,75 @@ if (
           </View>
           <Text style={styles.attachOptionText}>გალერეიდან არჩევა</Text>
         </Pressable>
+      </BottomSheet>
+
+      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)}>
+        <Pressable
+          testID="chat-report-user"
+          style={styles.attachOption}
+          onPress={() => {
+            setMenuOpen(false);
+            setReportOpen(true);
+          }}
+        >
+          <View style={styles.attachOptionIcon}>
+            <AlertCircle size={20} color={colors.foreground} />
+          </View>
+          <Text style={styles.attachOptionText}>მომხმარებლის დარეპორტება</Text>
+        </Pressable>
+        <Pressable testID="chat-block-user" style={styles.attachOption} onPress={toggleBlock} disabled={blockBusy}>
+          <View style={styles.attachOptionIcon}>
+            <Ban size={20} color={colors.destructive} />
+          </View>
+          <Text style={[styles.attachOptionText, { color: colors.destructive }]}>
+            {blockedByMe ? 'განბლოკვა' : 'დაბლოკვა'}
+          </Text>
+        </Pressable>
+      </BottomSheet>
+
+      <BottomSheet visible={reportOpen} onClose={closeReport}>
+        {reportDone ? (
+          <>
+            <Text style={styles.attachOptionText}>რეპორტი მიღებულია, გმადლობთ. განვიხილავთ.</Text>
+            <View style={{ height: spacing.md }} />
+            <Button label="დახურვა" onPress={closeReport} />
+          </>
+        ) : (
+          <>
+            {([
+              ['spam', 'სპამი'],
+              ['harassment', 'შეურაცხყოფა / შევიწროება'],
+              ['inappropriate_content', 'შეუფერებელი შინაარსი'],
+              ['scam', 'თაღლითობა'],
+              ['other', 'სხვა'],
+            ] as [ChatReportReason, string][]).map(([code, label]) => (
+              <Pressable key={code} style={styles.attachOption} onPress={() => setReportReason(code)}>
+                <View style={styles.attachOptionIcon}>
+                  {reportReason === code ? <Check size={18} color={colors.primary} strokeWidth={3} /> : null}
+                </View>
+                <Text style={styles.attachOptionText}>{label}</Text>
+              </Pressable>
+            ))}
+            {reportReason === 'other' && (
+              <TextInput
+                value={reportDetails}
+                onChangeText={setReportDetails}
+                placeholder="აღწერეთ მოკლედ..."
+                placeholderTextColor={colors.mutedForeground}
+                multiline
+                style={styles.textInput}
+              />
+            )}
+            <View style={{ height: spacing.sm }} />
+            <Button
+              label="გაგზავნა"
+              loadingLabel="იგზავნება..."
+              onPress={submitReport}
+              loading={reportSending}
+              disabled={!reportReason || (reportReason === 'other' && !reportDetails.trim())}
+            />
+          </>
+        )}
       </BottomSheet>
 
       <BottomSheet
@@ -1470,6 +1599,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     alignSelf: 'flex-start',
+    maxWidth: '100%',
     backgroundColor: colors.muted,
     borderRadius: radius.full,
     paddingHorizontal: spacing.sm + 2,
@@ -1484,6 +1614,7 @@ const styles = StyleSheet.create({
   },
   offerStatusText: {
     ...typography.small,
+    flexShrink: 1,
     color: colors.mutedForeground,
     fontWeight: '700',
   },

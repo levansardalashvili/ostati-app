@@ -22,10 +22,18 @@ type ReviewRow = {
 };
 
 // get_provider_reviews() RPC-ის ფორმა — მხოლოდ stars/text/date (0085)
-type PublicReviewRow = { stars: number; review_text: string; created_at: string };
+type PublicReviewRow = {
+  id: string;
+  stars: number;
+  review_text: string;
+  created_at: string;
+  provider_reply: string | null;
+};
 
 function fromReviewRow(row: PublicReviewRow): Review {
   return {
+    id: row.id,
+    reply: row.provider_reply,
     stars: row.stars,
     date: new Date(row.created_at).toLocaleDateString('ka-GE'),
     text: row.review_text,
@@ -42,6 +50,8 @@ export interface ReviewService {
     data: RatingData,
   ): Promise<void>;
   listRealReviewsForProvider(providerId: string): Promise<Review[]>;
+  // ოსტატის ერთჯერადი პასუხი შეფასებაზე (0100)
+  replyToReview(reviewId: string, reply: string): Promise<void>;
 
   // ერთი job-ის სრული შეფასება (#71) — CustomerJobDetailScreen-ს ("შენი
   // შეფასება" სექცია) და ProviderJobDetailScreen-ს ("completed" mode-ის
@@ -63,6 +73,10 @@ export const reviewService: ReviewService = {
     });
     // 23505 = ეს job უკვე შეფასებულია (წინა ცდის პასუხი დაიკარგა) — წარმატებად ითვლება
     if (error && error.code !== '23505') throw error;
+  },
+  async replyToReview(reviewId, reply) {
+    const { error } = await supabase.rpc('reply_to_review', { p_review_id: reviewId, p_reply: reply });
+    if (error) throw error;
   },
   async listRealReviewsForProvider(providerId) {
     const { data, error } = await supabase.rpc('get_provider_reviews', { p_provider_id: providerId });

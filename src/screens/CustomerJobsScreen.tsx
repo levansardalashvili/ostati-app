@@ -96,7 +96,8 @@ export function CustomerJobsScreen({ navigation }: Props) {
       );
     }
     if (tab === 'pending') return status === 'pending';
-    return status === 'completed';
+    // გაუქმებულიც აქ ჩანს — ოსტატის გაუქმების შემდეგ განცხადება ხელახლა უნდა იყოს გასახსნელი (0097)
+    return status === 'completed' || status === 'cancelled';
   });
 
   const openChat = (job: CustomerJob) => {

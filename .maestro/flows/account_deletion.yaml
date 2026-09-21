@@ -1,0 +1,128 @@
+appId: com.ostati.app
+---
+# Account deletion (0095) — Customer registers, deletes the account from Profile, and can no longer log in.
+
+- launchApp:
+    stopApp: false
+- extendedWaitUntil:
+    notVisible: "Loading from"
+    timeout: 20000
+# Optional dev-client "developer menu" onboarding tip — shown once per
+# fresh PROCESS START (an in-memory flag, not persisted — `launchApp`
+# restarts the process each time, so this reappears on every single run,
+# not just after `pm clear`/reinstall). It does NOT auto-dismiss; it must
+# be tapped, or it sits there blocking everything underneath forever.
+- extendedWaitUntil:
+    visible: "DEVELOPMENT SERVERS|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 30000
+    optional: true
+- tapOn:
+    point: "37%,28%"
+    optional: true
+- extendedWaitUntil:
+    visible: "Loading from|Continue|.*დაწყება.*|.*პროფილი.*"
+    timeout: 90000
+    optional: true
+- extendedWaitUntil:
+    visible: "Continue"
+    timeout: 6000
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+# Maestro's accessibility-injected tap on "Continue" consistently lands
+# on the dev-client's floating gear bubble instead (confirmed reproducible
+# even on a factory-wiped emulator + fresh install — a raw `adb shell
+# input tap` at the same coordinates never has this problem, only
+# Maestro's own gesture-dispatch tap does), opening the Tools menu instead
+# of dismissing the tip. Detect and back out of it if it happened.
+- runFlow:
+    when:
+      visible: "Toggle performance monitor"
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: ".*(პროფილი|დაწყება).*"
+    timeout: 90000
+
+- tapOn:
+    text: "^პროფილი$"
+    optional: true
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+    optional: true
+- tapOn:
+    text: ".*გასვლა.*"
+    optional: true
+- tapOn:
+    id: "logout-confirm-button"
+    optional: true
+
+- evalScript: ${output.email = 'e2e.delete.' + Date.now() + '@example.com'}
+
+- tapOn: ".*დაწყება.*"
+- tapOn: ".*მომხმარებელი.*"
+- tapOn:
+    id: "register-first-name"
+- inputText: "ImgCustomer"
+- tapOn:
+    id: "register-last-name"
+- inputText: "E2E"
+- tapOn:
+    id: "register-email"
+- inputText: "${output.email}"
+- tapOn: ".*ჭავჭავაძის.*"
+- inputText: "Test address 1"
+- hideKeyboard
+- tapOn:
+    id: "register-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "register-confirm-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn: "^გაგრძელება$"
+- tapOn:
+    text: "Not now"
+    optional: true
+- tapOn:
+    text: "Never"
+    optional: true
+
+- assertVisible: ".*პროფილის დასრულება.*"
+- tapOn:
+    id: "setup-terms-checkbox"
+    optional: true
+- tapOn: "^დასრულება$"
+- assertVisible: ".*სერვისები.*"
+
+- tapOn: "^პროფილი$"
+- scrollUntilVisible:
+    element: ".*ანგარიშის წაშლა.*"
+    direction: DOWN
+- tapOn:
+    id: "delete-account-row"
+- tapOn:
+    id: "delete-account-confirm-button"
+- extendedWaitUntil:
+    visible: ".*დაწყება.*"
+    timeout: 20000
+
+# the account is gone — login must fail
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.email}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- extendedWaitUntil:
+    visible: ".*(არასწორი|შეცდომა|ვერ).*"
+    timeout: 15000
+- assertNotVisible: ".*სერვისები.*"

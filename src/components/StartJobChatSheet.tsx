@@ -148,6 +148,7 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
         date: '',
         preferredDate: null,
         timeSlot: null,
+        invitedProviderId: provider.id,
       });
       const published = await jobService.finalizeJobPublish(job.id);
       // Provider-მდე job "ცხადად" რომ მივიდეს ("ეს job კონკრეტულად

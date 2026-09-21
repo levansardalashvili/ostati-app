@@ -300,6 +300,12 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
                     <Text style={styles.reviewDate}>{r.date}</Text>
                   </View>
                   <Text style={styles.reviewText}>{r.text}</Text>
+                  {!!r.reply && (
+                    <View style={styles.reviewReply}>
+                      <Text style={styles.reviewReplyLabel}>ოსტატის პასუხი</Text>
+                      <Text style={styles.reviewText}>{r.reply}</Text>
+                    </View>
+                  )}
                 </View>
               ))}
             </>
@@ -654,6 +660,18 @@ const styles = StyleSheet.create({
   reviewDate: {
     fontSize: 11,
     color: colors.mutedForeground,
+  },
+  reviewReply: {
+    marginTop: spacing.sm,
+    padding: spacing.sm + 2,
+    backgroundColor: colors.muted,
+    borderRadius: radius.md,
+  },
+  reviewReplyLabel: {
+    ...typography.small,
+    color: colors.foreground,
+    fontWeight: '600',
+    marginBottom: 2,
   },
   reviewText: {
     ...typography.small,

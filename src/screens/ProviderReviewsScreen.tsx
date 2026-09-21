@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Star, User } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -20,6 +20,24 @@ export function ProviderReviewsScreen({ navigation }: Props) {
   const avg = reviews.length ? reviews.reduce((s, r) => s + r.stars, 0) / reviews.length : 0;
   const avgLabel = avg.toFixed(1);
   const [isLoading, setIsLoading] = useState(true);
+  // რომელ შეფასებაზე იწერება პასუხი ახლა (id) და მისი ტექსტი (0100)
+  const [replyingId, setReplyingId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [sending, setSending] = useState(false);
+  const sendReply = async (id: string) => {
+    if (sending || replyText.trim().length < 2) return;
+    setSending(true);
+    try {
+      await reviewService.replyToReview(id, replyText.trim());
+      setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, reply: replyText.trim() } : r)));
+      setReplyingId(null);
+      setReplyText('');
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'პასუხის გაგზავნა ვერ მოხერხდა — სცადეთ თავიდან.');
+    } finally {
+      setSending(false);
+    }
+  };
 
   useEffect(() => {
     const uid = authService.getCurrentUser()?.uid;
@@ -107,6 +125,37 @@ export function ProviderReviewsScreen({ navigation }: Props) {
                   ))}
                 </View>
                 <Text style={styles.reviewText}>{r.text}</Text>
+                {r.reply ? (
+                  <View style={styles.replyBox}>
+                    <Text style={styles.replyLabel}>თქვენი პასუხი</Text>
+                    <Text style={styles.reviewText}>{r.reply}</Text>
+                  </View>
+                ) : replyingId === r.id ? (
+                  <View style={{ marginTop: spacing.sm }}>
+                    <TextInput
+                      testID="review-reply-input"
+                      style={styles.replyInput}
+                      value={replyText}
+                      onChangeText={setReplyText}
+                      placeholder="დაწერეთ პასუხი"
+                      placeholderTextColor={colors.mutedForeground}
+                      multiline
+                      maxLength={500}
+                    />
+                    <View style={styles.replyActions}>
+                      <Pressable onPress={() => { setReplyingId(null); setReplyText(''); }}>
+                        <Text style={styles.replyCancel}>გაუქმება</Text>
+                      </Pressable>
+                      <Pressable testID="review-reply-send" onPress={() => sendReply(r.id!)} disabled={sending || replyText.trim().length < 2}>
+                        <Text style={[styles.replySend, (sending || replyText.trim().length < 2) && { opacity: 0.4 }]}>გაგზავნა</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : r.id ? (
+                  <Pressable testID="review-reply-button" onPress={() => setReplyingId(r.id!)} style={{ marginTop: spacing.sm }}>
+                    <Text style={styles.replySend}>პასუხის გაცემა</Text>
+                  </Pressable>
+                ) : null}
               </View>
             ))}
           </View>
@@ -249,6 +298,42 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
     lineHeight: 18,
+  },
+  replyBox: {
+    marginTop: spacing.sm,
+    padding: spacing.sm + 2,
+    backgroundColor: colors.muted,
+    borderRadius: radius.md,
+  },
+  replyLabel: {
+    ...typography.small,
+    color: colors.foreground,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  replyInput: {
+    ...typography.caption,
+    color: colors.foreground,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.sm + 2,
+    minHeight: 64,
+    textAlignVertical: 'top',
+  },
+  replyActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  replyCancel: {
+    ...typography.captionMedium,
+    color: colors.mutedForeground,
+  },
+  replySend: {
+    ...typography.captionMedium,
+    color: colors.primary,
   },
   emptyState: {
     alignItems: 'center',

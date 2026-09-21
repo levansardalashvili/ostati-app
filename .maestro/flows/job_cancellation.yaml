@@ -291,12 +291,43 @@ appId: com.ostati.app
     id: "logout-confirm-button"
 - assertVisible: ".*დაწყება.*"
 
-# NOTE: there is deliberately no "Phase 6" verifying Job B shows as
-# cancelled on the Customer's own "განცხადებები" list — CustomerJobsScreen
-# has exactly 3 tabs (pending/active-adjacent/completed, see the `items`
-# filter in CustomerJobsScreen.tsx) and 'cancelled' is not included in any
-# of them, so a cancelled job simply disappears from that screen entirely.
-# This mirrors the already-documented, deliberate limitation for
-# ProviderMyJobsScreen (CLAUDE.md decision #88) — discovered here to apply
-# symmetrically to the Customer's own list too. Not fixed by this flow:
-# expanding a tab filter is a product-scope call, not a testing task.
+# --- Phase 6: Customer sees the Provider-cancelled Job B and reopens it (0097) ---
+# Cancelled jobs live in the "დასრულებული" tab. The Provider who cancelled is excluded, so after
+# reopening the job is pending again with no interested providers left.
+- tapOn: ".*შესვლა.*"
+- tapOn:
+    id: "login-email"
+- inputText: "${output.customerEmail}"
+- hideKeyboard
+- tapOn:
+    id: "login-password"
+- inputText: "TestPass123"
+- hideKeyboard
+- tapOn:
+    id: "login-submit-button"
+- assertVisible: ".*სერვისები.*"
+
+- tapOn: ".*განცხადებები.*"
+- tapOn: "^დასრულებული$"
+- extendedWaitUntil:
+    visible: ".*${output.jobBMarker}.*"
+    timeout: 15000
+- tapOn:
+    text: ".*${output.jobBMarker}.*"
+- assertVisible: ".*ოსტატმა სამუშაო გააუქმა.*"
+- tapOn:
+    id: "reopen-job-button"
+- extendedWaitUntil:
+    visible: ".*დაინტერესებული ოსტატი არ არის.*"
+    timeout: 15000
+- assertNotVisible: ".*ოსტატმა სამუშაო გააუქმა.*"
+
+- back
+- tapOn: "^პროფილი$"
+- scrollUntilVisible:
+    element: ".*გასვლა.*"
+    direction: DOWN
+- tapOn: ".*გასვლა.*"
+- tapOn:
+    id: "logout-confirm-button"
+- assertVisible: ".*დაწყება.*"
