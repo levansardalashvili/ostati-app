@@ -10,4 +10,6 @@ export type CategoryRecord = {
   sortOrder: number;
   isActive: boolean;
   featured: boolean;
+  // ოსტატის პროფილში ჩანს "ფასი კვ.მ-ზე" ველი (0124)
+  pricePerSqm: boolean;
 };

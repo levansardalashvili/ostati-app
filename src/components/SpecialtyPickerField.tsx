@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Briefcase, Check, ChevronRight, X } from 'lucide-react-native';
 import { BottomSheet } from './BottomSheet';
@@ -6,6 +6,7 @@ import { Button } from './Button';
 import { getCategoryIcon } from './CategoryIcon';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
+import { categoryService } from '../services/categoryService';
 
 export type SpecialtyOption = { id: string; label: string };
 export type SelectedSpecialty = SpecialtyOption[];
@@ -23,6 +24,12 @@ const CUSTOM_PREFIX = 'custom:';
 // არის. Provider-ს შეუძლია რამდენიმე სპეციალობის არჩევა.
 export function SpecialtyPickerField({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
+  // ადმინ-პანელიდან მართული კატეგორიები (`categories`, is_active) — სპეციალობა = კატეგორია (#116)
+  const [categoryList, setCategoryList] = useState(() => categoryService.getCached());
+  useEffect(() => {
+    categoryService.listCategories().then(setCategoryList);
+  }, []);
+  const activeCategories = categoryList.filter((c) => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder);
   const [customText, setCustomText] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
 
@@ -63,7 +70,8 @@ export function SpecialtyPickerField({ value, onChange }: Props) {
         <Text style={styles.sheetHint}>შეგიძლია აირჩიო რამდენიმე</Text>
 
         <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-        {CATEGORIES.map((sp) => {
+        {activeCategories.map((c) => {
+          const sp = { id: c.id, label: c.name, dot: CATEGORIES.find((sc) => sc.id === c.id)?.dot ?? colors.primary };
           const on = isSelected(sp.id);
           const SpecialtyIcon = getCategoryIcon(sp.id);
           return (
@@ -81,7 +89,7 @@ export function SpecialtyPickerField({ value, onChange }: Props) {
         <Pressable style={styles.row} onPress={() => setShowCustomInput((v) => !v)}>
           <View style={styles.checkbox} />
           <Text style={styles.rowIcon}>❓</Text>
-          <Text style={styles.rowLabel}>სხვა</Text>
+          <Text style={styles.rowLabel}>სხვა პროფესია</Text>
         </Pressable>
         </ScrollView>
 

@@ -126,9 +126,9 @@ appId: com.ostati.app
 - tapOn: ".*სანტექნიკა.*"
 - tapOn: ".*შეღებვა.*"
 - scrollUntilVisible:
-    element: ".*სხვა.*"
+    element: ".*სხვა პროფესია.*"
     direction: DOWN
-- tapOn: ".*სხვა.*"
+- tapOn: ".*სხვა პროფესია.*"
 - tapOn: ".*მიუთითე შენი პროფესია.*"
 - inputText: "დურგალი"
 # No hideKeyboard here: with the keyboard already resolved Maestro's hideKeyboard

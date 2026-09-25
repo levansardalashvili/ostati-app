@@ -23,7 +23,7 @@ import { ProgressBar } from '../components/ProgressBar';
 import { SpecialtyPickerField, type SpecialtyOption } from '../components/SpecialtyPickerField';
 import { SqmPriceField } from '../components/SqmPriceField';
 import { colors, radius, spacing, typography } from '../theme';
-import { isSqmPriced } from '../data/categories';
+import { categoryService } from '../services/categoryService';
 import { authService } from '../services/authService';
 import { storageService, type UserMediaKind } from '../services/storageService';
 import { userService } from '../services/userService';
@@ -60,7 +60,7 @@ export function ProviderSetupScreen({ navigation }: Props) {
 
   // კვ.მ-ზე ფასიანი სპეციალობები, provider-ის შერჩეულთაგან — ერთი ველი
   // თითო სპეციალობაზე, საერთო მნიშვნელობის ნაცვლად (მომხმარებლის მოთხოვნით).
-  const sqmSpecialties = specialty.filter((s) => isSqmPriced(s.id));
+  const sqmSpecialties = specialty.filter((s) => categoryService.isSqmPriced(s.id));
 
   // პროფილის შევსება სავალდებულოა — "გამოტოვება" შესაძლებლობა განზრახ
   // არ არსებობს (მომხმარებლის მოთხოვნით). სერთიფიკატები/ნამუშევრები

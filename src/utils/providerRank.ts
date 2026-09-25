@@ -8,8 +8,19 @@ export function isNewProvider(p: Pick<Provider, 'reviews'>): boolean {
   return p.reviews === 0;
 }
 
-const RATING_PRIOR_COUNT = 15; // "ვირტუალური" ხმების რაოდენობა baseline-ის წონისთვის
-const RATING_PRIOR_MEAN = 4.3; // baseline საშუალო რეიტინგი, სანამ საკმარისი შეფასება დაგროვდება
+// პარამეტრები ადმინიდან იცვლება (app_settings, 0125) და აპის გაშვებისას ჩაიტვირთება (rankingConfigService);
+// ნაგულისხმევი მნიშვნელობები = ძველი ჰარდქოდი, ქსელის გარეშეც იგივე ქცევაა.
+const rankingConfig = {
+  priorCount: 15, // "ვირტუალური" ხმების რაოდენობა baseline-ის წონისთვის
+  priorMean: 4.3, // baseline საშუალო რეიტინგი, სანამ საკმარისი შეფასება დაგროვდება
+  jobsWeight: 0.15, // დასრულებული სამუშაოების log-წონა ქულაში
+};
+
+export function setRankingConfig(c: { priorCount?: number; priorMean?: number; jobsWeight?: number }) {
+  if (typeof c.priorCount === 'number' && c.priorCount > 0) rankingConfig.priorCount = c.priorCount;
+  if (typeof c.priorMean === 'number' && c.priorMean > 0) rankingConfig.priorMean = c.priorMean;
+  if (typeof c.jobsWeight === 'number' && c.jobsWeight > 0) rankingConfig.jobsWeight = c.jobsWeight;
+}
 
 // Bayesian/წონიანი საშუალო რეიტინგი (IMDB-ის რანჟირების პრინციპი) —
 // მცირე რაოდენობის შეფასებას (მაგ. ერთი 5-ვარსკვლავიანი) არ შეუძლია
@@ -19,11 +30,9 @@ const RATING_PRIOR_MEAN = 4.3; // baseline საშუალო რეიტი
 // ხდება — არასდროს პირდაპირ `p.rating`-ით (CustomerHomeScreen-ის ტოპ
 // ოსტატები, CustomerJobDetailScreen-ის "რეიტინგით" sort chip).
 export function weightedRating(p: Pick<Provider, 'rating' | 'reviews'>): number {
-  if (p.reviews === 0) return RATING_PRIOR_MEAN;
-  return (
-    (p.reviews / (p.reviews + RATING_PRIOR_COUNT)) * p.rating +
-    (RATING_PRIOR_COUNT / (p.reviews + RATING_PRIOR_COUNT)) * RATING_PRIOR_MEAN
-  );
+  const { priorCount, priorMean } = rankingConfig;
+  if (p.reviews === 0) return priorMean;
+  return (p.reviews / (p.reviews + priorCount)) * p.rating + (priorCount / (p.reviews + priorCount)) * priorMean;
 }
 
 // სრული რანჟირების ქულა ("ტოპ ოსტატები") — წონიან რეიტინგს ემატება
@@ -31,7 +40,7 @@ export function weightedRating(p: Pick<Provider, 'rating' | 'reviews'>): number 
 // მინიმალური tie-breaker ბოლო აქტივობაზე (`online`-ს ვიყენებთ პროქსად,
 // mock მონაცემებს "ბოლო აქტივობის დრო" არ აქვს).
 export function providerRankScore(p: Pick<Provider, 'rating' | 'reviews' | 'jobs' | 'online'>): number {
-  const completedJobsBoost = Math.log10(p.jobs + 1) * 0.15;
+  const completedJobsBoost = Math.log10(p.jobs + 1) * rankingConfig.jobsWeight;
   const recentActivityBoost = p.online ? 0.05 : 0;
   return weightedRating(p) + completedJobsBoost + recentActivityBoost;
 }

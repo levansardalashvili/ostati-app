@@ -115,6 +115,11 @@ appId: com.ostati.app
     id: "post-job-description"
 - inputText: "${output.jobAMarker} - leaking pipe under the kitchen sink needs a quick fix"
 - hideKeyboard
+- scrollUntilVisible:
+    element: ".*აირჩიეთ რაიონი/ქალაქი.*"
+    direction: DOWN
+- tapOn: ".*აირჩიეთ რაიონი/ქალაქი.*"
+- tapOn: "^ვაკე$"
 - tapOn: "^გამოქვეყნება$"
 - assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
 - tapOn: ".*მთავარზე დაბრუნება.*"
@@ -156,6 +161,11 @@ appId: com.ostati.app
     id: "post-job-description"
 - inputText: "${output.jobBMarker} - kitchen light switch not working, needs an electrician"
 - hideKeyboard
+- scrollUntilVisible:
+    element: ".*აირჩიეთ რაიონი/ქალაქი.*"
+    direction: DOWN
+- tapOn: ".*აირჩიეთ რაიონი/ქალაქი.*"
+- tapOn: "^ვაკე$"
 - tapOn: "^გამოქვეყნება$"
 - assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
 - tapOn: ".*მთავარზე დაბრუნება.*"

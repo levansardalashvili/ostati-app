@@ -145,6 +145,11 @@ appId: com.ostati.app
     id: "post-job-description"
 - inputText: "${output.jobMarker} - bathroom outlet sparking, needs an electrician urgently please"
 - hideKeyboard
+- scrollUntilVisible:
+    element: ".*აირჩიეთ რაიონი/ქალაქი.*"
+    direction: DOWN
+- tapOn: ".*აირჩიეთ რაიონი/ქალაქი.*"
+- tapOn: "^ვაკე$"
 - tapOn: "^გამოქვეყნება$"
 - assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
 - tapOn: ".*მთავარზე დაბრუნება.*"

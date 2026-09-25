@@ -139,8 +139,10 @@ appId: com.ostati.app
     checked: true
 
 # --- Phase 3: Turn ONE toggle off, confirm it flips immediately ----------
+# dev-client-ის მოძრავი gear-ღილაკი (~84–96% x, ~22% y) ზუსტად ამ გადამრთველის მარჯვენა ნაწილს ფარავს და
+# dev-მენიუს ხსნის — ვეხებით გადამრთველის მარცხენა კიდეს (id-ით შეხება ცენტრში ეცემა gear-ს)
 - tapOn:
-    id: "notif-toggle-new_chat_message"
+    point: "82%, 22%"
 - assertVisible:
     id: "notif-toggle-new_chat_message"
     checked: false

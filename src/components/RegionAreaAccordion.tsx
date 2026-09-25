@@ -2,19 +2,22 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Check, ChevronDown } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
-import { GEORGIA_REGIONS } from '../data/georgiaRegions';
+import { useRegions } from '../services/regionService';
 
 type Props = {
   selected: Set<string>;
   onToggleDistrict: (district: string) => void;
   onToggleAllInRegion: (regionId: string) => void;
   defaultExpanded?: string[];
+  // ერთი რაიონის არჩევა — "ყველას მონიშვნა" მწკრივი იმალება
+  single?: boolean;
 };
 
 // RegionAreaAccordion — საქართველოს მხარეების/რაიონების არჩევის ბადე,
 // გამოიყენება როგორც ProviderSetup-ის რეგისტრაციის picker-ში (RegionAreaPicker
 // ეკრანი), ისე პროფილის "სამუშაო არეალი" ეკრანზე პირდაპირ ჩაშენებული.
-export function RegionAreaAccordion({ selected, onToggleDistrict, onToggleAllInRegion, defaultExpanded = ['tbilisi'] }: Props) {
+export function RegionAreaAccordion({ selected, onToggleDistrict, onToggleAllInRegion, defaultExpanded = ['tbilisi'], single = false }: Props) {
+  const regions = useRegions();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(defaultExpanded));
 
   const toggleExpanded = (regionId: string) => {
@@ -27,7 +30,7 @@ export function RegionAreaAccordion({ selected, onToggleDistrict, onToggleAllInR
 
   return (
     <View style={{ gap: spacing.sm + 2 }}>
-      {GEORGIA_REGIONS.map((region) => {
+      {regions.map((region) => {
         const isExpanded = expanded.has(region.id);
         const selectedCount = region.districts.filter((d) => selected.has(d)).length;
         const allSelected = selectedCount === region.districts.length;
@@ -50,12 +53,14 @@ export function RegionAreaAccordion({ selected, onToggleDistrict, onToggleAllInR
 
             {isExpanded && (
               <View style={styles.districtList}>
-                <Pressable style={styles.districtRow} onPress={() => onToggleAllInRegion(region.id)}>
+                {!single && (
+                  <Pressable style={styles.districtRow} onPress={() => onToggleAllInRegion(region.id)}>
                   <View style={[styles.checkbox, allSelected && styles.checkboxOn]}>
                     {allSelected && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
                   </View>
                   <Text style={styles.selectAllText}>ყველას მონიშვნა</Text>
                 </Pressable>
+                )}
                 {region.districts.map((district) => {
                   const on = selected.has(district);
                   return (

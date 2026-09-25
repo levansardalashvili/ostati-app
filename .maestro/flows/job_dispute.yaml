@@ -126,6 +126,11 @@ appId: com.ostati.app
     id: "post-job-description"
 - inputText: "${output.jobMarker} - leaking pipe under the sink, needs a plumber"
 - hideKeyboard
+- scrollUntilVisible:
+    element: ".*აირჩიეთ რაიონი/ქალაქი.*"
+    direction: DOWN
+- tapOn: ".*აირჩიეთ რაიონი/ქალაქი.*"
+- tapOn: "^ვაკე$"
 - tapOn: "^გამოქვეყნება$"
 - assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
 - tapOn: ".*მთავარზე დაბრუნება.*"

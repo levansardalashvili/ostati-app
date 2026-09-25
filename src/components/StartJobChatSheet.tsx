@@ -6,6 +6,9 @@ import { Button } from './Button';
 import { colors, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
+import { DistrictPickerField } from './DistrictPickerField';
+import { guessDistrict } from '../data/georgiaRegions';
+import { regionService } from '../services/regionService';
 import { getPublishErrorMessage, jobService } from '../services/jobService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { Provider } from '../types/provider';
@@ -63,6 +66,7 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
   const [checking, setChecking] = useState(false);
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
+  const [district, setDistrict] = useState('');
   const [submitTouched, setSubmitTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -83,6 +87,7 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
     if (!provider) {
       setDescription('');
       setAddress('');
+      setDistrict('');
       setSubmitTouched(false);
       setSubmitError('');
       setChecking(false);
@@ -90,6 +95,7 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
     }
     setDescription('');
     setAddress(profile.defaultAddress);
+    setDistrict(guessDistrict(profile.defaultAddress, regionService.getCached()));
     setSubmitTouched(false);
     setSubmitError('');
 
@@ -126,7 +132,8 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
         ? 'ეს ველი სავალდებულოა'
         : '';
   const addressError = submitTouched && !address.trim() ? 'მისამართი სავალდებულოა' : '';
-  const canSubmit = description.trim().length >= DESCRIPTION_MIN && !!address.trim();
+  const districtError = submitTouched && !district;
+  const canSubmit = description.trim().length >= DESCRIPTION_MIN && !!address.trim() && !!district;
 
   const handleClose = () => {
     if (submitting) return;
@@ -150,6 +157,7 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
         timeSlot: null,
         invitedProviderId: provider.id,
       });
+      await jobService.setJobDistrict(job.id, district);
       const published = await jobService.finalizeJobPublish(job.id);
       // Provider-მდე job "ცხადად" რომ მივიდეს ("ეს job კონკრეტულად
       // თქვენთვისაა", არა ზოგადი "ახალი job თქვენს არეალში" ბრადქასტი) —
@@ -204,6 +212,10 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
             style={[styles.textarea, !!descriptionError && styles.textareaError]}
           />
           {!!descriptionError && <Text style={styles.errorText}>{descriptionError}</Text>}
+
+          <View style={styles.addressField}>
+            <DistrictPickerField value={district} onChange={setDistrict} error={districtError} />
+          </View>
 
           <View style={styles.addressField}>
             <AddressAutocompleteField

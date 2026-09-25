@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { authService } from '../services/authService';
 import { categoryService } from '../services/categoryService';
+import { loadRankingConfig } from '../services/rankingConfigService';
 import { userService } from '../services/userService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
@@ -69,6 +70,7 @@ export function RootNavigator() {
   // ჩავარდნაზე (ქსელი) categoryService თავადვე vardebა სტატიკურ fallback-ზე.
   useEffect(() => {
     categoryService.listCategories().catch(() => {});
+    loadRankingConfig();
   }, []);
 
   useEffect(() => {

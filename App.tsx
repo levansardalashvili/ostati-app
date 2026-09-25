@@ -5,6 +5,7 @@ import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { AppGateOverlay } from './src/components/AppGateOverlay';
 import { navigationRef } from './src/navigation/navigationRef';
 import { PushNotificationsBootstrap } from './src/components/PushNotificationsBootstrap';
 import { colors } from './src/theme';
@@ -34,6 +35,7 @@ export default function App() {
                 <NavigationContainer ref={navigationRef} theme={navigationTheme}>
                   <RootNavigator />
                   <PushNotificationsBootstrap />
+                  <AppGateOverlay />
                   <StatusBar style="dark" />
                 </NavigationContainer>
               </JobStatusProvider>

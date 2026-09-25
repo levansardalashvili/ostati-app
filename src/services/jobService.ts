@@ -23,6 +23,7 @@ type JobPostRow = {
   category: string;
   description: string;
   address: string;
+  district?: string | null;
   date: string;
   status: CustomerJob['status'];
   photos: string[];
@@ -76,7 +77,10 @@ export function getPublishErrorMessage(err: unknown): string {
     return 'აღწერა უნდა იყოს 20–500 სიმბოლოს ფარგლებში — შეასწორე და სცადე თავიდან.';
   }
   if (message.includes('TOO_MANY_OPEN_JOBS')) {
-    return 'ერთდროულად მაქსიმუმ 10 ღია განცხადება შეიძლება გქონდეთ — ზედმეტი გააუქმეთ და სცადეთ თავიდან.';
+    return 'ღია განცხადებების ლიმიტი ამოიწურა — ზედმეტი გააუქმეთ და სცადეთ თავიდან.';
+  }
+  if (message.includes('ACCOUNT_SUSPENDED')) {
+    return 'თქვენი ანგარიში შეჩერებულია — მოქმედება მიუწვდომელია.';
   }
   if (message.includes('exact address is required')) {
     return 'მისამართი სავალდებულოა — შეავსე ველი და სცადე თავიდან.';
@@ -94,6 +98,7 @@ function fromJobPostRow(row: JobPostRow): CustomerJob {
     providerId: row.provider_id ?? undefined,
     date: row.date,
     address: row.address,
+    district: row.district ?? undefined,
     desc: row.description,
     photos: row.photos,
     agreedPrice: row.agreed_price,
@@ -269,6 +274,8 @@ export interface JobService {
   // supabase/migrations/0054), მაქს. 3 რეფერენცია, ყველა უნდა ეკუთვნოდეს
   // ზუსტად ამ job-ს/ამ caller-ს.
   setJobPhotos(jobId: string, photos: string[]): Promise<void>;
+  // 0109 — განცხადების რაიონი (provider areas-ის იგივე მნიშვნელობა), finalize-მდე/რედაქტირების შემდეგ
+  setJobDistrict(jobId: string, district: string): Promise<void>;
 
   // Final pre-beta audit, item 1 — CONFIRMED bug fix. Syncs current form
   // values into an already-created draft before publish, so a Customer
@@ -334,6 +341,11 @@ export const jobService: JobService = {
     if (error) throw error;
     return fromJobPostRow(data as JobPostRow);
   },
+  async setJobDistrict(jobId, district) {
+    const { error } = await supabase.rpc('set_job_district', { p_job_id: jobId, p_district: district });
+    if (error) throw error;
+  },
+
   async setJobPhotos(jobId, photos) {
     const { error } = await supabase.rpc('set_job_photos', { p_job_id: jobId, p_photos: photos });
     if (error) throw error;

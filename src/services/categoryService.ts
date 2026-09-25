@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { CATEGORIES as STATIC_CATEGORIES } from '../data/categories';
+import { CATEGORIES as STATIC_CATEGORIES, isSqmPriced as staticIsSqmPriced } from '../data/categories';
 import type { CategoryRecord } from '../types/category';
 
 // `categories` ცხრილის Postgres row shape (supabase/migrations/0043).
@@ -10,6 +10,7 @@ type CategoryRow = {
   sort_order: number;
   is_active: boolean;
   featured: boolean;
+  price_per_sqm: boolean;
 };
 
 function fromRow(row: CategoryRow): CategoryRecord {
@@ -20,6 +21,7 @@ function fromRow(row: CategoryRow): CategoryRecord {
     sortOrder: row.sort_order,
     isActive: row.is_active,
     featured: row.featured,
+    pricePerSqm: row.price_per_sqm ?? false,
   };
 }
 
@@ -41,6 +43,7 @@ const STATIC_FALLBACK: CategoryRecord[] = STATIC_CATEGORIES.map((c, i) => ({
   sortOrder: i,
   isActive: true,
   featured: FALLBACK_FEATURED_IDS.has(c.id),
+  pricePerSqm: staticIsSqmPriced(c.id),
 }));
 
 // მარტივი module-level cache — ბოლო წარმატებული fetch-ის შედეგი, ან,
@@ -62,6 +65,8 @@ export interface CategoryService {
   // jobService.ts-ის deriveJobTitle()-ის და მსგავსი call site-ების
   // ჩანაცვლება, ადრინდელი `CATEGORIES.find(...)`-ის ნაცვლად.
   getCategoryName(id: string): string;
+  // კვ.მ-ფასის ველი უნდა ჩანდეს ამ სპეციალობაზე? (custom:* — არასდროს)
+  isSqmPriced(id: string): boolean;
 }
 
 export const categoryService: CategoryService = {
@@ -78,5 +83,8 @@ export const categoryService: CategoryService = {
   },
   getCategoryName(id) {
     return cache.find((c) => c.id === id)?.name ?? id;
+  },
+  isSqmPriced(id) {
+    return cache.find((c) => c.id === id)?.pricePerSqm ?? false;
   },
 };

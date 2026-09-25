@@ -37,6 +37,9 @@ import { authService } from '../services/authService';
 import { categoryService } from '../services/categoryService';
 import { getPublishErrorMessage, jobService } from '../services/jobService';
 import { storageService } from '../services/storageService';
+import { DistrictPickerField } from '../components/DistrictPickerField';
+import { guessDistrict } from '../data/georgiaRegions';
+import { regionService } from '../services/regionService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { CategoryRecord } from '../types/category';
 import type { CustomerJob, TimeSlot } from '../types/job';
@@ -78,6 +81,7 @@ export function PostJobScreen({ navigation, route }: Props) {
   // ცვლილება არასდროს არ სცვლის თავად default address-ს (მხოლოდ ამ
   // კონკრეტული job post-ის მისამართია) — მომხმარებლის მოთხოვნით.
   const [address, setAddress] = useState(editJob?.address ?? profile.defaultAddress);
+  const [district, setDistrict] = useState(editJob?.district ?? guessDistrict(editJob?.address ?? profile.defaultAddress, regionService.getCached()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
     const m = editJob?.preferredDate?.match(/^(d{4})-(d{2})-(d{2})/);
     return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
@@ -141,9 +145,10 @@ export function PostJobScreen({ navigation, route }: Props) {
   // სავალდებულოა (თარიღის გარეშე დროც არ მოწმდება — ორივე ერთად
   // ივსება/არცერთი, DatePickerField-ის arსებული UX-ის მიხედვით).
   const addressError = submitTouched && !address.trim() ? 'მისამართი სავალდებულოა' : '';
+  const districtError = submitTouched && !district;
   const dateTimeError = submitTouched && !!selectedDate && !selectedTime ? 'აირჩიეთ სასურველი დრო' : '';
   const canSubmit =
-    !!category && description.trim().length >= DESCRIPTION_MIN && !!address.trim() && (!selectedDate || !!selectedTime);
+    !!category && description.trim().length >= DESCRIPTION_MIN && !!address.trim() && !!district && (!selectedDate || !!selectedTime);
   const selectedCategory = activeCategories.find((c) => c.id === category) ?? null;
   const SelectedCategoryIcon = getCategoryIcon(selectedCategory?.id ?? '');
 
@@ -164,7 +169,8 @@ export function PostJobScreen({ navigation, route }: Props) {
           preferredDate: selectedDate ? toIsoDateString(selectedDate) : null,
           timeSlot: selectedTime || null,
         });
-        navigation.popTo('CustomerJobDetail', { jobId: updated.id, job: updated });
+        await jobService.setJobDistrict(updated.id, district);
+        navigation.popTo('CustomerJobDetail', { jobId: updated.id, job: { ...updated, district } });
         return;
       }
       // Third hardening pass, priority 2 — idempotent publish. The job
@@ -243,6 +249,7 @@ export function PostJobScreen({ navigation, route }: Props) {
         photos.length > 0
           ? await Promise.all(photos.map((uri) => storageService.uploadPrivateJobPhoto(job.id, uid, uri)))
           : [];
+      await jobService.setJobDistrict(job.id, district);
       await jobService.setJobPhotos(job.id, photoRefs);
       // finalize_job_publish() returns the up-to-date row (including any
       // photos just attached above) — no need to re-derive it client-side.
@@ -401,6 +408,12 @@ export function PostJobScreen({ navigation, route }: Props) {
           {!!photoError && <FieldError message={photoError} />}
         </View>
         )}
+
+        <View style={styles.field}>
+          <FieldLabel text="რაიონი / ქალაქი" required />
+          <DistrictPickerField value={district} onChange={setDistrict} error={districtError} />
+          <FieldError message={districtError ? 'აირჩიეთ რაიონი ან ქალაქი' : ''} />
+        </View>
 
         <View style={styles.field}>
           <FieldLabel text="მისამართი" required />

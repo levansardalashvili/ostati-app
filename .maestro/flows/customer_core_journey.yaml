@@ -151,6 +151,11 @@ appId: com.ostati.app
     id: "post-job-description"
 - inputText: "Maestro E2E ტესტის მოთხოვნაა — გაჟონვის შეკეთება სამზარეულოში."
 - hideKeyboard
+- scrollUntilVisible:
+    element: ".*აირჩიეთ რაიონი/ქალაქი.*"
+    direction: DOWN
+- tapOn: ".*აირჩიეთ რაიონი/ქალაქი.*"
+- tapOn: "^ვაკე$"
 # Same header-vs-button ambiguity as CustomerSetup above — this screen's
 # own title is "მოთხოვნის გამოქვეყნება", a superstring of the button.
 - tapOn: "^გამოქვეყნება$"

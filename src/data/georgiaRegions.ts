@@ -34,3 +34,9 @@ export const GEORGIA_REGIONS: GeorgiaRegion[] = [
   { id: 'kvemo-kartli', label: 'ქვემო ქართლი', districts: ['რუსთავი', 'გარდაბანი', 'მარნეული', 'ბოლნისი', 'დმანისი', 'წალკა', 'თეთრიწყარო'] },
   { id: 'shida-kartli', label: 'შიდა ქართლი', districts: ['გორი', 'კასპი', 'ხაშური', 'ქარელი'] },
 ];
+
+// მისამართის ტექსტიდან რაიონის წინასწარი ვარაუდი (მხოლოდ საწყისი მნიშვნელობა — მომხმარებელი ცვლის)
+export function guessDistrict(address: string, regions: GeorgiaRegion[] = GEORGIA_REGIONS): string {
+  const all = regions.flatMap((r) => r.districts);
+  return all.find((d) => address.includes(d)) ?? '';
+}

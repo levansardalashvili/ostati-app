@@ -318,6 +318,8 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       if (message.includes('PROVIDER_NOT_VERIFIED')) {
         setOfferSheetOpen(false);
         setVerifySheetOpen(true);
+      } else if (message.includes('ACCOUNT_SUSPENDED')) {
+        Alert.alert('ანგარიში შეჩერებულია', 'თქვენი ანგარიში შეჩერებულია — მოქმედება მიუწვდომელია.');
       } else {
         Alert.alert('ვერ მოხერხდა', 'ინტერესის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
       }
@@ -422,7 +424,11 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
                 derived (RPC-ის შიგნით), არასდროს client-ის claim — ტექსტი
                 სწორად განასხვავებს, თავად Provider-მა გააუქმა თუ Customer-მა. */}
             <Text style={styles.disputedBannerText}>
-              {job.cancellationActor === 'provider' ? 'შენ გააუქმე ეს სამუშაო.' : 'მომხმარებელმა ეს მოთხოვნა გააუქმა.'}
+              {job.cancellationActor === 'provider'
+                ? 'შენ გააუქმე ეს სამუშაო.'
+                : job.cancellationActor === 'admin'
+                  ? 'ეს მოთხოვნა ადმინისტრაციამ გააუქმა.'
+                  : 'მომხმარებელმა ეს მოთხოვნა გააუქმა.'}
             </Text>
           </View>
         )}
@@ -638,7 +644,11 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         <View style={[styles.footer, { paddingBottom: footerBottomPadding }]}>
           <View style={{ flex: 1 }}>
             <Text style={styles.disputedFooterText}>
-              {job.cancellationActor === 'provider' ? 'შენ გააუქმე ეს სამუშაო.' : 'მომხმარებელმა მოთხოვნა გააუქმა.'}
+              {job.cancellationActor === 'provider'
+                ? 'შენ გააუქმე ეს სამუშაო.'
+                : job.cancellationActor === 'admin'
+                  ? 'მოთხოვნა ადმინისტრაციამ გააუქმა.'
+                  : 'მომხმარებელმა მოთხოვნა გააუქმა.'}
             </Text>
           </View>
         </View>

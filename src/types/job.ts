@@ -137,6 +137,8 @@ export type CustomerJob = {
   providerId?: string;
   date: string;
   address: string;
+  // 0109 — სტრუქტურირებული რაიონი/ქალაქი; ძველ განცხადებებზე undefined
+  district?: string;
   desc: string;
   // Supabase Storage-ის საჯარო URL-ები (#63) — `undefined` ძველ mock
   // demo-ჩანაწერებზე (j1/j2/j3, #61-ის წინა), ცარიელი მასივი რეალურ

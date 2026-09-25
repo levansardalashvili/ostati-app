@@ -16,7 +16,7 @@ import { SpecialtyPickerField, type SpecialtyOption } from '../components/Specia
 import { SqmPriceField } from '../components/SqmPriceField';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
-import { isSqmPriced } from '../data/categories';
+import { categoryService } from '../services/categoryService';
 import { authService } from '../services/authService';
 import { storageService, type UserMediaKind } from '../services/storageService';
 import { userService } from '../services/userService';
@@ -62,7 +62,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
   // უფრო სუფთაა.
   const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
 
-  const sqmSpecialties = specialty.filter((s) => isSqmPriced(s.id));
+  const sqmSpecialties = specialty.filter((s) => categoryService.isSqmPriced(s.id));
 
   const firstNameErr = !firstName.trim() ? 'ეს ველი სავალდებულოა' : '';
   const lastNameErr = !lastName.trim() ? 'ეს ველი სავალდებულოა' : '';

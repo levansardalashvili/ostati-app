@@ -6,7 +6,7 @@ import { BackHeader } from '../components/BackHeader';
 import { Button } from '../components/Button';
 import { RegionAreaAccordion } from '../components/RegionAreaAccordion';
 import { colors, spacing, typography } from '../theme';
-import { GEORGIA_REGIONS } from '../data/georgiaRegions';
+import { useRegions } from '../services/regionService';
 import { authService } from '../services/authService';
 import { userService } from '../services/userService';
 import { useProviderProfile } from '../state/ProviderProfileContext';
@@ -30,6 +30,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProviderServiceAreas'>;
 // იგივე save-გზით.
 export function ProviderServiceAreasScreen({ navigation }: Props) {
   const { profile, setProfile } = useProviderProfile();
+  const regions = useRegions();
   const [selected, setSelected] = useState<Set<string>>(() => new Set(profile.areas));
   const [saving, setSaving] = useState(false);
 
@@ -42,7 +43,7 @@ export function ProviderServiceAreasScreen({ navigation }: Props) {
   };
 
   const toggleAllInRegion = (regionId: string) => {
-    const region = GEORGIA_REGIONS.find((r) => r.id === regionId);
+    const region = regions.find((r) => r.id === regionId);
     if (!region) return;
     const allSelected = region.districts.every((d) => selected.has(d));
     setSelected((prev) => {

@@ -118,6 +118,11 @@ appId: com.ostati.app
     id: "post-job-description"
 - inputText: "${output.jobMarker} - kitchen faucet leak needs urgent repair, please help fix this soon"
 - hideKeyboard
+- scrollUntilVisible:
+    element: ".*აირჩიეთ რაიონი/ქალაქი.*"
+    direction: DOWN
+- tapOn: ".*აირჩიეთ რაიონი/ქალაქი.*"
+- tapOn: "^ვაკე$"
 - tapOn: "^გამოქვეყნება$"
 - assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
 - tapOn: ".*მთავარზე დაბრუნება.*"
@@ -340,7 +345,7 @@ appId: com.ostati.app
 - back
 
 # Also verify ProviderReviewsScreen (Profile menu → "შეფასებები") shows
-# the real, aggregated review — avg "5.0" and a "1 შეფ." count, both
+# the real, aggregated review — avg "5.0" and a "N შეფ." (N grows — shared verified provider) count, both
 # computed from the actual `reviews` row this same job just created
 # (Phase 5's 5-star rating), not a hardcoded/mock summary.
 - scrollUntilVisible:
@@ -349,7 +354,7 @@ appId: com.ostati.app
     optional: true
 - tapOn: ".*შეფასებები.*"
 - assertVisible: ".*5.0.*"
-- assertVisible: ".*1 შეფ.*"
+- assertVisible: ".*[0-9]+ შეფ.*"
 - back
 
 # --- Cleanup: logout ------------------------------------------------------

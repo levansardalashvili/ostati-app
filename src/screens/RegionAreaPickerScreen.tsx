@@ -6,7 +6,7 @@ import { BackHeader } from '../components/BackHeader';
 import { Button } from '../components/Button';
 import { RegionAreaAccordion } from '../components/RegionAreaAccordion';
 import { colors, spacing, typography } from '../theme';
-import { GEORGIA_REGIONS } from '../data/georgiaRegions';
+import { useRegions } from '../services/regionService';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegionAreaPicker'>;
@@ -16,6 +16,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'RegionAreaPicker'>;
 // ფორმიდან callback-ის საშუალებით (myhome.ge-ის მდებარეობის picker-ის
 // მსგავსი ინტერაქციით — მომხმარებლის მოწოდებული screenshot-ების მიხედვით).
 export function RegionAreaPickerScreen({ navigation, route }: Props) {
+  const regions = useRegions();
   const [selected, setSelected] = useState<Set<string>>(() => new Set(route.params.selected));
 
   const toggleDistrict = (district: string) => {
@@ -27,7 +28,7 @@ export function RegionAreaPickerScreen({ navigation, route }: Props) {
   };
 
   const toggleAllInRegion = (regionId: string) => {
-    const region = GEORGIA_REGIONS.find((r) => r.id === regionId);
+    const region = regions.find((r) => r.id === regionId);
     if (!region) return;
     const allSelected = region.districts.every((d) => selected.has(d));
     setSelected((prev) => {

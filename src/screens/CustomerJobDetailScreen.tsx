@@ -299,7 +299,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       setReloadKey((k) => k + 1);
     } catch (e) {
       const tooMany = ((e as { message?: string } | null)?.message ?? '').includes('TOO_MANY_OPEN_JOBS');
-      Alert.alert('ვერ მოხერხდა', tooMany ? 'ერთდროულად მაქსიმუმ 10 ღია განცხადება შეიძლება გქონდეთ.' : 'განცხადების ხელახლა გახსნა ვერ მოხერხდა — სცადეთ თავიდან.');
+      Alert.alert('ვერ მოხერხდა', tooMany ? 'ღია განცხადებების ლიმიტი ამოიწურა — ზედმეტი გააუქმეთ და სცადეთ თავიდან.' : 'განცხადების ხელახლა გახსნა ვერ მოხერხდა — სცადეთ თავიდან.');
     } finally {
       setReopening(false);
     }

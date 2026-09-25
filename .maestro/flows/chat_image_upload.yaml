@@ -177,6 +177,8 @@ appId: com.ostati.app
 - assertVisible: ".*რისი გაკეთება გჭირდებათ.*"
 - tapOn: ".*ნათურის შეცვლა.*"
 - inputText: "Kitchen light needs replacing, e2e test"
+- tapOn: ".*აირჩიეთ რაიონი/ქალაქი.*"
+- tapOn: "^ვაკე$"
 - tapOn: "^გაგზავნა$"
 - extendedWaitUntil:
     visible: ".*გამარჯობა.*"
