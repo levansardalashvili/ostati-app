@@ -125,7 +125,14 @@ export function ProviderProfileScreen({ navigation }: Props) {
         <Text style={styles.title}>პროფილი</Text>
         <View style={styles.profileRow}>
           <View style={styles.avatarWrap}>
-            <Avatar initials={initials} color={colors.primary} size={72} online uri={profile.photoUrl} />
+            <Avatar
+              initials={initials}
+              color={colors.primary}
+              size={72}
+              online
+              uri={profile.photoUrl}
+              verified={profile.verificationStatus === 'verified'}
+            />
             <Pressable style={styles.cameraBadge} onPress={() => handleMenuPress('photo')}>
               <Camera size={10} color={colors.primaryForeground} />
             </Pressable>

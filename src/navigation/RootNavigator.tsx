@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { authService } from '../services/authService';
@@ -84,6 +84,10 @@ export function RootNavigator() {
             // (მაგ. რეგისტრაცია არასდროს დასრულებულა) — "ნახევრად
             // authenticated" state-ს არ ვტოვებთ, უსაფრთხოდ ვსვამთ.
             await authService.signOut().catch(() => {});
+          } else if (record.suspended) {
+            // ანგარიშის შეჩერება (0106) — cold-start-ზეც იგივე გეითი, რაც LoginScreen.completeSignIn-ს
+            await authService.signOut().catch(() => {});
+            Alert.alert('ანგარიში შეჩერებულია', record.suspensionReason ?? 'წესების დარღვევის გამო');
           } else if (record.role === 'provider') {
             setProviderProfile({ firstName: record.firstName, lastName: record.lastName });
             // პროფილის row არარსებობა = სავალდებულო setup არ დასრულებულა (#13) —

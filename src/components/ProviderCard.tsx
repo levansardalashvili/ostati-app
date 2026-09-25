@@ -37,7 +37,14 @@ export function ProviderCard({
         onPressIn={body.onPressIn}
         onPressOut={body.onPressOut}
       >
-        <Avatar initials={provider.initials} color={provider.color} size={54} online={provider.online} uri={provider.photoUrl} />
+        <Avatar
+          initials={provider.initials}
+          color={provider.color}
+          size={54}
+          online={provider.online}
+          uri={provider.photoUrl}
+          verified={provider.verified}
+        />
         <View style={styles.providerInfo}>
           <View style={styles.providerNameRow}>
             <Text style={styles.providerName} numberOfLines={1}>

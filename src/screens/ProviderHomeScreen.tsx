@@ -208,6 +208,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
               color={colors.primary}
               size={38}
               uri={providerProfile.photoUrl}
+              verified={providerProfile.verificationStatus === 'verified'}
             />
             <Pressable style={styles.bellButton} onPress={handleNotifications}>
               <Bell size={19} color={colors.foreground} strokeWidth={1.8} />

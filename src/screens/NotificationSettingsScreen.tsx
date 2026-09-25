@@ -27,6 +27,7 @@ const PROVIDER_TOGGLES: { key: string; label: string }[] = [
   { key: 'job_selected', label: 'სამუშაოზე არჩევა' },
   { key: 'job_status_change', label: 'მოთხოვნის სტატუსის ცვლილება' },
   { key: 'new_review', label: 'ახალი შეფასება' },
+  { key: 'verification_status_change', label: 'ვერიფიკაციის შედეგი' },
 ];
 
 // NotificationSettings — ზუსტად ზიპის App.tsx-ის NotificationSettings-ის

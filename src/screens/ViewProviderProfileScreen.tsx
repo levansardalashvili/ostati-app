@@ -155,7 +155,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
         <View style={styles.hero}>
           <View style={styles.heroContent}>
             <View style={styles.avatarWrap}>
-              <Avatar initials={p.initials} color={p.color} size={88} uri={p.photoUrl} />
+              <Avatar initials={p.initials} color={p.color} size={88} uri={p.photoUrl} verified={p.verified} />
               {p.online && <View style={styles.onlineDot} />}
             </View>
             <View style={styles.nameRow}>

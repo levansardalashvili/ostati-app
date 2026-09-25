@@ -273,8 +273,9 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       setConfirmProvider(null);
       // #73: "შენ აგირჩიეს სამუშაოსთვის" ახლა select_provider RPC-ის მხრიდან
       // იგზავნება, სერვერის მხარეს — იხ. supabase/migrations/0022.
-    } catch {
-      Alert.alert('ვერ მოხერხდა', 'ოსტატის არჩევა ვერ დასრულდა — სცადე თავიდან.');
+    } catch (e) {
+      const blocked = ((e as { message?: string } | null)?.message ?? '').includes('PROVIDER_BLOCKED');
+      Alert.alert('ვერ მოხერხდა', blocked ? 'ამ ოსტატის არჩევა შეუძლებელია (დაბლოკილია).' : 'ოსტატის არჩევა ვერ დასრულდა — სცადეთ თავიდან.');
     } finally {
       setSelecting(false);
     }
@@ -555,7 +556,12 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
             <Text style={styles.completionSubtitle}>დაადასტურეთ დასრულება ან შეგვატყობინეთ პრობლემის შესახებ</Text>
             {selectedProvider && (
               <View style={styles.completionProviderRow}>
-                <Avatar initials={selectedProvider.initials} color={selectedProvider.color} size={38} />
+                <Avatar
+                  initials={selectedProvider.initials}
+                  color={selectedProvider.color}
+                  size={38}
+                  verified={selectedProvider.verified}
+                />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.completionProviderName}>{selectedProvider.name}</Text>
                   <View style={styles.providerStat}>
@@ -704,7 +710,13 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
                   return (
                     <View key={prov.id} style={[styles.providerCard, isSelected && styles.providerCardSelected]}>
                       <View style={styles.providerRow}>
-                        <Avatar initials={prov.initials} color={prov.color} size={46} online={prov.online} />
+                        <Avatar
+                          initials={prov.initials}
+                          color={prov.color}
+                          size={46}
+                          online={prov.online}
+                          verified={prov.verified}
+                        />
                         <View style={{ flex: 1 }}>
                           <View style={styles.providerNameRow}>
                             <Text style={styles.providerName}>{prov.name}</Text>
@@ -812,7 +824,12 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
               გსურთ <Text style={styles.sheetSubtitleBold}>{confirmProvider.name}</Text>-ის დანიშვნა ამ სამუშაოსთვის?
             </Text>
             <View style={styles.sheetProviderRow}>
-              <Avatar initials={confirmProvider.initials} color={confirmProvider.color} size={44} />
+              <Avatar
+                initials={confirmProvider.initials}
+                color={confirmProvider.color}
+                size={44}
+                verified={confirmProvider.verified}
+              />
               <View>
                 <View style={styles.providerNameRow}>
                   <Text style={styles.providerName}>{confirmProvider.name}</Text>

@@ -275,6 +275,9 @@ export const authService: AuthService = {
   async deleteAccount() {
     const uid = cachedUser?.id;
     if (!uid) throw new Error('Authentication required');
+    // ჯერ შემოწმება (აქტიური სამუშაოები და ა.შ.) — უარის შემთხვევაში ფაილები არ უნდა წაიშალოს
+    const check = await supabase.rpc('can_delete_my_account');
+    if (check.error) throw check.error;
     // ფაილების გასუფთავება — best-effort, სანამ სესია ცოცხალია (RPC-ის შემდეგ ვეღარ ვიქნებით
     // ავტორიზებულები). private-media-ს ფაილებს Edge Function შლის (SQL-ით storage ობიექტები არ იშლება).
     await supabase.functions.invoke('delete-account-files').catch(() => {});

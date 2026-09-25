@@ -59,6 +59,11 @@ export function PhoneForgotPasswordVerifyScreen({ navigation, route }: Props) {
       setError('ეს ანგარიში ვერ მოიძებნა — სცადე თავიდან.');
       return;
     }
+    if (record.suspended) {
+      await authService.signOut();
+      setError(`თქვენი ანგარიში შეჩერებულია: ${record.suspensionReason ?? 'წესების დარღვევის გამო'}`);
+      return;
+    }
     if (record.role === 'provider') {
       setProviderProfile({ firstName: record.firstName, lastName: record.lastName });
       const providerProfile = await userService.getProviderProfileRecord(uid);

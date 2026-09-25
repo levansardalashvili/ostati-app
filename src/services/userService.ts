@@ -14,6 +14,8 @@ type UserRow = {
   default_address: string;
   // #107 — supabase/migrations/0083.
   phone: string;
+  suspended_at: string | null;
+  suspension_reason: string | null;
 };
 
 function fromRow(row: UserRow): UserRecord {
@@ -32,6 +34,8 @@ function fromRow(row: UserRow): UserRecord {
     email: row.email,
     defaultAddress: row.default_address,
     phone: row.phone ?? '',
+    suspended: !!row.suspended_at,
+    suspensionReason: row.suspension_reason ?? null,
   };
 }
 
@@ -202,7 +206,8 @@ export interface UserService {
   // სად გადაიყვანოს — CustomerHome თუ ProviderHome), CustomerEditProfile
   // ცვლილებას ინახავს. ეს არის პირველი ნამდვილი (არა mock) backend
   // persistence ამ აპში — providerProfiles/jobPosts/... ჯერ არ არსებობს.
-  createUserRecord(uid: string, record: UserRecord): Promise<void>;
+  // suspended/suspensionReason ადმინის RPC-ის საქმეა, არასდროს registration-ისას (0106) — ახალ ანგარიშს DB-default (unsuspended) ეყოლება
+  createUserRecord(uid: string, record: Omit<UserRecord, 'suspended' | 'suspensionReason'>): Promise<void>;
   getUserRecord(uid: string): Promise<UserRecord | null>;
   updateUserRecord(uid: string, patch: Partial<UserRecord>): Promise<void>;
 
@@ -243,7 +248,9 @@ export interface UserService {
   // `jobService.cancelJob`-ის იგივე პატერნით). client-ს არასდროს არ
   // შეუძლია `verification_status`-ის პირდაპირი `.update()`/`.upsert()` —
   // ეს ერთადერთი გზაა unverified/rejected → pending-ის შესაცვლელად.
-  requestProviderVerification(): Promise<void>;
+  // 0107 — RPC now requires a private-media selfie path, uploaded via
+  // storageService.uploadPrivateVerificationSelfie first.
+  requestProviderVerification(selfiePath: string): Promise<void>;
 }
 
 export const userService: UserService = {
@@ -397,8 +404,8 @@ export const userService: UserService = {
     if (error) throw error;
   },
 
-  async requestProviderVerification() {
-    const { error } = await supabase.rpc('request_provider_verification');
+  async requestProviderVerification(selfiePath) {
+    const { error } = await supabase.rpc('request_provider_verification', { p_selfie_path: selfiePath });
     if (error) throw error;
   },
 };

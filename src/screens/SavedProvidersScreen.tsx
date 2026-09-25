@@ -157,7 +157,14 @@ function SavedProviderCard({
     <View style={styles.card}>
       <Animated.View style={{ transform: [{ scale: body.scale }] }}>
         <Pressable style={styles.cardBody} onPress={onOpenProfile} onPressIn={body.onPressIn} onPressOut={body.onPressOut}>
-          <Avatar initials={p.initials} color={p.color} size={54} online={p.online} uri={p.photoUrl} />
+          <Avatar
+            initials={p.initials}
+            color={p.color}
+            size={54}
+            online={p.online}
+            uri={p.photoUrl}
+            verified={p.verified}
+          />
           <View style={styles.info}>
             <View style={styles.nameRow}>
               <Text style={styles.name} numberOfLines={1}>

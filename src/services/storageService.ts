@@ -45,6 +45,13 @@ export interface StorageService {
     localUri: string,
   ): Promise<string>;
 
+  // Manual verification selfie — path `verification/{uid}/{filename}`,
+  // owner-write / owner-or-admin-read (supabase/migrations/0107).
+  uploadPrivateVerificationSelfie(
+    uid: string,
+    localUri: string,
+  ): Promise<string>;
+
   // Converts private-media://... into a temporary signed URL.
   // Normal http/public URLs pass through unchanged.
   getDisplayUrl(reference: string): Promise<string>;
@@ -186,6 +193,12 @@ export const storageService: StorageService = {
     const path =
       `job/${jobId}/${uploaderId}/` +
       createFilename(localUri);
+
+    return uploadPrivate(path, localUri);
+  },
+
+  async uploadPrivateVerificationSelfie(uid, localUri) {
+    const path = `verification/${uid}/${createFilename(localUri)}`;
 
     return uploadPrivate(path, localUri);
   },

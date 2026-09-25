@@ -126,11 +126,12 @@ appId: com.ostati.app
     direction: DOWN
 - assertVisible: ".*პროფილის რედაქტირება.*"
 
-# Tapping the disabled request button must not open the confirm sheet.
+# Tapping the disabled request button must not open the confirm sheet
+# (which, since #141, only ever opens after a selfie is captured).
 - tapOn:
     text: "^ვერიფიკაციის მოთხოვნა$"
     optional: true
-- assertNotVisible: ".*შენი პროფილი გადაეცემა განხილვას.*"
+- assertNotVisible: ".*სელფი გადაეცემა ადმინისტრაციას.*"
 
 - scrollUntilVisible:
     element: ".*გასვლა.*"

@@ -64,6 +64,11 @@ export function PhoneLoginScreen({ navigation }: Props) {
       setError('ეს ანგარიში ჯერ არ არის დარეგისტრირებული — ჯერ დარეგისტრირდი.');
       return;
     }
+    if (record.suspended) {
+      await authService.signOut();
+      setError(`თქვენი ანგარიში შეჩერებულია: ${record.suspensionReason ?? 'წესების დარღვევის გამო'}`);
+      return;
+    }
     if (record.role === 'provider') {
       setProviderProfile({ firstName: record.firstName, lastName: record.lastName });
       const providerProfile = await userService.getProviderProfileRecord(user.uid);

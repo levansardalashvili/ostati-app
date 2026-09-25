@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Clock, Shield, ShieldCheck, XCircle } from 'lucide-react-native';
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
 import { ProfileCompletionRing } from './ProfileCompletionRing';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
+import { storageService } from '../services/storageService';
 import { userService } from '../services/userService';
 import {
   getVerificationEligibility,
@@ -28,23 +30,48 @@ type Props = {
 export function VerificationRequestCard({ profile, onUpdated, onEditProfile }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [selfieUri, setSelfieUri] = useState<string | null>(null);
   const status = profile.verificationStatus ?? 'unverified';
   const eligibility = getVerificationEligibility(profile);
 
-  const submit = async () => {
+  // Task — მოთხოვნას ახლა თან ახლავს live სელფი (წინა-კამერით), რომელსაც
+  // ადმინი ხელით ადარებს პროფილის საჯარო ფოტოსთან (VerificationQueue.tsx-ში
+  // უკვე ჩანს) — ავტომატური KYC/liveness-პროვაიდერის (ფასიანი) ნაცვლად.
+  const takeSelfie = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('წვდომა საჭიროა', 'სელფის გადასაღებად საჭიროა კამერაზე წვდომა.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.6, cameraType: ImagePicker.CameraType.front });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    setSelfieUri(result.assets[0].uri);
+    setConfirmOpen(true);
+  };
+
+  const closeConfirm = () => {
     if (submitting) return;
     setConfirmOpen(false);
+    setSelfieUri(null);
+  };
+
+  const submit = async () => {
+    if (submitting || !selfieUri) return;
     setSubmitting(true);
     try {
-      await userService.requestProviderVerification();
+      const uid = authService.getCurrentUser()?.uid;
+      if (!uid) throw new Error('not signed in');
+      const selfiePath = await storageService.uploadPrivateVerificationSelfie(uid, selfieUri);
+      await userService.requestProviderVerification(selfiePath);
+      setConfirmOpen(false);
+      setSelfieUri(null);
       // წარმატების შემდეგ ჭეშმარიტი მდგომარეობა ბაზიდან ისევ იტვირთება
       // (task-ის მოთხოვნა — "refresh provider profile/status after
       // success"); თუ ეს კონკრეტული re-fetch ჩავარდა (RPC თავად მაინც
       // წარმატებით დასრულდა), ლოკალურად ვასახავთ იმას, რაც RPC-მ სერვერზე
       // უსათუოდ დაწერა — UI არასდროს არ რჩება ძველ, staleuc "unverified"/
       // "rejected" მდგომარეობაზე გაყინული.
-      const uid = authService.getCurrentUser()?.uid;
-      const fresh = uid ? await userService.getProviderProfileRecord(uid).catch(() => null) : null;
+      const fresh = await userService.getProviderProfileRecord(uid).catch(() => null);
       if (fresh) {
         onUpdated(fresh);
       } else {
@@ -129,25 +156,29 @@ export function VerificationRequestCard({ profile, onUpdated, onEditProfile }: P
 
       <Button
         label={status === 'rejected' ? 'ხელახლა მოთხოვნა' : 'ვერიფიკაციის მოთხოვნა'}
-        onPress={() => setConfirmOpen(true)}
+        onPress={takeSelfie}
         disabled={!eligibility.eligible || submitting}
         loading={submitting}
         loadingLabel="იგზავნება..."
       />
 
-      <BottomSheet
-        visible={confirmOpen}
-        onClose={() => {
-          if (!submitting) setConfirmOpen(false);
-        }}
-      >
-        <View style={styles.confirmIcon}>
-          <Shield size={22} color={colors.primary} />
-        </View>
+      <BottomSheet visible={confirmOpen} onClose={closeConfirm}>
+        {selfieUri ? (
+          <Image source={{ uri: selfieUri }} style={styles.selfiePreview} />
+        ) : (
+          <View style={styles.confirmIcon}>
+            <Shield size={22} color={colors.primary} />
+          </View>
+        )}
         <Text style={styles.sheetTitle}>ვერიფიკაციის მოთხოვნა</Text>
-        <Text style={styles.sheetSubtitle}>შენი პროფილი გადაეცემა განხილვას. ნამდვილად გსურს გაგზავნა?</Text>
+        <Text style={styles.sheetSubtitle}>
+          სელფი გადაეცემა ადმინისტრაციას შესადარებლად შენს პროფილის ფოტოსთან. ნამდვილად გსურს გაგზავნა?
+        </Text>
         <Button label="მოთხოვნის გაგზავნა" onPress={submit} loading={submitting} loadingLabel="იგზავნება..." />
-        <Pressable style={styles.sheetCancelLink} onPress={() => setConfirmOpen(false)}>
+        <Pressable style={styles.sheetCancelLink} onPress={takeSelfie} disabled={submitting}>
+          <Text style={styles.sheetCancelLinkText}>თავიდან გადაღება</Text>
+        </Pressable>
+        <Pressable style={styles.sheetCancelLink} onPress={closeConfirm} disabled={submitting}>
           <Text style={styles.sheetCancelLinkText}>გაუქმება</Text>
         </Pressable>
       </BottomSheet>
@@ -270,6 +301,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'center',
     marginBottom: spacing.sm + 2,
+  },
+  selfiePreview: {
+    width: 120,
+    height: 120,
+    borderRadius: radius.lg,
+    alignSelf: 'center',
+    marginBottom: spacing.sm + 2,
+    backgroundColor: colors.secondary,
   },
   sheetTitle: {
     ...typography.h3,

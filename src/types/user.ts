@@ -33,4 +33,8 @@ export type UserRecord = {
   // #107 — `public.users.phone` (supabase/migrations/0083), Email-ის
   // იგივე "ცარიელი, თუ ეს მეთოდით არ დარეგისტრირებულა" პრინციპით.
   phone: string;
+  // ადმინის მიერ ანგარიშის შეჩერება (supabase/migrations/0106) — client არასდროს წერს,
+  // მხოლოდ კითხულობს login/session-restore-ზე (#139).
+  suspended: boolean;
+  suspensionReason: string | null;
 };
