@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Bell, Briefcase, Camera, Heart, LogOut, MapPin, Pencil, Settings } from 'lucide-react-native';
+import { Bell, Briefcase, Camera, CircleHelp, Heart, LogOut, MapPin, Pencil, Settings } from 'lucide-react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -10,6 +10,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { DeleteAccountRow } from '../components/DeleteAccountRow';
 import { ProfileMenuRow } from '../components/ProfileMenuRow';
+import { HELP_URL } from '../config/site';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
@@ -61,6 +62,7 @@ export function CustomerProfileScreen({ navigation }: Props) {
     { icon: Pencil, label: 'პროფილის რედაქტირება', bg: '#F5F3FF', color: '#7C3AED', badge: 0 },
     { icon: Bell, label: 'შეტყობინებები', bg: '#FFFBEB', color: '#D97706', badge: unreadNotifCount },
     { icon: Settings, label: 'ანგარიშის პარამეტრები', bg: colors.muted, color: colors.mutedForeground, badge: 0 },
+    { icon: CircleHelp, label: 'დახმარება', bg: '#ECFEFF', color: '#0891B2', badge: 0 },
   ];
 
   const handleMenuPress = (label: string) => {
@@ -74,6 +76,8 @@ export function CustomerProfileScreen({ navigation }: Props) {
       navigation.navigate('Notifications', { role: 'customer' });
     } else if (label === 'ანგარიშის პარამეტრები') {
       navigation.navigate('ProfileSettings');
+    } else if (label === 'დახმარება') {
+      Linking.openURL(HELP_URL).catch(() => {});
     }
   };
 

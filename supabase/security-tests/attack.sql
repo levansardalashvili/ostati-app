@@ -42,6 +42,10 @@ begin
  begin select count(*) into n from public.job_posts; insert into res values('16 ანონიმური: job_posts','ვხედავ '||n||' (უნდა იყოს 0)'); exception when others then insert into res values('16 ანონიმური: job_posts','დაბლოკილია'); end;
  begin select count(*) into n from public.messages; insert into res values('17 ანონიმური: messages','ვხედავ '||n||' (უნდა იყოს 0)'); exception when others then insert into res values('17 ანონიმური: messages','დაბლოკილია'); end;
  begin perform public.get_provider_stats(); insert into res values('18 ანონიმური: RPC გამოძახება','ᲨᲔᲡᲐᲫᲚᲔᲑᲔᲚᲘᲐ!'); exception when others then insert into res values('18 ანონიმური: RPC გამოძახება','დაბლოკილია'); end;
+ begin select count(*) into n from public.support_requests; insert into res values('19 ანონიმური: support_requests','ვხედავ '||n||' (უნდა იყოს 0)'); exception when others then insert into res values('19 ანონიმური: support_requests','დაბლოკილია'); end;
+ begin insert into public.support_requests(name,contact,topic,message) values('x','y@z.co','other','direct insert text'); insert into res values('20 ანონიმური: მიმართვის პირდაპირი ჩაწერა (RPC-ს გვერდის ავლით)','ᲨᲔᲡᲐᲫᲚᲔᲑᲔᲚᲘᲐ!'); exception when others then insert into res values('20 ანონიმური: მიმართვის პირდაპირი ჩაწერა','დაბლოკილია'); end;
+ begin perform public.admin_set_support_request(gen_random_uuid(),'closed',''); insert into res values('21 ანონიმური: admin ფუნქცია (მიმართვა)','ᲨᲔᲡᲐᲫᲚᲔᲑᲔᲚᲘᲐ!'); exception when others then insert into res values('21 ანონიმური: admin ფუნქცია (მიმართვა)','დაბლოკილია'); end;
+ begin insert into public.help_articles(category_id,slug,title) values('customers','hack','x'); insert into res values('22 ანონიმური: დახმარების სტატიის ჩაწერა','ᲨᲔᲡᲐᲫᲚᲔᲑᲔᲚᲘᲐ!'); exception when others then insert into res values('22 ანონიმური: დახმარების სტატიის ჩაწერა','დაბლოკილია'); end;
 end $$;
 reset role;
 select t, r from res order by t;

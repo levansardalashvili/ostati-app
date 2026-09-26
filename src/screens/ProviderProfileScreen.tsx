@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Bell,
   Briefcase,
   Camera,
   ChevronRight,
+  CircleHelp,
   ClipboardList,
   Eye,
   LogOut,
@@ -18,6 +19,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
+import { HELP_URL } from '../config/site';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { DeleteAccountRow } from '../components/DeleteAccountRow';
@@ -91,6 +93,7 @@ export function ProviderProfileScreen({ navigation }: Props) {
     { icon: Star, label: 'შეფასებები', bg: '#FFFBEB', color: '#D97706', badge: displayStats.reviews },
     { icon: Bell, label: 'შეტყობინებები', bg: colors.muted, color: colors.mutedForeground, badge: unreadNotifCount },
     { icon: Settings, label: 'ანგარიშის პარამეტრები', bg: colors.muted, color: colors.mutedForeground, badge: 0 },
+    { icon: CircleHelp, label: 'დახმარება', bg: '#ECFEFF', color: '#0891B2', badge: 0 },
   ];
 
   const handleMenuPress = (label: string) => {
@@ -110,6 +113,8 @@ export function ProviderProfileScreen({ navigation }: Props) {
       navigation.navigate('Notifications', { role: 'provider' });
     } else if (label === 'ანგარიშის პარამეტრები') {
       navigation.navigate('ProfileSettings');
+    } else if (label === 'დახმარება') {
+      Linking.openURL(HELP_URL).catch(() => {});
     }
   };
 
