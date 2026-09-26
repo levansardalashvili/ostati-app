@@ -1,11 +1,13 @@
-// delete-account-files — Edge Function (Deno). Called by the app right BEFORE `delete_my_account()`.
-// Removes the caller's private-media files (chat / job / completion photos) with the service role,
-// because storage objects cannot be deleted with plain SQL. The caller is identified ONLY by their
-// own JWT — a user can never trigger deletion of somebody else's files.
+// delete-account-files — Edge Function (Deno). Called right BEFORE the account is deleted:
+//  - by the app, before `delete_my_account()` (no body → the caller's own files), or
+//  - by the admin panel, before `admin_delete_user()` (body `{ user_id }` → that user's files; caller must be an admin).
+// Removes private-media files (chat / job / completion / verification photos) with the service role,
+// because storage objects cannot be deleted with plain SQL. The caller is identified ONLY by their own JWT —
+// a non-admin can never trigger deletion of somebody else's files.
 //
 // Env (auto-provided by Supabase): SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.115.0';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +26,16 @@ Deno.serve(async (req) => {
   });
   const { data: userData, error: userError } = await userClient.auth.getUser();
   if (userError || !userData.user) return new Response('Unauthorized', { status: 401, headers: CORS });
-  const uid = userData.user.id;
+  let uid = userData.user.id;
+
+  // ადმინი სხვა მომხმარებლის ფაილებს შლის — მხოლოდ თუ გამომძახებელი რეალურად ადმინია (is_admin() caller-ის JWT-ით)
+  const body = await req.json().catch(() => ({}));
+  const target = typeof body?.user_id === 'string' ? body.user_id : null;
+  if (target && target !== uid) {
+    const { data: isAdmin } = await userClient.rpc('is_admin');
+    if (isAdmin !== true) return new Response('Forbidden', { status: 403, headers: CORS });
+    uid = target;
+  }
 
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const { data: paths, error } = await admin.rpc('private_media_paths_for_user', { p_uid: uid });

@@ -57,6 +57,9 @@ Deno.serve(async (req) => {
   const phone = payload.user?.phone;
   const otp = payload.sms?.otp;
   if (!phone || !otp) return json(400, { error: 'Missing phone or otp' });
+  // აპი მხოლოდ საქართველოს მობილურებს იღებს (+995 5XX XXX XXX). სხვა ნომერზე SMS არ იგზავნება — ამით ვერავინ დახარჯავს ბალანსს
+  // საერთაშორისო/ძვირფას მიმართულებებზე OTP-ის მასობრივი მოთხოვნით (SMS-pumping თაღლითობა).
+  if (!/^\+?9955\d{8}$/.test(phone)) return json(400, { error: { http_code: 400, message: 'Unsupported phone number' } });
 
   try {
     // ნომერი + ით ან მის გარეშე შეიძლება მოვიდეს — sendSms() ორივეს ამუშავებს.

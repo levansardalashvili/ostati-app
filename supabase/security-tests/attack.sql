@@ -31,6 +31,8 @@ begin
  begin select count(*) into n from public.push_tokens where user_id<>me; insert into res values('12 სხვის push token-ებს ვკითხულობ','ვხედავ '||n||' (უნდა იყოს 0)'); exception when others then insert into res values('12 push_tokens','დაბლოკილია'); end;
  begin insert into public.reviews(job_id,customer_id,provider_id,stars,review_text) values(fj,me,pv,1,'fake'); insert into res values('13 სხვის განცხადებაზე ყალბი შეფასება','ᲨᲔᲡᲐᲫᲚᲔᲑᲔᲚᲘᲐ!'); exception when others then insert into res values('13 სხვის განცხადებაზე ყალბი შეფასება','დაბლოკილია'); end;
  begin insert into public.job_posts(customer_id,category,description,address,status) values(me,'plumbing','x','x','pending'); insert into res values('14 განცხადების პირდაპირი ჩაწერა (RPC-ს გვერდის ავლით)','ᲨᲔᲡᲐᲫᲚᲔᲑᲔᲚᲘᲐ!'); exception when others then insert into res values('14 პირდაპირი job_posts insert','დაბლოკილია'); end;
+ begin perform public.admin_delete_user(pv,'x'); insert into res values('23 სხვისი ანგარიშის წაშლა (admin ფუნქცია)','ᲨᲔᲡᲐᲫᲚᲔᲑᲔᲚᲘᲐ!'); exception when others then insert into res values('23 სხვისი ანგარიშის წაშლა (admin ფუნქცია)','დაბლოკილია'); end;
+ begin perform public._delete_account_core(pv); insert into res values('24 შიდა წაშლის ფუნქციის პირდაპირი გამოძახება','ᲨᲔᲡᲐᲫᲚᲔᲑᲔᲚᲘᲐ!'); exception when others then insert into res values('24 შიდა წაშლის ფუნქციის პირდაპირი გამოძახება','დაბლოკილია'); end;
 end $$;
 reset role;
 select set_config('request.jwt.claims','',true); -- ანონიმური: მომხმარებლის claims-ის გარეშე

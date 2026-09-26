@@ -41,7 +41,7 @@
 // This file never imports or references any service-role/secret value
 // from the mobile app — those only exist in this server-side runtime.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.115.0';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
