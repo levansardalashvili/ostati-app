@@ -100,6 +100,7 @@ export function CalendarPicker({ selected, onSelect, minDate }: Props) {
           return (
             <View key={day} style={styles.cell}>
               <Pressable
+                testID={`calendar-day-${toIsoDateString(cellDate)}`}
                 style={[styles.dayCell, isSelected && styles.dayCellSelected]}
                 disabled={disabled}
                 onPress={() => onSelect(cellDate)}

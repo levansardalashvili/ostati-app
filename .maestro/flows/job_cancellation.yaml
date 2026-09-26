@@ -120,6 +120,17 @@ appId: com.ostati.app
     direction: DOWN
 - tapOn: ".*აირჩიეთ რაიონი/ქალაქი.*"
 - tapOn: "^ვაკე$"
+# თარიღი და დრო სავალდებულოა: დღევანდელი დღე (საქართველოს დრო) + 07:00–08:00 — ოსტატს "სამუშაო დავასრულე" უკვე შეუძლია
+- evalScript: ${output.today = new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10)}
+- scrollUntilVisible:
+    element: ".*აირჩიეთ თარიღი.*"
+    direction: DOWN
+- tapOn: ".*აირჩიეთ თარიღი.*"
+- tapOn:
+    id: "calendar-day-${output.today}"
+- tapOn: "07:00–08:00"
+- tapOn:
+    id: "time-confirm-button"
 - tapOn: "^გამოქვეყნება$"
 - assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
 - tapOn: ".*მთავარზე დაბრუნება.*"
@@ -166,6 +177,17 @@ appId: com.ostati.app
     direction: DOWN
 - tapOn: ".*აირჩიეთ რაიონი/ქალაქი.*"
 - tapOn: "^ვაკე$"
+# თარიღი და დრო სავალდებულოა: დღევანდელი დღე (საქართველოს დრო) + 07:00–08:00 — ოსტატს "სამუშაო დავასრულე" უკვე შეუძლია
+- evalScript: ${output.today = new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10)}
+- scrollUntilVisible:
+    element: ".*აირჩიეთ თარიღი.*"
+    direction: DOWN
+- tapOn: ".*აირჩიეთ თარიღი.*"
+- tapOn:
+    id: "calendar-day-${output.today}"
+- tapOn: "07:00–08:00"
+- tapOn:
+    id: "time-confirm-button"
 - tapOn: "^გამოქვეყნება$"
 - assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
 - tapOn: ".*მთავარზე დაბრუნება.*"

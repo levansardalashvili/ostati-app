@@ -82,6 +82,9 @@ export function getPublishErrorMessage(err: unknown): string {
   if (message.includes('ACCOUNT_SUSPENDED')) {
     return 'თქვენი ანგარიში შეჩერებულია — მოქმედება მიუწვდომელია.';
   }
+  if (message.includes('DATE_TIME_REQUIRED')) {
+    return 'სასურველი თარიღი და დრო სავალდებულოა — აირჩიე ორივე და სცადე თავიდან.';
+  }
   if (message.includes('exact address is required')) {
     return 'მისამართი სავალდებულოა — შეავსე ველი და სცადე თავიდან.';
   }

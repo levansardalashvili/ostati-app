@@ -158,6 +158,17 @@ appId: com.ostati.app
 - tapOn: "^ვაკე$"
 # Same header-vs-button ambiguity as CustomerSetup above — this screen's
 # own title is "მოთხოვნის გამოქვეყნება", a superstring of the button.
+# თარიღი და დრო სავალდებულოა: დღევანდელი დღე (საქართველოს დრო) + 07:00–08:00 — ოსტატს "სამუშაო დავასრულე" უკვე შეუძლია
+- evalScript: ${output.today = new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10)}
+- scrollUntilVisible:
+    element: ".*აირჩიეთ თარიღი.*"
+    direction: DOWN
+- tapOn: ".*აირჩიეთ თარიღი.*"
+- tapOn:
+    id: "calendar-day-${output.today}"
+- tapOn: "07:00–08:00"
+- tapOn:
+    id: "time-confirm-button"
 - tapOn: "^გამოქვეყნება$"
 - assertVisible: ".*მოთხოვნა გამოქვეყნებულია.*"
 - tapOn: ".*მთავარზე დაბრუნება.*"

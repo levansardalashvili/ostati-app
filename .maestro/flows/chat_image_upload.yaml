@@ -179,6 +179,15 @@ appId: com.ostati.app
 - inputText: "Kitchen light needs replacing, e2e test"
 - tapOn: ".*აირჩიეთ რაიონი/ქალაქი.*"
 - tapOn: "^ვაკე$"
+# თარიღი და დრო სავალდებულოა (StartJobChatSheet): დღევანდელი დღე + 07:00–08:00
+- evalScript: ${output.today = new Date(Date.now() + 4 * 3600 * 1000).toISOString().slice(0, 10)}
+- tapOn:
+    id: "start-job-date"
+- tapOn:
+    id: "calendar-day-${output.today}"
+- tapOn: "07:00–08:00"
+- tapOn:
+    id: "time-confirm-button"
 - tapOn: "^გაგზავნა$"
 - extendedWaitUntil:
     visible: ".*გამარჯობა.*"

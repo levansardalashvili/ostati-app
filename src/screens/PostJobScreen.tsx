@@ -18,7 +18,6 @@ import {
   Check,
   CheckCircle,
   ChevronRight,
-  Clock,
   Image as ImageIcon,
   Shield,
   X,
@@ -29,6 +28,8 @@ import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { getCategoryIcon } from '../components/CategoryIcon';
 import { DatePickerField } from '../components/DatePickerField';
+import { TimePickerField } from '../components/TimePickerField';
+import { timeSlotLabel } from '../data/timeSlots';
 import { formatPickedDate, toIsoDateString } from '../components/CalendarPicker';
 import { InlineBanner } from '../components/InlineBanner';
 import { colors, radius, spacing, typography } from '../theme';
@@ -47,17 +48,6 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PostJob'>;
 
-// კოდი + ქართული ლეიბლი, ცალკე (supabase/migrations/0041-ის
-// `job_posts_time_slot_check`-ის ზუსტი ანარეკლი) — არა თავისუფალი ტექსტი,
-// რომ RPC-მ (`provider_request_completion`) რეალურად შეძლოს დაგეგმილი
-// დროის სერვერზე ვალიდაცია.
-const TIME_SLOTS: { code: TimeSlot; label: string }[] = [
-  { code: '09-12', label: '9:00–12:00' },
-  { code: '12-15', label: '12:00–15:00' },
-  { code: '15-18', label: '15:00–18:00' },
-  { code: '18-21', label: '18:00–21:00' },
-  { code: 'flexible', label: 'ნებისმიერ დროს' },
-];
 // პროდუქტული წესი (product-spec.md) — job post-ში მაქს. 3 ფოტო,
 // არა 5, როგორც დიზაინის რეფერენსშია
 const MAX_PHOTOS = 3;
@@ -83,11 +73,11 @@ export function PostJobScreen({ navigation, route }: Props) {
   const [address, setAddress] = useState(editJob?.address ?? profile.defaultAddress);
   const [district, setDistrict] = useState(editJob?.district ?? guessDistrict(editJob?.address ?? profile.defaultAddress, regionService.getCached()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
-    const m = editJob?.preferredDate?.match(/^(d{4})-(d{2})-(d{2})/);
+    const m = editJob?.preferredDate?.match(/^(\d{4})-(\d{2})-(\d{2})/);
     return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
   });
   const [selectedTime, setSelectedTime] = useState<TimeSlot | ''>(editJob?.timeSlot ?? '');
-  const selectedTimeLabel = TIME_SLOTS.find((t) => t.code === selectedTime)?.label ?? '';
+  const selectedTimeLabel = timeSlotLabel(selectedTime);
   const [timeSheetOpen, setTimeSheetOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [published, setPublished] = useState(false);
@@ -146,9 +136,11 @@ export function PostJobScreen({ navigation, route }: Props) {
   // ივსება/არცერთი, DatePickerField-ის arსებული UX-ის მიხედვით).
   const addressError = submitTouched && !address.trim() ? 'მისამართი სავალდებულოა' : '';
   const districtError = submitTouched && !district;
+  // თარიღი და დრო სავალდებულოა (ოსტატს უნდა ჰქონდეს კონკრეტული დაგეგმილი დრო; „ნებისმიერ დროს“ ცალკე არჩევანია)
+  const dateError = submitTouched && !selectedDate ? 'აირჩიეთ სასურველი თარიღი' : '';
   const dateTimeError = submitTouched && !!selectedDate && !selectedTime ? 'აირჩიეთ სასურველი დრო' : '';
   const canSubmit =
-    !!category && description.trim().length >= DESCRIPTION_MIN && !!address.trim() && !!district && (!selectedDate || !!selectedTime);
+    !!category && description.trim().length >= DESCRIPTION_MIN && !!address.trim() && !!district && !!selectedDate && !!selectedTime;
   const selectedCategory = activeCategories.find((c) => c.id === category) ?? null;
   const SelectedCategoryIcon = getCategoryIcon(selectedCategory?.id ?? '');
 
@@ -429,23 +421,21 @@ export function PostJobScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.field}>
-          <FieldLabel text="სასურველი თარიღი" />
-          <DatePickerField value={selectedDate} onChange={handleDateSelect} />
+          <FieldLabel text="სასურველი თარიღი" required />
+          <DatePickerField value={selectedDate} onChange={handleDateSelect} error={!!dateError} />
+          <FieldError message={dateError} />
         </View>
 
         <View style={styles.field}>
-          <FieldLabel text="სასურველი დრო" />
-          <Pressable
-            style={[styles.categoryButton, !selectedDate && styles.categoryButtonDisabled, dateTimeError && styles.inputError]}
+          <FieldLabel text="სასურველი დრო" required />
+          <TimePickerField
+            value={selectedTime}
+            onChange={setSelectedTime}
             disabled={!selectedDate}
-            onPress={() => setTimeSheetOpen(true)}
-          >
-            <Clock size={16} color={colors.mutedForeground} />
-            <Text style={[styles.categoryButtonText, !selectedTime && styles.categoryButtonPlaceholder]} numberOfLines={1}>
-              {selectedTimeLabel || (selectedDate ? 'აირჩიეთ დრო' : 'ჯერ აირჩიეთ თარიღი')}
-            </Text>
-            <ChevronRight size={16} color={colors.mutedForeground} />
-          </Pressable>
+            error={!!dateTimeError}
+            open={timeSheetOpen}
+            onOpenChange={setTimeSheetOpen}
+          />
           <FieldError message={dateTimeError} />
         </View>
 
@@ -505,25 +495,6 @@ export function PostJobScreen({ navigation, route }: Props) {
         </ScrollView>
       </BottomSheet>
 
-      <BottomSheet visible={timeSheetOpen} onClose={() => setTimeSheetOpen(false)}>
-        <Text style={styles.sheetTitle}>სასურველი დრო</Text>
-        {TIME_SLOTS.map((t) => {
-          const on = selectedTime === t.code;
-          return (
-            <Pressable
-              key={t.code}
-              onPress={() => {
-                setSelectedTime(t.code);
-                setTimeSheetOpen(false);
-              }}
-              style={styles.categorySheetRow}
-            >
-              <Text style={[styles.categoryLabel, on && styles.categoryLabelSelected]}>{t.label}</Text>
-              {on && <Check size={16} color={colors.primary} strokeWidth={3} />}
-            </Pressable>
-          );
-        })}
-      </BottomSheet>
     </SafeAreaView>
   );
 }

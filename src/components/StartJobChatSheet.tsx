@@ -7,6 +7,10 @@ import { colors, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
 import { DistrictPickerField } from './DistrictPickerField';
+import { DatePickerField } from './DatePickerField';
+import { TimePickerField } from './TimePickerField';
+import { formatPickedDate, toIsoDateString } from './CalendarPicker';
+import { timeSlotLabel } from '../data/timeSlots';
 import { guessDistrict } from '../data/georgiaRegions';
 import { regionService } from '../services/regionService';
 import { getPublishErrorMessage, jobService } from '../services/jobService';
@@ -67,6 +71,10 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
   const [district, setDistrict] = useState('');
+  // თარიღი და დრო სავალდებულოა (როგორც PostJobScreen-ზე) — ოსტატს უნდა ჰქონდეს კონკრეტული დაგეგმილი დრო
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTime, setSelectedTime] = useState('');
+  const [timeOpen, setTimeOpen] = useState(false);
   const [submitTouched, setSubmitTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -88,6 +96,8 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
       setDescription('');
       setAddress('');
       setDistrict('');
+      setSelectedDate(null);
+      setSelectedTime('');
       setSubmitTouched(false);
       setSubmitError('');
       setChecking(false);
@@ -96,6 +106,8 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
     setDescription('');
     setAddress(profile.defaultAddress);
     setDistrict(guessDistrict(profile.defaultAddress, regionService.getCached()));
+    setSelectedDate(null);
+    setSelectedTime('');
     setSubmitTouched(false);
     setSubmitError('');
 
@@ -133,7 +145,9 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
         : '';
   const addressError = submitTouched && !address.trim() ? 'მისამართი სავალდებულოა' : '';
   const districtError = submitTouched && !district;
-  const canSubmit = description.trim().length >= DESCRIPTION_MIN && !!address.trim() && !!district;
+  const dateError = submitTouched && !selectedDate;
+  const timeError = submitTouched && !!selectedDate && !selectedTime;
+  const canSubmit = description.trim().length >= DESCRIPTION_MIN && !!address.trim() && !!district && !!selectedDate && !!selectedTime;
 
   const handleClose = () => {
     if (submitting) return;
@@ -152,9 +166,9 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
         category: provider.category,
         description: description.trim(),
         address: address.trim(),
-        date: '',
-        preferredDate: null,
-        timeSlot: null,
+        date: selectedDate ? `${formatPickedDate(selectedDate)} ${timeSlotLabel(selectedTime)}`.trim() : '',
+        preferredDate: selectedDate ? toIsoDateString(selectedDate) : null,
+        timeSlot: selectedTime || null,
         invitedProviderId: provider.id,
       });
       await jobService.setJobDistrict(job.id, district);
@@ -217,6 +231,37 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
             <DistrictPickerField value={district} onChange={setDistrict} error={districtError} />
           </View>
 
+          <Text style={[styles.fieldLabel, { marginTop: spacing.sm }]}>
+            სასურველი თარიღი და დრო<Text style={{ color: colors.destructive }}> *</Text>
+          </Text>
+          <View style={styles.dateRow}>
+            <View style={{ flex: 1 }}>
+              <DatePickerField
+                testID="start-job-date"
+                value={selectedDate}
+                onChange={(d) => {
+                  setSelectedDate(d);
+                  setTimeOpen(true);
+                }}
+                placeholder="თარიღი"
+                error={dateError}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <TimePickerField
+                testID="start-job-time"
+                value={selectedTime}
+                onChange={setSelectedTime}
+                disabled={!selectedDate}
+                error={timeError}
+                placeholder="დრო"
+                disabledPlaceholder="დრო"
+                open={timeOpen}
+                onOpenChange={setTimeOpen}
+              />
+            </View>
+          </View>
+
           <View style={styles.addressField}>
             <AddressAutocompleteField
               label="მისამართი"
@@ -265,6 +310,11 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     textAlign: 'center',
     marginBottom: spacing.lg,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
   fieldLabel: {
     ...typography.small,

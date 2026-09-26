@@ -45,7 +45,8 @@ export type JobStatus =
 // SQL ფუნქცია (იქვე) განსაზღვრავს, რომელი დროიდან ითვლება job-ის
 // "დაწყებული" — 'flexible'/`undefined`-ისთვის უბრალოდ თარიღის დასაწყისი
 // (00:00, Asia/Tbilisi).
-export type TimeSlot = '09-12' | '12-15' | '15-18' | '18-21' | 'flexible';
+// 'HH-HH' (საქართველოს დრო, მაგ. '09-10' = 09:00–10:00; ძველი განცხადებებისთვის '09-12' და ა.შ.) ან 'flexible' — იხ. data/timeSlots.ts
+export type TimeSlot = string;
 
 // Provider-ის მხრიდან ხილული job-ის ჩანაწერი (Job Feed) — რეალურად
 // Supabase-ის `job_posts` ცხრილზეა აგებული (#55 "ეტაპი B", jobService.ts-ის

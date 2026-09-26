@@ -9,17 +9,19 @@ type Props = {
   value: Date | null;
   onChange: (date: Date) => void;
   placeholder?: string;
+  error?: boolean;
+  testID?: string;
 };
 
 // DatePickerField — ველი + BottomSheet-ში ჩაშენებული CalendarPicker.
 // თარიღზე დაჭერისას იხურება sheet (მოთხოვნა: "თარიღზე დაჭერისას გაიხსნას
 // კალენდარი").
-export function DatePickerField({ value, onChange, placeholder = 'აირჩიეთ თარიღი' }: Props) {
+export function DatePickerField({ value, onChange, placeholder = 'აირჩიეთ თარიღი', error, testID }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <Pressable style={styles.field} onPress={() => setOpen(true)}>
+      <Pressable testID={testID} style={[styles.field, error && styles.fieldError]} onPress={() => setOpen(true)}>
         <Calendar size={16} color={colors.mutedForeground} />
         <Text style={[styles.fieldText, !value && styles.fieldPlaceholder]} numberOfLines={1}>
           {value ? formatPickedDate(value) : placeholder}
@@ -52,6 +54,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+  },
+  fieldError: {
+    borderColor: colors.destructive,
   },
   fieldText: {
     ...typography.caption,
