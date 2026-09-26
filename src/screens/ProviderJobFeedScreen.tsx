@@ -6,6 +6,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
 import { ProviderFeedJobCard, ProviderFeedJobCardSkeleton } from '../components/ProviderFeedJobCard';
+import { Reveal } from '../components/Reveal';
+import { staggerDelay } from '../utils/motion';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
@@ -97,14 +99,15 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
           </View>
         ) : (
           <View style={{ gap: spacing.md }}>
-            {filtered.map((job) => (
+            {filtered.map((job, i) => (
+              <Reveal key={job.id} delay={staggerDelay(i)}>
               <ProviderFeedJobCard
-                key={job.id}
                 job={job}
                 sent={interests.has(job.id)}
                 onDetail={() => handleJobDetail(job)}
                 onChat={() => handleOpenChat(job)}
               />
+              </Reveal>
             ))}
           </View>
         )}

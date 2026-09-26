@@ -5,6 +5,8 @@ import { ArrowLeft, Bell, Settings } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Skeleton } from '../components/Skeleton';
+import { Reveal } from '../components/Reveal';
+import { staggerDelay } from '../utils/motion';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { notificationService } from '../services/notificationService';
@@ -110,8 +112,10 @@ export function NotificationsScreen({ navigation, route }: Props) {
         </View>
       ) : (
         <ScrollView style={styles.body}>
-          {items.map((item) => (
-            <NotifRow key={item.id} item={item} onPress={() => handleTap(item)} />
+          {items.map((item, i) => (
+            <Reveal key={item.id} delay={staggerDelay(i)} distance={10}>
+              <NotifRow item={item} onPress={() => handleTap(item)} />
+            </Reveal>
           ))}
           <View style={styles.footer}>
             <Text style={styles.footerText}>სულ {items.length} შეტყობინება</Text>

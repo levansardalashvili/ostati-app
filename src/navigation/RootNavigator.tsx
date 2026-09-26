@@ -140,7 +140,7 @@ export function RootNavigator() {
   }
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRoute}>
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }} initialRouteName={initialRoute}>
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
@@ -158,14 +158,14 @@ export function RootNavigator() {
       {/* CustomerHome/ProviderHome routes render the Bottom Tab navigators
           (Home/ჩატები/პროფილი) — route names kept as-is so every existing
           navigation.reset({routes:[{name:'CustomerHome'}]}) call still works. */}
-      <Stack.Screen name="CustomerHome" component={CustomerTabs} />
-      <Stack.Screen name="ProviderHome" component={ProviderTabs} />
+      <Stack.Screen name="CustomerHome" component={CustomerTabs} options={{ animation: 'fade' }} />
+      <Stack.Screen name="ProviderHome" component={ProviderTabs} options={{ animation: 'fade' }} />
       <Stack.Screen name="ProviderJobDetail" component={ProviderJobDetailScreen} />
       <Stack.Screen name="ProviderJobFeed" component={ProviderJobFeedScreen} />
-      <Stack.Screen name="PostJob" component={PostJobScreen} />
+      <Stack.Screen name="PostJob" component={PostJobScreen} options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="CustomerJobDetail" component={CustomerJobDetailScreen} />
       <Stack.Screen name="ChatConversation" component={ChatConversationScreen} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
       <Stack.Screen name="CustomerEditProfile" component={CustomerEditProfileScreen} />
@@ -175,7 +175,7 @@ export function RootNavigator() {
       <Stack.Screen name="ProviderReviews" component={ProviderReviewsScreen} />
       <Stack.Screen name="ViewProviderProfile" component={ViewProviderProfileScreen} />
       <Stack.Screen name="SavedProviders" component={SavedProvidersScreen} />
-      <Stack.Screen name="RatingScreen" component={RatingScreen} />
+      <Stack.Screen name="RatingScreen" component={RatingScreen} options={{ animation: 'fade_from_bottom' }} />
       <Stack.Screen name="CustomerCategories" component={CustomerCategoriesScreen} />
       <Stack.Screen name="CustomerCategory" component={CustomerCategoryScreen} />
       <Stack.Screen name="CustomerProviderList" component={CustomerProviderListScreen} />

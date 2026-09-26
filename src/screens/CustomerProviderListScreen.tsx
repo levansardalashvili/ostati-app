@@ -9,6 +9,8 @@ import { getCategoryIcon } from '../components/CategoryIcon';
 import { Chip } from '../components/Chip';
 import { ProviderCard, ProviderCardSkeleton } from '../components/ProviderCard';
 import { StartJobChatSheet } from '../components/StartJobChatSheet';
+import { Reveal } from '../components/Reveal';
+import { staggerDelay } from '../utils/motion';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
 import { TBILISI_AREAS as DISTRICTS } from '../data/districts';
@@ -220,13 +222,14 @@ export function CustomerProviderListScreen({ navigation }: Props) {
           </View>
         ) : (
           <View style={{ gap: spacing.md }}>
-            {filtered.map((p) => (
+            {filtered.map((p, i) => (
+              <Reveal key={p.id} delay={staggerDelay(i)}>
               <ProviderCard
-                key={p.id}
                 provider={p}
                 onOpenProfile={() => handleOpenProvider(p.id)}
                 onMessage={() => handleOpenChat(p)}
               />
+              </Reveal>
             ))}
           </View>
         )}

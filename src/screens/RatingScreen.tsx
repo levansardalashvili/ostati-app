@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CheckCircle, Image as ImageIcon, Star } from 'lucide-react-native';
+import { Image as ImageIcon, Star } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
@@ -10,6 +10,8 @@ import { Button } from '../components/Button';
 import { InlineBanner } from '../components/InlineBanner';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
 import { MediaUploadGrid, nextMediaItem, type MediaItem } from '../components/MediaUploadGrid';
+import { SuccessCheck } from '../components/SuccessCheck';
+import { Reveal } from '../components/Reveal';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
@@ -121,17 +123,23 @@ export function RatingScreen({ navigation, route }: Props) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.doneWrap}>
-          <View style={styles.doneIcon}>
-            <CheckCircle size={38} color={colors.success} />
-          </View>
-          <Text style={styles.doneTitle}>მადლობა შეფასებისთვის!</Text>
-          <Text style={styles.doneSubtitle}>თქვენი მოსაზრება ეხმარება სხვა მომხმარებლებს სწორი ოსტატის არჩევაში.</Text>
+          <SuccessCheck size={88} />
+          <Reveal delay={420}>
+            <Text style={styles.doneTitle}>მადლობა შეფასებისთვის!</Text>
+          </Reveal>
+          <Reveal delay={520}>
+            <Text style={styles.doneSubtitle}>თქვენი მოსაზრება ეხმარება სხვა მომხმარებლებს სწორი ოსტატის არჩევაში.</Text>
+          </Reveal>
           <View style={styles.doneStars}>
             {[1, 2, 3, 4, 5].map((s) => (
-              <Star key={s} size={22} color="#FBBF24" fill={stars >= s ? '#FBBF24' : 'transparent'} />
+              <Reveal key={s} delay={600 + s * 80} scaleFrom={0.4} from="none">
+                <Star size={22} color="#FBBF24" fill={stars >= s ? '#FBBF24' : 'transparent'} />
+              </Reveal>
             ))}
           </View>
-          <Button label="მთავარზე დაბრუნება" onPress={goHome} />
+          <Reveal delay={1100}>
+            <Button label="მთავარზე დაბრუნება" onPress={goHome} />
+          </Reveal>
         </View>
       </SafeAreaView>
     );

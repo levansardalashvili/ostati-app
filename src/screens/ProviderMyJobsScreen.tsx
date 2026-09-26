@@ -9,6 +9,8 @@ import { BackHeader } from '../components/BackHeader';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { Skeleton } from '../components/Skeleton';
 import { StatusPill } from '../components/StatusPill';
+import { Reveal } from '../components/Reveal';
+import { staggerDelay } from '../utils/motion';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
@@ -156,17 +158,18 @@ export function ProviderMyJobsScreen({ navigation }: Props) {
           onScroll={handleScroll}
           scrollEventThrottle={16}
         >
-          {items.map((j) => {
+          {items.map((j, i) => {
             const liveStatus = j.customerJobId ? (getStatus(j.customerJobId) ?? j.status) : j.status;
             return (
+              <Reveal key={j.id} delay={staggerDelay(i)}>
               <JobCard
-                key={j.id}
                 job={j}
                 status={liveStatus}
                 onPress={() =>
                   navigation.navigate('ProviderJobDetail', { id: j.id, job: j, mode: tab === 'pending' ? 'browse' : 'selected' })
                 }
               />
+              </Reveal>
             );
           })}
         </ScrollView>

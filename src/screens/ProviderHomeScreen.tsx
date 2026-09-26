@@ -11,8 +11,11 @@ import { Button } from '../components/Button';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { ProviderFeedJobCard, ProviderFeedJobCardSkeleton } from '../components/ProviderFeedJobCard';
 import { PopBadge } from '../components/PopBadge';
+import { AnimatedNumber } from '../components/AnimatedNumber';
 import { StatusPill } from '../components/StatusPill';
 import { Switch } from '../components/Switch';
+import { Reveal } from '../components/Reveal';
+import { staggerDelay } from '../utils/motion';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
 import { authService } from '../services/authService';
@@ -162,8 +165,8 @@ export function ProviderHomeScreen({ navigation }: Props) {
     .filter((j) => j.status === 'completed')
     .reduce((sum, j) => sum + (j.agreedPrice ?? 0), 0);
   const homeStats = [
-    { key: 'income', value: `${income} ₾`, label: 'შემოსავალი' },
-    { key: 'jobs', value: String(stats.jobs), label: 'სამუშაო' },
+    { key: 'income', num: income, fmt: (n: number) => `${Math.round(n)} ₾`, label: 'შემოსავალი' },
+    { key: 'jobs', num: stats.jobs, fmt: (n: number) => String(Math.round(n)), label: 'სამუშაო' },
   ];
 
   const homeFeed = filtered.slice(0, HOME_FEED_LIMIT);
@@ -279,12 +282,12 @@ export function ProviderHomeScreen({ navigation }: Props) {
               {homeStats.map((s) =>
                 s.key === 'jobs' ? (
                   <Pressable key={s.key} style={styles.statBox} onPress={() => navigation.navigate('MyJobsTab')}>
-                    <Text style={styles.statValue}>{s.value}</Text>
+                    <AnimatedNumber style={styles.statValue} value={s.num} format={s.fmt} />
                     <Text style={styles.statLabel}>{s.label}</Text>
                   </Pressable>
                 ) : (
                   <View key={s.key} style={styles.statBox}>
-                    <Text style={styles.statValue}>{s.value}</Text>
+                    <AnimatedNumber style={styles.statValue} value={s.num} format={s.fmt} />
                     <Text style={styles.statLabel}>{s.label}</Text>
                   </View>
                 ),
@@ -356,14 +359,15 @@ export function ProviderHomeScreen({ navigation }: Props) {
             </View>
           ) : (
             <>
-              {homeFeed.map((job) => (
+              {homeFeed.map((job, i) => (
+                <Reveal key={job.id} delay={staggerDelay(i)}>
                 <ProviderFeedJobCard
-                  key={job.id}
                   job={job}
                   sent={interests.has(job.id)}
                   onDetail={() => handleJobDetail(job)}
                   onChat={() => handleOpenChat(job)}
                 />
+                </Reveal>
               ))}
               <Pressable style={styles.viewAllButton} onPress={handleViewAllFeed}>
                 <Text style={styles.viewAllButtonText}>ყველას ნახვა</Text>

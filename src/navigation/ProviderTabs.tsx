@@ -6,6 +6,7 @@ import { ProviderHomeScreen } from '../screens/ProviderHomeScreen';
 import { ProviderMyJobsScreen } from '../screens/ProviderMyJobsScreen';
 import { ChatsListScreen } from '../screens/ChatsListScreen';
 import { ProviderProfileScreen } from '../screens/ProviderProfileScreen';
+import { AnimatedTabIcon } from '../components/AnimatedTabIcon';
 import { FloatingTabBar } from '../components/FloatingTabBar';
 import { PopBadge } from '../components/PopBadge';
 import { colors, radius } from '../theme';
@@ -53,6 +54,7 @@ export function ProviderTabs() {
         tabBar={(props) => <FloatingTabBar {...props} />}
         screenOptions={{
           headerShown: false,
+          animation: 'fade',
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.mutedForeground,
           tabBarShowLabel: false,
@@ -115,7 +117,11 @@ export function ProviderTabs() {
           options={{
             tabBarLabel: 'მთავარი',
             tabBarAccessibilityLabel: 'მთავარი',
-            tabBarIcon: ({ color, focused }) => <Home size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />,
+            tabBarIcon: ({ color, focused }) => (
+            <AnimatedTabIcon focused={focused}>
+              <Home size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+            </AnimatedTabIcon>
+          ),
           }}
         />
         <Tab.Screen
@@ -125,7 +131,9 @@ export function ProviderTabs() {
             tabBarLabel: 'სამუშაოები',
             tabBarAccessibilityLabel: 'სამუშაოები',
             tabBarIcon: ({ color, focused }) => (
-              <ClipboardList size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+              <AnimatedTabIcon focused={focused}>
+                <ClipboardList size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+              </AnimatedTabIcon>
             ),
           }}
         />
@@ -136,7 +144,9 @@ export function ProviderTabs() {
             tabBarAccessibilityLabel: 'ჩატები',
             tabBarIcon: ({ color, focused }) => (
               <View>
-                <MessageCircle size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+                <AnimatedTabIcon focused={focused}>
+                  <MessageCircle size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+                </AnimatedTabIcon>
                 {unreadChats > 0 && !focused && <PopBadge style={badgeStyle} />}
               </View>
             ),
@@ -150,7 +160,11 @@ export function ProviderTabs() {
           options={{
             tabBarLabel: 'პროფილი',
             tabBarAccessibilityLabel: 'პროფილი',
-            tabBarIcon: ({ color, focused }) => <User size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />,
+            tabBarIcon: ({ color, focused }) => (
+            <AnimatedTabIcon focused={focused}>
+              <User size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+            </AnimatedTabIcon>
+          ),
           }}
         />
       </Tab.Navigator>

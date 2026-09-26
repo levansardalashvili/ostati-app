@@ -6,6 +6,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
 import { ProviderCard } from '../components/ProviderCard';
 import { StartJobChatSheet } from '../components/StartJobChatSheet';
+import { Reveal } from '../components/Reveal';
+import { staggerDelay } from '../utils/motion';
 import { colors, radius, spacing, typography } from '../theme';
 import { categoryService } from '../services/categoryService';
 import { userService } from '../services/userService';
@@ -81,13 +83,14 @@ export function CustomerCategoryScreen({ navigation, route }: Props) {
         </View>
       ) : (
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          {providers.map((p) => (
+          {providers.map((p, i) => (
+            <Reveal key={p.id} delay={staggerDelay(i)}>
             <ProviderCard
-              key={p.id}
               provider={p}
               onOpenProfile={() => navigation.navigate('ViewProviderProfile', { id: p.id })}
               onMessage={() => setStartChatProvider(p)}
             />
+            </Reveal>
           ))}
         </ScrollView>
       )}

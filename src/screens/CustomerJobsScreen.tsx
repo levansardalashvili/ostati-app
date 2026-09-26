@@ -9,6 +9,8 @@ import { BackHeader } from '../components/BackHeader';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { Skeleton } from '../components/Skeleton';
 import { StatusPill } from '../components/StatusPill';
+import { Reveal } from '../components/Reveal';
+import { staggerDelay } from '../utils/motion';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { jobService } from '../services/jobService';
@@ -166,14 +168,15 @@ export function CustomerJobsScreen({ navigation }: Props) {
           onScroll={handleScroll}
           scrollEventThrottle={16}
         >
-          {items.map((j) => (
+          {items.map((j, i) => (
+            <Reveal key={j.id} delay={staggerDelay(i)}>
             <JobCard
-              key={j.id}
               job={j}
               status={getStatus(j.id) ?? j.status}
               onPress={() => navigation.navigate('CustomerJobDetail', { jobId: j.id, job: j })}
               onChat={() => openChat(j)}
             />
+            </Reveal>
           ))}
         </ScrollView>
       )}

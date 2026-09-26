@@ -20,6 +20,8 @@ import { PopBadge } from '../components/PopBadge';
 import { StartJobChatSheet } from '../components/StartJobChatSheet';
 import { usePressScale } from '../utils/usePressScale';
 import { StatusPill } from '../components/StatusPill';
+import { Reveal } from '../components/Reveal';
+import { staggerDelay } from '../utils/motion';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES, SPECIALTY_LABEL } from '../data/categories';
 import { TBILISI_AREAS as DISTRICTS } from '../data/districts';
@@ -225,6 +227,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <Reveal from="top" distance={12}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
@@ -259,6 +262,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
           </View>
         </View>
       </View>
+      </Reveal>
 
       <ScrollView
         style={styles.body}
@@ -267,6 +271,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
         scrollEventThrottle={16}
       >
         {currentJob && currentJobCategory && (
+          <Reveal delay={60}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>მიმდინარე სამუშაო</Text>
             <Animated.View style={{ transform: [{ scale: currentJobPress.scale }] }}>
@@ -291,8 +296,10 @@ export function CustomerHomeScreen({ navigation }: Props) {
               </Pressable>
             </Animated.View>
           </View>
+          </Reveal>
         )}
 
+        <Reveal delay={110}>
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>სერვისები</Text>
@@ -303,9 +310,10 @@ export function CustomerHomeScreen({ navigation }: Props) {
             )}
           </View>
           <View style={styles.serviceGrid}>
-            {topCategories.map((c) => (
+            {topCategories.map((c, i) => (
               <ServiceTile
                 key={c.id}
+                index={i}
                 selected={selCats.has(c.id)}
                 bg={c.bg}
                 dot={c.dot}
@@ -319,12 +327,15 @@ export function CustomerHomeScreen({ navigation }: Props) {
               bg={colors.secondary}
               dot={colors.secondaryForeground}
               label="ყველა სერვისი"
+              index={topCategories.length}
               Icon={LayoutGrid}
               onPress={handleAllServices}
             />
           </View>
         </View>
+        </Reveal>
 
+        <Reveal delay={190}>
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.resultsTitle}>ტოპ ოსტატები შენს არეალში</Text>
@@ -355,13 +366,14 @@ export function CustomerHomeScreen({ navigation }: Props) {
           ) : (
             <>
               <View style={{ gap: spacing.md }}>
-                {topProviders.map((p) => (
+                {topProviders.map((p, i) => (
+                  <Reveal key={p.id} delay={staggerDelay(i, 60)}>
                   <ProviderCard
-                    key={p.id}
                     provider={p}
                     onOpenProfile={() => handleOpenProvider(p.id)}
                     onMessage={() => handleOpenChat(p)}
                   />
+                  </Reveal>
                 ))}
               </View>
               <Pressable style={styles.viewAllButton} onPress={handleViewAllProviders}>
@@ -371,6 +383,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
             </>
           )}
         </View>
+        </Reveal>
       </ScrollView>
       <StartJobChatSheet
         provider={startChatProvider}
@@ -388,7 +401,9 @@ function ServiceTile({
   label,
   Icon,
   onPress,
+  index = 0,
 }: {
+  index?: number;
   selected: boolean;
   bg: string;
   dot: string;
@@ -399,7 +414,8 @@ function ServiceTile({
   const { scale, onPressIn, onPressOut } = usePressScale();
 
   return (
-    <Animated.View style={{ width: '47%', transform: [{ scale }] }}>
+    <Reveal delay={160 + staggerDelay(index)} scaleFrom={0.9} distance={10} style={{ width: '47%' }}>
+    <Animated.View style={{ width: '100%', transform: [{ scale }] }}>
       <Pressable
         style={[styles.serviceCard, { width: '100%' }, selected && styles.serviceCardSelected]}
         onPress={onPress}
@@ -414,6 +430,7 @@ function ServiceTile({
         </Text>
       </Pressable>
     </Animated.View>
+    </Reveal>
   );
 }
 

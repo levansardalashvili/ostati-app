@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { usePop } from '../utils/usePop';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Award, Heart, Image as ImageIcon, MapPin, MessageCircle, Share2, Star, User } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -94,6 +95,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
   const { isFavorite, toggleFavorite } = useFavoriteProviders();
   const isSelfPreview = !!p.id && p.id === authService.getCurrentUser()?.uid;
   const favorite = isFavorite(p.id);
+  const heartScale = usePop(favorite);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const handleToggleFavorite = () => {
     const willBeFavorite = !favorite;
@@ -136,7 +138,9 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
         <View style={styles.headerActions}>
           {!loading && !isSelfPreview && (
             <Pressable testID="favorite-toggle" style={styles.iconButton} onPress={handleToggleFavorite}>
-              <Heart size={17} color={favorite ? colors.destructive : colors.mutedForeground} fill={favorite ? colors.destructive : 'transparent'} />
+              <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                <Heart size={17} color={favorite ? colors.destructive : colors.mutedForeground} fill={favorite ? colors.destructive : 'transparent'} />
+              </Animated.View>
             </Pressable>
           )}
           <Pressable style={styles.iconButton}>

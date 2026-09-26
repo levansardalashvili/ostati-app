@@ -16,7 +16,6 @@ import {
   AlertCircle,
   Camera,
   Check,
-  CheckCircle,
   ChevronRight,
   Image as ImageIcon,
   Shield,
@@ -31,6 +30,8 @@ import { DatePickerField } from '../components/DatePickerField';
 import { TimePickerField } from '../components/TimePickerField';
 import { timeSlotLabel } from '../data/timeSlots';
 import { formatPickedDate, toIsoDateString } from '../components/CalendarPicker';
+import { SuccessCheck } from '../components/SuccessCheck';
+import { Reveal } from '../components/Reveal';
 import { InlineBanner } from '../components/InlineBanner';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
@@ -291,12 +292,14 @@ export function PostJobScreen({ navigation, route }: Props) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.successState}>
-          <View style={styles.successIcon}>
-            <CheckCircle size={40} color={colors.success} strokeWidth={1.8} />
-          </View>
-          <Text style={styles.successTitle}>მოთხოვნა გამოქვეყნებულია!</Text>
-          <Text style={styles.successSubtitle}>თქვენი მოთხოვნა შესაბამის ოსტატებს უკვე შეუძლიათ ნახონ.</Text>
-          <View style={styles.successActions}>
+          <SuccessCheck size={92} />
+          <Reveal delay={420}>
+            <Text style={styles.successTitle}>მოთხოვნა გამოქვეყნებულია!</Text>
+          </Reveal>
+          <Reveal delay={520}>
+            <Text style={styles.successSubtitle}>თქვენი მოთხოვნა შესაბამის ოსტატებს უკვე შეუძლიათ ნახონ.</Text>
+          </Reveal>
+          <Reveal delay={640} style={styles.successActions}>
             <Button
               label="მოთხოვნის ნახვა"
               onPress={() => {
@@ -309,7 +312,7 @@ export function PostJobScreen({ navigation, route }: Props) {
               variant="outline"
               onPress={() => navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] })}
             />
-          </View>
+          </Reveal>
         </View>
       </SafeAreaView>
     );

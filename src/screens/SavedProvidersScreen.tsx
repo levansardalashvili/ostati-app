@@ -9,6 +9,8 @@ import { Skeleton } from '../components/Skeleton';
 import { StartJobChatSheet } from '../components/StartJobChatSheet';
 import { Toast } from '../components/Toast';
 import { VerifiedBadge } from '../components/VerifiedBadge';
+import { Reveal } from '../components/Reveal';
+import { staggerDelay } from '../utils/motion';
 import { colors, radius, spacing, typography } from '../theme';
 import { SPECIALTY_LABEL } from '../data/categories';
 import { userService } from '../services/userService';
@@ -113,9 +115,9 @@ export function SavedProvidersScreen({ navigation }: Props) {
         </View>
       ) : (
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          {saved.map((p) => (
+          {saved.map((p, i) => (
+            <Reveal key={p.id} delay={staggerDelay(i)}>
             <SavedProviderCard
-              key={p.id}
               provider={p}
               onOpenProfile={() => openProfile(p.id)}
               onToggleFavorite={() => {
@@ -124,6 +126,7 @@ export function SavedProvidersScreen({ navigation }: Props) {
               }}
               onMessage={() => openChat(p)}
             />
+            </Reveal>
           ))}
         </ScrollView>
       )}

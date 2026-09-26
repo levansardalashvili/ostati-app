@@ -6,6 +6,7 @@ import { CustomerHomeScreen } from '../screens/CustomerHomeScreen';
 import { CustomerJobsScreen } from '../screens/CustomerJobsScreen';
 import { ChatsListScreen } from '../screens/ChatsListScreen';
 import { CustomerProfileScreen } from '../screens/CustomerProfileScreen';
+import { AnimatedTabIcon } from '../components/AnimatedTabIcon';
 import { FloatingTabBar } from '../components/FloatingTabBar';
 import { PopBadge } from '../components/PopBadge';
 import { colors, radius } from '../theme';
@@ -55,6 +56,7 @@ export function CustomerTabs() {
         tabBar={(props) => <FloatingTabBar {...props} />}
         screenOptions={{
           headerShown: false,
+          animation: 'fade',
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.mutedForeground,
           tabBarShowLabel: false,
@@ -117,7 +119,11 @@ export function CustomerTabs() {
         options={{
           tabBarLabel: 'მთავარი',
           tabBarAccessibilityLabel: 'მთავარი',
-          tabBarIcon: ({ color, focused }) => <Home size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />,
+          tabBarIcon: ({ color, focused }) => (
+            <AnimatedTabIcon focused={focused}>
+              <Home size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+            </AnimatedTabIcon>
+          ),
         }}
       />
       <Tab.Screen
@@ -126,7 +132,11 @@ export function CustomerTabs() {
         options={{
           tabBarLabel: 'განცხადებები',
           tabBarAccessibilityLabel: 'განცხადებები',
-          tabBarIcon: ({ color, focused }) => <FilePlus2 size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />,
+          tabBarIcon: ({ color, focused }) => (
+            <AnimatedTabIcon focused={focused}>
+              <FilePlus2 size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+            </AnimatedTabIcon>
+          ),
         }}
       />
       <Tab.Screen
@@ -136,7 +146,9 @@ export function CustomerTabs() {
           tabBarAccessibilityLabel: 'ჩატები',
           tabBarIcon: ({ color, focused }) => (
             <View>
-              <MessageCircle size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+              <AnimatedTabIcon focused={focused}>
+                <MessageCircle size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+              </AnimatedTabIcon>
               {unreadChats > 0 && !focused && <PopBadge style={badgeStyle} />}
             </View>
           ),
@@ -150,7 +162,11 @@ export function CustomerTabs() {
         options={{
           tabBarLabel: 'პროფილი',
           tabBarAccessibilityLabel: 'პროფილი',
-          tabBarIcon: ({ color, focused }) => <User size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />,
+          tabBarIcon: ({ color, focused }) => (
+            <AnimatedTabIcon focused={focused}>
+              <User size={23} color={color} strokeWidth={focused ? 2.4 : 1.8} />
+            </AnimatedTabIcon>
+          ),
         }}
       />
       </Tab.Navigator>

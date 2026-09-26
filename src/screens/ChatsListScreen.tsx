@@ -8,6 +8,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { getCategoryIcon } from '../components/CategoryIcon';
 import { Skeleton } from '../components/Skeleton';
+import { Reveal } from '../components/Reveal';
+import { staggerDelay } from '../utils/motion';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
@@ -107,8 +109,10 @@ export function ChatsListScreen({ navigation, role }: Props) {
         </View>
       ) : (
         <ScrollView style={styles.body} onScroll={handleScroll} scrollEventThrottle={16}>
-          {filtered.map((c) => (
-            <ChatRow key={c.id} chat={c} onPress={() => openChat(c)} />
+          {filtered.map((c, i) => (
+            <Reveal key={c.id} delay={staggerDelay(i)} distance={10}>
+              <ChatRow chat={c} onPress={() => openChat(c)} />
+            </Reveal>
           ))}
         </ScrollView>
       )}
