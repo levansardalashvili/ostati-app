@@ -150,7 +150,7 @@ appId: com.ostati.app
 - tapOn:
     id: "post-job-description"
 - inputText: "Maestro E2E ტესტის მოთხოვნაა — გაჟონვის შეკეთება სამზარეულოში."
-- hideKeyboard
+# hideKeyboard გამოტოვებულია: ემულატორზე, სადაც soft keyboard არ ჩანს, Android-ზე Back-ს აგზავნის და ფორმას ტოვებს (რაიონის ველი ისედაც ჩანს)
 - scrollUntilVisible:
     element: ".*აირჩიეთ რაიონი/ქალაქი.*"
     direction: DOWN
