@@ -1,8 +1,9 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Wrench } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import { BrandGlyph } from './BrandGlyph';
 import { Reveal } from './Reveal';
 import { colors, radius, spacing, typography } from '../theme';
 import { motion } from '../utils/motion';
@@ -30,7 +31,7 @@ type Props = {
   // სახელია, არა ბრენდი, ამიტომ "ოსტატი" ფორმით რჩება უცვლელი.
   brand?: string;
   // მოცემულია, თუ Register-ს RoleSelectScreen-ის იგივე emoji-ს (🏠/🔧) სჭირდება
-  // Wrench-ლოგოს ნაცვლად — default undefined ინარჩუნებს Login-ის Wrench-ს
+  // ბრენდის ნიშნის ნაცვლად — default undefined ინარჩუნებს Login-ის ბრენდის ნიშანს
   emoji?: string;
 };
 
@@ -61,7 +62,7 @@ export function CurvedAuthHeader({ subtitle, onBack, brand = 'ოსტატო
       >
         <Reveal from="none" scaleFrom={0.7} duration={motion.duration.slow}>
           <View style={styles.logoCircle}>
-            {emoji ? <Text style={styles.logoEmoji}>{emoji}</Text> : <Wrench size={26} color="#FFFFFF" strokeWidth={1.8} />}
+            {emoji ? <Text style={styles.logoEmoji}>{emoji}</Text> : <BrandGlyph size={34} color="#FFFFFF" />}
           </View>
         </Reveal>
         <Reveal delay={140}>

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
-import { Wrench } from 'lucide-react-native';
 import { Circle, Svg } from 'react-native-svg';
 import { colors } from '../theme';
 import { motion, useReduceMotion } from '../utils/motion';
+import { BrandGlyph } from './BrandGlyph';
 import { Reveal } from './Reveal';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -14,9 +14,9 @@ type Props = {
   delay?: number;
 };
 
-// აპის ლოგო — ლურჯი „დახატვადი“ რგოლი + wrench, გატანილია WelcomeScreen-იდან
-// (#170), რომ სხვა ეკრანებმაც (RegistrationSuccessScreen) იგივე ბრენდის
-// ვიზუალი გაიზიარონ დუბლირების გარეშე.
+// აპის ლოგო — ლურჯი „დახატვადი“ რგოლი + ბრენდის ნიშანი, გატანილია
+// WelcomeScreen-იდან (#170), რომ სხვა ეკრანებმაც (RegistrationSuccessScreen)
+// იგივე ბრენდის ვიზუალი გაიზიარონ დუბლირების გარეშე.
 export function BrandMark({ size = 116, delay = 300 }: Props) {
   const reduceMotion = useReduceMotion();
   const ringProgress = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
@@ -67,7 +67,7 @@ export function BrandMark({ size = 116, delay = 300 }: Props) {
             { width: logoSize, height: logoSize, borderRadius: logoSize / 2 },
           ]}
         >
-          <Wrench size={size * 0.34} color={colors.primary} strokeWidth={1.8} />
+          <BrandGlyph size={size * 0.46} color={colors.primary} />
         </View>
       </Reveal>
     </View>
