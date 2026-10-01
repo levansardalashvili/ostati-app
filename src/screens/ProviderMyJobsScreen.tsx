@@ -202,10 +202,12 @@ function JobCard({ job: j, status, onPress }: { job: FeedJob; status?: JobStatus
             <MapPin size={13} color={colors.mutedForeground} />
             <Text style={styles.metaText}>{j.location}</Text>
           </View>
-          <View style={styles.metaRow}>
-            <Clock size={13} color={colors.mutedForeground} />
-            <Text style={styles.metaText}>{j.date}</Text>
-          </View>
+          {!!j.date && (
+            <View style={styles.metaRow}>
+              <Clock size={13} color={colors.mutedForeground} />
+              <Text style={styles.metaText}>{j.date}</Text>
+            </View>
+          )}
         </View>
       </Pressable>
     </Animated.View>
