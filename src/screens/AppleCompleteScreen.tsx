@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AddressAutocompleteField } from '../components/AddressAutocompleteField';
+import { AddressDetailsField, type AddressDetails } from '../components/AddressDetailsField';
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { ProgressBar } from '../components/ProgressBar';
@@ -38,17 +39,38 @@ export function AppleCompleteScreen({ navigation, route }: Props) {
   const initials = `${firstName.charAt(0)}${lastName.charAt(0) || ''}`.toUpperCase() || 'A';
 
   const [address, setAddress] = useState('');
+  const [addressDetails, setAddressDetails] = useState<AddressDetails>({
+    entrance: '',
+    apartment: '',
+    doorCode: '',
+    isPrivateHouse: false,
+  });
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
   const addressError = !isProvider && touched && !address.trim() ? 'ეს ველი სავალდებულოა' : '';
-  const canContinue = (isProvider || address.trim()) && !loading;
+  const entranceError =
+    !isProvider &&
+    touched &&
+    !addressDetails.isPrivateHouse &&
+    (!addressDetails.entrance.trim() || !addressDetails.apartment.trim());
+  const canContinue =
+    (isProvider || address.trim()) &&
+    (isProvider ||
+      addressDetails.isPrivateHouse ||
+      (addressDetails.entrance.trim() && addressDetails.apartment.trim())) &&
+    !loading;
 
   const handleContinue = async () => {
     setTouched(true);
     setSubmitError('');
-    if (!isProvider && !address.trim()) return;
+    if (
+      !isProvider &&
+      (!address.trim() ||
+        (!addressDetails.isPrivateHouse && (!addressDetails.entrance.trim() || !addressDetails.apartment.trim())))
+    )
+      return;
     if (!appleUser) {
       setSubmitError('Apple სესია ვერ მოიძებნა — დაბრუნდი და სცადე თავიდან.');
       return;
@@ -63,12 +85,26 @@ export function AppleCompleteScreen({ navigation, route }: Props) {
         email: appleEmail,
         defaultAddress,
         phone: appleUser.phone ?? '',
+        entrance: isProvider ? '' : addressDetails.entrance,
+        apartment: isProvider ? '' : addressDetails.apartment,
+        doorCode: isProvider ? '' : addressDetails.doorCode,
+        isPrivateHouse: isProvider ? false : addressDetails.isPrivateHouse,
       });
       if (role === 'provider') {
         setProviderProfile({ firstName, lastName });
         navigation.replace('ProviderSetup');
       } else {
-        setProfile({ firstName, lastName, email: appleEmail, defaultAddress, phone: '' });
+        setProfile({
+          firstName,
+          lastName,
+          email: appleEmail,
+          defaultAddress,
+          phone: '',
+          entrance: addressDetails.entrance,
+          apartment: addressDetails.apartment,
+          doorCode: addressDetails.doorCode,
+          isPrivateHouse: addressDetails.isPrivateHouse,
+        });
         navigation.replace('CustomerSetup', { userName: displayName });
       }
     } catch (error) {
@@ -119,6 +155,14 @@ export function AppleCompleteScreen({ navigation, route }: Props) {
               placeholder="მაგ. ჭავჭავაძე 48"
               error={addressError}
             />
+            <View style={styles.entranceRow}>
+              <AddressDetailsField
+                address={address}
+                value={addressDetails}
+                onChange={setAddressDetails}
+                error={entranceError}
+              />
+            </View>
           </View>
         )}
 
@@ -205,6 +249,11 @@ const styles = StyleSheet.create({
   field: {
     marginBottom: spacing.lg,
     zIndex: 10,
+  },
+  entranceRow: {
+    flexDirection: 'row',
+    gap: spacing.sm + 2,
+    marginTop: spacing.md,
   },
   errorBanner: {
     backgroundColor: colors.dangerBackground,

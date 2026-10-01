@@ -1,20 +1,16 @@
 import React, { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Phone } from 'lucide-react-native';
+import { StatusBar } from 'expo-status-bar';
+import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AddressAutocompleteField } from '../components/AddressAutocompleteField';
+import { AddressDetailsField, type AddressDetails } from '../components/AddressDetailsField';
 import { Button } from '../components/Button';
+import { CurvedAuthHeader } from '../components/CurvedAuthHeader';
+import { PasswordStrengthMeter } from '../components/PasswordStrengthMeter';
 import { ProgressBar } from '../components/ProgressBar';
+import { Reveal } from '../components/Reveal';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
@@ -37,9 +33,15 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [address, setAddress] = useState('');
+  const [addressDetails, setAddressDetails] = useState<AddressDetails>({
+    entrance: '',
+    apartment: '',
+    doorCode: '',
+    isPrivateHouse: false,
+  });
   const [phoneDigits, setPhoneDigits] = useState('');
   // Task — ეს პაროლი ინახება Supabase-ის ანგარიშზე OTP-ვერიფიკაციის
-  // წარმატების შემდეგ (PhoneRegisterVerifyScreen-ის `setPhonePassword`)
+  // წარმატების შემდეგ (PhoneRegisterVerifyScreen-ის `setNewPassword`)
   // — რომ login-ისას (PhoneLoginScreen) ყოველ ჯერზე ახალი SMS-კოდი აღარ
   // დასჭირდეს, RegisterScreen-ის (email) იგივე პაროლის პრინციპით.
   const [password, setPassword] = useState('');
@@ -54,6 +56,11 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
     firstName: touched.firstName && !firstName.trim() ? 'ეს ველი სავალდებულოა' : '',
     lastName: touched.lastName && !lastName.trim() ? 'ეს ველი სავალდებულოა' : '',
     address: !isProvider && touched.address && !address.trim() ? 'ეს ველი სავალდებულოა' : '',
+    entrance:
+      !isProvider &&
+      touched.entrance &&
+      !addressDetails.isPrivateHouse &&
+      (!addressDetails.entrance.trim() || !addressDetails.apartment.trim()),
     phone:
       touched.phone && !phoneDigits
         ? 'ეს ველი სავალდებულოა'
@@ -78,6 +85,9 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
   const allValid =
     nameValid &&
     (isProvider || address.trim()) &&
+    (isProvider ||
+      addressDetails.isPrivateHouse ||
+      (addressDetails.entrance.trim() && addressDetails.apartment.trim())) &&
     PHONE_RE.test(phoneDigits) &&
     password.length >= 8 &&
     password === confirmPassword;
@@ -87,6 +97,7 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
       firstName: true,
       lastName: true,
       address: !isProvider,
+      entrance: !isProvider,
       phone: true,
       password: true,
       confirmPassword: true,
@@ -103,6 +114,10 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         defaultAddress: isProvider ? '' : address.trim(),
+        entrance: isProvider ? '' : addressDetails.entrance,
+        apartment: isProvider ? '' : addressDetails.apartment,
+        doorCode: isProvider ? '' : addressDetails.doorCode,
+        isPrivateHouse: isProvider ? false : addressDetails.isPrivateHouse,
         password,
       });
     } catch (error) {
@@ -113,19 +128,23 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-              <ArrowLeft size={18} color={colors.foreground} />
-            </Pressable>
-            <ProgressBar step={0} total={role === 'provider' ? 3 : 2} />
-            <View style={styles.headerSpacer} />
-          </View>
+    <SafeAreaView style={styles.container} edges={[]}>
+      <StatusBar style="light" />
+      <CurvedAuthHeader
+        onBack={() => navigation.goBack()}
+        brand={isProvider ? 'ოსტატი' : 'მომხმარებელი'}
+        emoji={isProvider ? '🔧' : '🏠'}
+      />
+      <KeyboardAwareForm
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+          <ProgressBar step={0} total={role === 'provider' ? 3 : 2} />
 
-          <Text style={styles.title}>ტელეფონის ნომრით რეგისტრაცია</Text>
-          <Text style={styles.subtitle}>დაადასტურეთ SMS-კოდი</Text>
+          <Reveal delay={260}>
+            <Text style={styles.subtitle}>შეიყვანეთ თქვენი მონაცემები რეგისტრაციის გასაგრძელებლად</Text>
+          </Reveal>
 
           {submitError ? (
             <View style={styles.errorBanner}>
@@ -160,15 +179,23 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
             </View>
 
             {!isProvider && (
-              <AddressAutocompleteField
-                label="მისამართი"
-                required
-                value={address}
-                onChangeText={setAddress}
-                onBlur={() => touch('address')}
-                placeholder="მაგ. ჭავჭავაძის 48"
-                error={errors.address}
-              />
+              <>
+                <AddressAutocompleteField
+                  label="მისამართი"
+                  required
+                  value={address}
+                  onChangeText={setAddress}
+                  onBlur={() => touch('address')}
+                  placeholder="მაგ. ჭავჭავაძის 48"
+                  error={errors.address}
+                />
+                <AddressDetailsField
+                  address={address}
+                  value={addressDetails}
+                  onChange={setAddressDetails}
+                  error={errors.entrance}
+                />
+              </>
             )}
 
             <View>
@@ -179,7 +206,7 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
                 <View style={styles.phonePrefix}>
                   <Text style={styles.phonePrefixText}>+995</Text>
                 </View>
-                <TextInput
+                <ScrollAwareTextInput
                   value={phoneDigits}
                   onChangeText={(v) => setPhoneDigits(v.replace(/\D/g, '').slice(0, 9))}
                   onBlur={() => touch('phone')}
@@ -205,6 +232,7 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
               secureTextEntry
               autoCapitalize="none"
             />
+            <PasswordStrengthMeter password={password} />
             <TextField
               label="გაიმეორე პაროლი"
               required
@@ -225,17 +253,14 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
               loading={loading}
             />
 
-            <Text style={styles.loginText}>უკვე გაქვს ანგარიში?</Text>
-            <Pressable
-              style={({ pressed }) => [styles.phoneButton, pressed && styles.phoneButtonPressed]}
-              onPress={() => navigation.navigate('PhoneLogin')}
-            >
-              <Phone size={18} color={colors.foreground} />
-              <Text style={styles.phoneButtonText}>შესვლა ტელეფონით</Text>
-            </Pressable>
+            <View style={styles.loginRow}>
+              <Text style={styles.loginText}>უკვე გაქვს ანგარიში? </Text>
+              <Pressable onPress={() => navigation.navigate('PhoneLogin')}>
+                <Text style={styles.loginLink}>შესვლა</Text>
+              </Pressable>
+            </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareForm>
     </SafeAreaView>
   );
 }
@@ -250,32 +275,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.xl,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerSpacer: {
-    width: 36,
-  },
-  title: {
-    ...typography.h1,
-    color: colors.foreground,
-    marginBottom: spacing.xs,
-    textAlign: 'center',
-  },
   subtitle: {
-    ...typography.caption,
-    color: colors.mutedForeground,
+    ...typography.body,
+    color: colors.foreground,
+    marginTop: spacing.lg,
     marginBottom: spacing.lg,
     textAlign: 'center',
   },
@@ -338,31 +341,17 @@ const styles = StyleSheet.create({
     color: colors.destructive,
     marginTop: spacing.xs,
   },
+  loginRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingTop: spacing.xs,
+  },
   loginText: {
     ...typography.caption,
     color: colors.mutedForeground,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
   },
-  // Task — RegisterScreen.tsx-ის იგივე ცვლილება: GoogleButton-ის ზუსტად
-  // იგივე ზომა/ვიზუალი, Phone აიქონით.
-  phoneButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    minHeight: 52,
-    borderRadius: radius.md,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  phoneButtonPressed: {
-    opacity: 0.85,
-  },
-  phoneButtonText: {
-    ...typography.bodyMedium,
-    color: colors.foreground,
+  loginLink: {
+    ...typography.captionMedium,
+    color: colors.primary,
   },
 });

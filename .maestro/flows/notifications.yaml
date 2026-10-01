@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # Notifications (#70) — a real server-side trigger event (Provider
 # expresses interest → `handle_job_response_notify()` inserts a
@@ -48,7 +48,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 - tapOn:
@@ -70,7 +70,7 @@ appId: com.ostati.app
 - evalScript: ${output.providerEmail = 'verified.provider@e2e.example.com'}
 - evalScript: ${output.jobMarker = 'NotifJobE2E' + Date.now()}
 
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
@@ -141,7 +141,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 2: Provider registers, expresses interest (fires the notify trigger)
 - tapOn: ".*შესვლა.*"
@@ -183,7 +183,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 3: Customer logs back in, checks the notification -----------
 - tapOn: ".*შესვლა.*"
@@ -225,4 +225,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

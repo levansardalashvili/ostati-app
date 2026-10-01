@@ -14,6 +14,14 @@ export type CustomerProfile = {
   // ცარიელი სტრიქონი ორივე ველისთვის (`email`-ის იგივე default-ი,
   // #2-ის migration 0002-დანვე).
   phone: string;
+  // მისამართის დამატებითი დეტალები (შესასვლელი/ბინა/კარის კოდი) —
+  // `defaultAddress`-ის იგივე "მხოლოდ წინასწარ ივსება, არასდროს
+  // ავტომატურად არ იცვლება" პრინციპით. `entrance` სავალდებულოა, გარდა
+  // `isPrivateHouse`-ისა (კერძო სახლს შესასვლელი/ბინა არ გააჩნია).
+  entrance: string;
+  apartment: string;
+  doorCode: string;
+  isPrivateHouse: boolean;
 };
 
 // Supabase-ის `users` ცხრილის row-ის ფორმა — ანგარიშის საბაზისო
@@ -33,6 +41,13 @@ export type UserRecord = {
   // #107 — `public.users.phone` (supabase/migrations/0083), Email-ის
   // იგივე "ცარიელი, თუ ეს მეთოდით არ დარეგისტრირებულა" პრინციპით.
   phone: string;
+  // `public.users.entrance`/`apartment`/`door_code`/`is_private_house` —
+  // Customer-ის მისამართის დამატებითი დეტალები, ყველა Provider-ისთვის
+  // ცარიელი/false (მისამართივით, #46).
+  entrance: string;
+  apartment: string;
+  doorCode: string;
+  isPrivateHouse: boolean;
   // ადმინის მიერ ანგარიშის შეჩერება (supabase/migrations/0106) — client არასდროს წერს,
   // მხოლოდ კითხულობს login/session-restore-ზე (#139).
   suspended: boolean;

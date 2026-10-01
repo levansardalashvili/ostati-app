@@ -30,7 +30,7 @@ async function sendSms(phone: string, text: string): Promise<void> {
   const res = await fetch('https://rest.nexmo.com/sms/json', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ api_key: apiKey, api_secret: apiSecret, from: 'Ostati', to: phone.replace(/^\+/, ''), text }),
+    body: JSON.stringify({ api_key: apiKey, api_secret: apiSecret, from: 'Ostato', to: phone.replace(/^\+/, ''), text }),
   });
   const data = await res.json().catch(() => null);
   // Vonage 200-ს აბრუნებს შეცდომაზეც — სტატუსი შეტყობინების შიგნითაა ("0" = წარმატება).
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
 
   try {
     // ნომერი + ით ან მის გარეშე შეიძლება მოვიდეს — sendSms() ორივეს ამუშავებს.
-    await sendSms(phone, `Ostati: თქვენი დადასტურების კოდია ${otp}`);
+    await sendSms(phone, `Ostato: თქვენი დადასტურების კოდია ${otp}`);
     return json(200, {});
   } catch (err) {
     console.error('send-sms-hook failed:', (err as Error).message);

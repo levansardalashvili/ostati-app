@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Shield } from 'lucide-react-native';
+import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
+import { Phone } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
+import { RecoveryStepHeader } from '../components/RecoveryStepHeader';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
 import type { RootStackParamList } from '../navigation/types';
@@ -12,9 +14,10 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PhoneForgotPassword'>;
 
 const PHONE_RE = /^5\d{8}$/;
 
-// Task — ForgotPasswordScreen.tsx-ის (email) ანალოგიური, ტელეფონის
-// ანგარიშისთვის — "ბმულის გაგზავნის" ნაცვლად OTP-კოდის გაგზავნა
-// (ტელეფონს ბმული ფიზიკურად არ შეესაბამება).
+// ForgotPasswordScreen.tsx-ის (email) ანალოგიური, ტელეფონის ანგარიშისთვის
+// — 3-ნაბიჯიანი ეზარდის 1/3 (#170). `sendPhoneOtpForReset` (არა
+// `sendPhoneOtp`) — `shouldCreateUser: false`, არარსებულ ნომერზე ახალ
+// ცარიელ ანგარიშს არასდროს ქმნის.
 export function PhoneForgotPasswordScreen({ navigation }: Props) {
   const [phoneDigits, setPhoneDigits] = useState('');
   const [touched, setTouched] = useState(false);
@@ -31,7 +34,7 @@ export function PhoneForgotPasswordScreen({ navigation }: Props) {
     setLoading(true);
     try {
       const e164 = `+995${phoneDigits}`;
-      await authService.sendPhoneOtp(e164);
+      await authService.sendPhoneOtpForReset(e164);
       navigation.navigate('PhoneForgotPasswordVerify', { phone: e164 });
     } catch (err) {
       setError(getAuthErrorMessage(err));
@@ -42,55 +45,51 @@ export function PhoneForgotPasswordScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={styles.content}>
-          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeft size={18} color={colors.foreground} />
-          </Pressable>
+      <KeyboardAwareForm
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <RecoveryStepHeader icon={Phone} step={0} total={3} onBack={() => navigation.goBack()} />
 
-          <View style={styles.headerIcon}>
-            <Shield size={24} color={colors.primary} />
+        <Text style={styles.title}>პაროლი დაგავიწყდა?</Text>
+        <Text style={styles.subtitle}>შეიყვანე ტელეფონის ნომერი — გამოგიგზავნით დასადასტურებელ SMS-კოდს.</Text>
+
+        {!!error && (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorBannerText}>{error}</Text>
           </View>
-          <Text style={styles.title}>პაროლის აღდგენა</Text>
-          <Text style={styles.subtitle}>შეიყვანე ტელეფონის ნომერი — გამოგიგზავნით დასადასტურებელ SMS-კოდს.</Text>
+        )}
 
-          {!!error && (
-            <View style={styles.errorBanner}>
-              <Text style={styles.errorBannerText}>{error}</Text>
+        <View style={styles.field}>
+          <Text style={styles.phoneLabel}>
+            ტელეფონის ნომერი<Text style={styles.requiredMark}> *</Text>
+          </Text>
+          <View style={[styles.phoneRow, phoneError && styles.phoneRowError]}>
+            <View style={styles.phonePrefix}>
+              <Text style={styles.phonePrefixText}>+995</Text>
             </View>
-          )}
-
-          <View style={styles.field}>
-            <Text style={styles.phoneLabel}>
-              ტელეფონის ნომერი<Text style={styles.requiredMark}> *</Text>
-            </Text>
-            <View style={[styles.phoneRow, phoneError && styles.phoneRowError]}>
-              <View style={styles.phonePrefix}>
-                <Text style={styles.phonePrefixText}>+995</Text>
-              </View>
-              <TextInput
-                value={phoneDigits}
-                onChangeText={(v) => setPhoneDigits(v.replace(/\D/g, '').slice(0, 9))}
-                onBlur={() => setTouched(true)}
-                placeholder="5XX XX XX XX"
-                placeholderTextColor={colors.mutedForeground}
-                keyboardType="number-pad"
-                maxLength={9}
-                style={styles.phoneInput}
-              />
-            </View>
-            {!!phoneError && <Text style={styles.phoneErrorText}>{phoneError}</Text>}
+            <ScrollAwareTextInput
+              value={phoneDigits}
+              onChangeText={(v) => setPhoneDigits(v.replace(/\D/g, '').slice(0, 9))}
+              onBlur={() => setTouched(true)}
+              placeholder="5XX XX XX XX"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="number-pad"
+              maxLength={9}
+              style={styles.phoneInput}
+            />
           </View>
-
-          <Button
-            label="კოდის გაგზავნა"
-            loadingLabel="იგზავნება..."
-            onPress={handleSend}
-            disabled={!canSubmit}
-            loading={loading}
-          />
+          {!!phoneError && <Text style={styles.phoneErrorText}>{phoneError}</Text>}
         </View>
-      </KeyboardAvoidingView>
+
+        <Button
+          label="კოდის გაგზავნა"
+          loadingLabel="იგზავნება..."
+          onPress={handleSend}
+          disabled={!canSubmit}
+          loading={loading}
+        />
+      </KeyboardAwareForm>
     </SafeAreaView>
   );
 }
@@ -101,27 +100,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xl,
-  },
-  headerIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.lg,
-    backgroundColor: colors.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   title: {
     ...typography.h1,

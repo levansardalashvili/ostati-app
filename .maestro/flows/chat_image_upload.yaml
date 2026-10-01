@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # Chat image upload — Customer messages a real Provider directly from
 # their public profile (first contact goes through StartJobChatSheet, #99) and sends a photo via "გალერეიდან არჩევა".
@@ -47,7 +47,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 - tapOn:
@@ -69,7 +69,7 @@ appId: com.ostati.app
 - evalScript: ${output.customerEmail = 'e2e.img.customer.' + Date.now() + '@example.com'}
 - evalScript: ${output.providerFirstName = 'ImgProviderE2E' + Date.now()}
 
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*ოსტატი.*"
 - tapOn:
     id: "register-first-name"
@@ -124,10 +124,10 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 2: Customer registers, finds the Provider, opens chat -------
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
@@ -206,7 +206,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 - tapOn: ".*შესვლა.*"
 - tapOn:
@@ -248,4 +248,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

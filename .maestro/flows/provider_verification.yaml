@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # Provider verification request (Task 3, #87) — `VerificationRequestCard`
 # on ProviderProfileScreen. Covers the ELIGIBILITY-GATING path only: a
@@ -51,7 +51,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 - tapOn:
@@ -71,7 +71,7 @@ appId: com.ostati.app
 # --- Provider registers, completes setup (no photo) ---------------------
 - evalScript: ${output.providerEmail = 'e2e.verify.provider.' + Date.now() + '@example.com'}
 
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*ოსტატი.*"
 - tapOn:
     id: "register-first-name"
@@ -139,4 +139,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # Keyboard-covers-typed-text regression guard. Real bug, found by the user
 # and confirmed live on-device: `KeyboardAvoidingView`'s Android `behavior`
@@ -75,7 +75,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 # Leftover-session cleanup, in case a previous run crashed mid-flow.
@@ -98,7 +98,7 @@ appId: com.ostati.app
 - evalScript: ${output.providerEmail = 'verified.provider@e2e.example.com'}
 - evalScript: ${output.jobMarker = 'KbVisE2E' + Date.now()}
 
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
@@ -169,7 +169,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 2 prelude: log in as the verified Provider ---------------------
 - tapOn: ".*შესვლა.*"
@@ -212,7 +212,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 3: ChatConversationScreen composer — the exact screen/bug the
 # user originally reported. -----------------------------------------------
@@ -264,4 +264,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # Job dispute path — the one branch of the job-lifecycle state machine
 # (#47) that had zero E2E coverage: instead of confirming completion,
@@ -57,7 +57,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 - tapOn:
@@ -79,7 +79,7 @@ appId: com.ostati.app
 - evalScript: ${output.providerEmail = 'verified.provider@e2e.example.com'}
 - evalScript: ${output.jobMarker = 'DisputeE2E' + Date.now()}
 
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
@@ -149,7 +149,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 2: Provider registers, expresses interest ---------------------
 - tapOn: ".*შესვლა.*"
@@ -184,7 +184,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 3: Customer selects the Provider ------------------------------
 - tapOn: ".*შესვლა.*"
@@ -213,7 +213,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 4: Provider marks work done -----------------------------------
 - tapOn: ".*შესვლა.*"
@@ -243,7 +243,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 5: Customer reports a problem instead of confirming — job goes
 # to 'disputed', NOT 'completed'. -----------------------------------------
@@ -286,7 +286,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 6: Provider sees the dispute banner ---------------------------
 - tapOn: ".*შესვლა.*"
@@ -316,4 +316,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { AlertCircle, Eye, EyeOff } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
+import { useScrollIntoViewOnFocus } from './KeyboardAwareForm';
 
 type IconComponent = React.ComponentType<{ size?: number; color?: string }>;
 
@@ -57,6 +58,7 @@ export function TextField({
   required,
 }: Props) {
   const [hidden, setHidden] = useState(!!secureTextEntry);
+  const { ref: scrollRef, onFocus } = useScrollIntoViewOnFocus();
 
   return (
     <View>
@@ -71,9 +73,11 @@ export function TextField({
           </View>
         )}
         <TextInput
+          ref={scrollRef}
           testID={testID}
           value={value}
           onChangeText={onChangeText}
+          onFocus={onFocus}
           onBlur={onBlur}
           placeholder={placeholder}
           placeholderTextColor={colors.mutedForeground}

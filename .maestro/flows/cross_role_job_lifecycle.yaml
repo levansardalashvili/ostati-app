@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # Cross-role job lifecycle — Customer posts a job, a Provider expresses
 # interest, Customer selects that Provider, both exchange a chat message,
@@ -49,7 +49,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 - tapOn:
@@ -71,7 +71,7 @@ appId: com.ostati.app
 - evalScript: ${output.providerEmail = 'verified.provider@e2e.example.com'}
 - evalScript: ${output.jobMarker = 'CrossRoleE2E' + Date.now()}
 
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
@@ -141,7 +141,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 2: Provider registers, sets up, expresses interest ----------
 - tapOn: ".*შესვლა.*"
@@ -180,7 +180,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 3: Customer logs back in, selects the Provider, sends a chat message
 - tapOn: ".*შესვლა.*"
@@ -226,7 +226,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 4: Provider logs back in, replies, marks work done ----------
 - tapOn: ".*შესვლა.*"
@@ -269,7 +269,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 5: Customer logs back in, confirms completion, rates --------
 - tapOn: ".*შესვლა.*"
@@ -307,7 +307,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 6: Provider logs back in and views its own now-completed job -
 # `ProviderMyJobsScreen`'s card always navigates with `mode: 'selected'`
@@ -374,4 +374,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
-import { MessageSquare } from 'lucide-react-native';
+import { MailCheck } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
 import { OtpCodeInput } from '../components/OtpCodeInput';
@@ -12,16 +12,13 @@ import { authService, getAuthErrorMessage } from '../services/authService';
 import { useResendCooldown } from '../utils/useResendCooldown';
 import type { RootStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'PhoneForgotPasswordVerify'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'ForgotPasswordVerify'>;
 
-// პაროლის აღდგენის ეზარდის 2/3 (ტელეფონი) — მხოლოდ OTP-კოდი
-// (ForgotPasswordVerifyScreen.tsx-ის, email-ის, ზუსტი სარკე). წარმატებაზე
-// სესია უკვე დამყარებულია (verifyPhoneOtp) — ბოლო ნაბიჯი გაზიარებული
-// ResetPasswordScreen-ია, აქამდე ეს ეკრანი თავად ამთავრებდა login-საც
-// (completeSignIn) — ახლა, #170-ის ვიდეო-რეფერენსის მიხედვით, ყოველთვის
-// ახალი პაროლის დაყენების შემდეგ გასვლა+ხელახალი-შესვლის მოთხოვნაა.
-export function PhoneForgotPasswordVerifyScreen({ navigation, route }: Props) {
-  const { phone } = route.params;
+// პაროლის აღდგენის ეზარდის 2/3 (email) — მხოლოდ OTP-კოდი. წარმატებაზე
+// სესია უკვე დამყარებულია (verifyEmailOtp), ბოლო ნაბიჯი (ახალი პაროლი)
+// გაზიარებული ResetPasswordScreen-ია, ტელეფონის ეზარდის იგივე ეკრანი.
+export function ForgotPasswordVerifyScreen({ navigation, route }: Props) {
+  const { email } = route.params;
   const { secondsLeft, canResend, restart } = useResendCooldown(60);
 
   const [code, setCode] = useState('');
@@ -35,7 +32,7 @@ export function PhoneForgotPasswordVerifyScreen({ navigation, route }: Props) {
     if (otp.length !== 6 || submitting) return;
     setSubmitting(true);
     try {
-      await authService.verifyPhoneOtp(phone, otp);
+      await authService.verifyEmailOtp(email, otp);
       navigation.navigate('ResetPassword');
     } catch (err) {
       setError(getAuthErrorMessage(err));
@@ -49,7 +46,7 @@ export function PhoneForgotPasswordVerifyScreen({ navigation, route }: Props) {
     setError('');
     setResending(true);
     try {
-      await authService.sendPhoneOtpForReset(phone);
+      await authService.sendEmailOtp(email);
       restart();
     } catch (err) {
       setError(getAuthErrorMessage(err));
@@ -64,10 +61,10 @@ export function PhoneForgotPasswordVerifyScreen({ navigation, route }: Props) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <RecoveryStepHeader icon={MessageSquare} step={1} total={3} onBack={() => navigation.goBack()} />
+        <RecoveryStepHeader icon={MailCheck} step={1} total={3} onBack={() => navigation.goBack()} />
 
-        <Text style={styles.title}>შეამოწმე SMS</Text>
-        <Text style={styles.subtitle}>კოდი გავაგზავნეთ {phone}-ზე — შეიყვანე ქვემოთ.</Text>
+        <Text style={styles.title}>შეამოწმე ელ. ფოსტა</Text>
+        <Text style={styles.subtitle}>კოდი გავაგზავნეთ {email}-ზე — შეიყვანე ქვემოთ.</Text>
 
         {!!error && (
           <View style={styles.errorBanner}>
@@ -76,7 +73,7 @@ export function PhoneForgotPasswordVerifyScreen({ navigation, route }: Props) {
         )}
 
         <View style={styles.otpWrap}>
-          <OtpCodeInput value={code} onChangeText={setCode} onComplete={handleSubmit} />
+          <OtpCodeInput value={code} onChangeText={setCode} onComplete={handleSubmit} error={undefined} />
         </View>
 
         <Button

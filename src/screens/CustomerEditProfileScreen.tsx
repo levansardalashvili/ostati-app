@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
 import { Camera } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AddressDetailsField, type AddressDetails } from '../components/AddressDetailsField';
 import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
 import { Button } from '../components/Button';
@@ -34,6 +36,12 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
   const [firstName, setFirstName] = useState(profile.firstName);
   const [lastName, setLastName] = useState(profile.lastName);
   const [address, setAddress] = useState(profile.defaultAddress);
+  const [addressDetails, setAddressDetails] = useState<AddressDetails>({
+    entrance: profile.entrance,
+    apartment: profile.apartment,
+    doorCode: profile.doorCode,
+    isPrivateHouse: profile.isPrivateHouse,
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
@@ -45,7 +53,15 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
     if (!canSave || isSaving) return;
     setSaveError(false);
     setIsSaving(true);
-    const patch = { firstName: firstName.trim(), lastName: lastName.trim(), defaultAddress: address.trim() };
+    const patch = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      defaultAddress: address.trim(),
+      entrance: addressDetails.entrance,
+      apartment: addressDetails.apartment,
+      doorCode: addressDetails.doorCode,
+      isPrivateHouse: addressDetails.isPrivateHouse,
+    };
     setProfile(patch);
     const uid = authService.getCurrentUser()?.uid;
     if (uid) {
@@ -69,7 +85,11 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
           field + save footer below it would be hidden behind the
           keyboard, same bug as ChatConversationScreen's composer. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+        <KeyboardAwareForm
+        avoidKeyboard={false}
+          style={styles.body}
+          contentContainerStyle={styles.bodyContent}
+        >
           <View style={styles.avatarRow}>
             <View style={styles.avatarWrap}>
               <Avatar initials={`${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`} color={colors.primary} size={88} />
@@ -89,6 +109,7 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
               </View>
             </View>
             <TextField label="მისამართი" value={address} onChangeText={setAddress} placeholder="ქ., არეალი" />
+            <AddressDetailsField address={address} value={addressDetails} onChange={setAddressDetails} />
             {(!!profile.email || !!profile.phone) && (
               <View>
                 <Text style={styles.infoLabel}>ანგარიშის ინფორმაცია</Text>
@@ -117,7 +138,7 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
               </View>
             )}
           </View>
-        </ScrollView>
+        </KeyboardAwareForm>
 
         <View style={styles.footer}>
           {saveError && (

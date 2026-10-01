@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ostati-app",
+    "name": "Ostato",
     "slug": "ostati-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,11 +8,11 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.ostati.app",
+      "bundleIdentifier": "com.ostato.app",
       "usesAppleSignIn": true
     },
     "android": {
-      "package": "com.ostati.app",
+      "package": "com.ostato.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -40,6 +40,12 @@
         {
           "icon": "./assets/android-icon-monochrome.png",
           "color": "#2563EB"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "აპს შენი მდებარეობის ცოდნა სჭირდება, რომ ავტომატურად შეავსოს შენი მისამართი."
         }
       ],
       [

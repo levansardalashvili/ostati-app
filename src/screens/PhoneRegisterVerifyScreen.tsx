@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
 import { ArrowLeft } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
@@ -21,7 +22,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PhoneRegisterVerify'>;
 // საკუთარი submit-ი (ცალკე "პროფილის დასრულების" ეკრანი, GoogleComplete-ის
 // მსგავსი, აქ საჭირო არაა — აღარაფერია დასრულებული).
 export function PhoneRegisterVerifyScreen({ navigation, route }: Props) {
-  const { role, phone, firstName, lastName, defaultAddress, password } = route.params;
+  const { role, phone, firstName, lastName, defaultAddress, entrance, apartment, doorCode, isPrivateHouse, password } =
+    route.params;
   const { setProfile } = useCustomerProfile();
   const { setProfile: setProviderProfile } = useProviderProfile();
   const { secondsLeft, canResend, restart } = useResendCooldown(60);
@@ -40,7 +42,7 @@ export function PhoneRegisterVerifyScreen({ navigation, route }: Props) {
       // Task — login-ისთვის მომავალში საჭირო, რომ SMS-კოდი აღარ დასჭირდეს
       // ყოველ ჯერზე (PhoneLoginScreen ამ პაროლს იყენებს). ცალკე, OTP-ის
       // ვერიფიკაციის უშუალო წარმატების შემდეგ (სესია უკვე აქტიურია).
-      await authService.setPhonePassword(password);
+      await authService.setNewPassword(password);
       try {
         await userService.createUserRecord(uid, {
           role,
@@ -49,6 +51,10 @@ export function PhoneRegisterVerifyScreen({ navigation, route }: Props) {
           email: '',
           defaultAddress,
           phone,
+          entrance,
+          apartment,
+          doorCode,
+          isPrivateHouse,
         });
       } catch (createError) {
         // duplicate key — ეს ტელეფონის ნომერი (uid) უკვე დარეგისტრირებულია
@@ -68,7 +74,7 @@ export function PhoneRegisterVerifyScreen({ navigation, route }: Props) {
         setProviderProfile({ firstName, lastName });
         navigation.replace('ProviderSetup');
       } else {
-        setProfile({ firstName, lastName, email: '', defaultAddress, phone });
+        setProfile({ firstName, lastName, email: '', defaultAddress, phone, entrance, apartment, doorCode, isPrivateHouse });
         navigation.replace('CustomerSetup', { userName: `${firstName} ${lastName}` });
       }
     } catch (err) {
@@ -94,8 +100,10 @@ export function PhoneRegisterVerifyScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={styles.content}>
+      <KeyboardAwareForm
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
           <View style={styles.header}>
             <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
               <ArrowLeft size={18} color={colors.foreground} />
@@ -130,8 +138,7 @@ export function PhoneRegisterVerifyScreen({ navigation, route }: Props) {
               <Text style={styles.resendMuted}>ხელახლა გაგზავნა — {secondsLeft} წმ</Text>
             )}
           </View>
-        </View>
-      </KeyboardAvoidingView>
+      </KeyboardAwareForm>
     </SafeAreaView>
   );
 }
@@ -142,7 +149,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     gap: spacing.md,

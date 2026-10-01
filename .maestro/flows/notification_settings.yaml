@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # NotificationSettingsScreen toggle persistence (Task 3, `notification_preferences`)
 # — the `notifications.yaml` flow already covers the notification LIST/badge,
@@ -55,7 +55,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 # Leftover-session cleanup, in case a previous run crashed mid-flow.
@@ -75,7 +75,7 @@ appId: com.ostati.app
 
 # --- Phase 1: Register a Customer ----------------------------------------
 - evalScript: ${output.email = 'e2e.notifsettings.' + Date.now() + '@example.com'}
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
@@ -159,7 +159,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 - tapOn: ".*შესვლა.*"
 - tapOn:
@@ -201,4 +201,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

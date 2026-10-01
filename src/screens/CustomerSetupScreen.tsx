@@ -41,7 +41,7 @@ export function CustomerSetupScreen({ navigation, route }: Props) {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'RegistrationSuccess', params: { role: 'customer' } }] });
     }, 1200);
   };
 
@@ -49,9 +49,13 @@ export function CustomerSetupScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeft size={18} color={colors.foreground} />
-          </Pressable>
+          {navigation.canGoBack() ? (
+            <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+              <ArrowLeft size={18} color={colors.foreground} />
+            </Pressable>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
           <ProgressBar step={2} total={2} />
           <View style={styles.headerSpacer} />
         </View>

@@ -1,21 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { ArrowLeft, Mail, Phone } from 'lucide-react-native';
+import { Mail } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AddressAutocompleteField } from '../components/AddressAutocompleteField';
+import { AddressDetailsField, type AddressDetails } from '../components/AddressDetailsField';
 import { Button } from '../components/Button';
-import { GoogleButton } from '../components/GoogleButton';
+import { CurvedAuthHeader } from '../components/CurvedAuthHeader';
+import { PasswordStrengthMeter } from '../components/PasswordStrengthMeter';
 import { ProgressBar } from '../components/ProgressBar';
+import { Reveal } from '../components/Reveal';
+import { SocialAuthRow } from '../components/SocialAuthRow';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
@@ -46,6 +44,12 @@ export function RegisterScreen({ navigation, route }: Props) {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
+  const [addressDetails, setAddressDetails] = useState<AddressDetails>({
+    entrance: '',
+    apartment: '',
+    doorCode: '',
+    isPrivateHouse: false,
+  });
   const [pass, setPass] = useState('');
   const [confirm, setConfirm] = useState('');
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -71,6 +75,11 @@ export function RegisterScreen({ navigation, route }: Props) {
           ? 'შეიყვანე სწორი ელ. ფოსტა'
           : '',
     address: !isProvider && touched.address && !address.trim() ? 'ეს ველი სავალდებულოა' : '',
+    entrance:
+      !isProvider &&
+      touched.entrance &&
+      !addressDetails.isPrivateHouse &&
+      (!addressDetails.entrance.trim() || !addressDetails.apartment.trim()),
     pass:
       touched.pass && !pass
         ? 'ეს ველი სავალდებულოა'
@@ -87,84 +96,148 @@ export function RegisterScreen({ navigation, route }: Props) {
 
   const nameValid = !!firstName.trim() && !!lastName.trim();
   const allValid =
-    nameValid && isEmail(email) && (isProvider || address.trim()) && pass.length >= 8 && pass === confirm;
+    nameValid &&
+    isEmail(email) &&
+    (isProvider || address.trim()) &&
+    (isProvider ||
+      addressDetails.isPrivateHouse ||
+      (addressDetails.entrance.trim() && addressDetails.apartment.trim())) &&
+    pass.length >= 8 &&
+    pass === confirm;
 
   const handleSubmit = async () => {
-    setTouched({ firstName: true, lastName: true, email: true, address: !isProvider, pass: true, confirm: true });
+    setTouched({
+      firstName: true,
+      lastName: true,
+      email: true,
+      address: !isProvider,
+      entrance: !isProvider,
+      pass: true,
+      confirm: true,
+    });
     setSubmitError('');
     if (!allValid || loading) return;
     setLoading(true);
     try {
-      // ნახევრად დასრულებული წინა მცდელობა: signUp გავიდა, მაგრამ `users`-ის row
-      // ვერ ჩაიწერა (მაგ. ქსელი გაწყდა) — ანგარიში არსებობს, პროფილი არა, და
-      // ხელახალი რეგისტრაცია "უკვე დარეგისტრირებულია"-ს ამბობდა სამუდამოდ.
-      // იგივე მონაცემებით შესვლა და row-ს დასრულება მას აღადგენს; სრულად
-      // დარეგისტრირებულ ანგარიშზე (row უკვე არსებობს) ჩვეულებრივი შეცდომა რჩება.
-      const resumeIncomplete = async (): Promise<string | null> => {
-        try {
-          const { uid: existing } = await authService.signInWithEmail({ email: email.trim(), password: pass });
-          if (await userService.getUserRecord(existing)) {
-            await authService.signOut().catch(() => {});
-            return null;
-          }
-          return existing;
-        } catch {
-          return null;
-        }
+      // Task — ელფოსტის რეგისტრაცია ახლა სავალდებულო OTP-დადასტურებას
+      // საჭიროებს (Supabase-ის "Confirm email" ჩართული) — `signUp()`
+      // მხოლოდ დაუდასტურებელ ანგარიშს ქმნის და ავტომატურად აგზავნის
+      // პირველ კოდს; `users`-ის row ("profile") ახლა მხოლოდ
+      // RegisterVerifyEmailScreen-ზე, verify-ის წარმატების შემდეგ იწერება
+      // (ზუსტად PhoneRegisterVerifyScreen-ის იგივე არქიტექტურით) —
+      // პაროლი კი, ტელეფონისგან განსხვავებით, უკვე ანგარიშის
+      // შექმნისთანავე დაყენებულია, ცალკე route param-ად გადატანა არ
+      // სჭირდება.
+      const goToVerify = () => {
+        setLoading(false);
+        navigation.navigate('RegisterVerifyEmail', {
+          role,
+          email: email.trim(),
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          defaultAddress: isProvider ? '' : address.trim(),
+          entrance: isProvider ? '' : addressDetails.entrance,
+          apartment: isProvider ? '' : addressDetails.apartment,
+          doorCode: isProvider ? '' : addressDetails.doorCode,
+          isPrivateHouse: isProvider ? false : addressDetails.isPrivateHouse,
+        });
       };
-      let uid: string;
-      try {
-        uid = (await authService.registerWithEmail({ email: email.trim(), password: pass, role })).uid;
-      } catch (registerError) {
-        // მხოლოდ "უკვე დარეგისტრირებულია"-ზე — სხვა შეცდომაზე (ქსელი, სუსტი პაროლი) resume უადგილოა
-        const resumed =
-          (registerError as { message?: string } | null)?.message === 'User already registered'
-            ? await resumeIncomplete()
-            : null;
-        if (!resumed) throw registerError;
-        uid = resumed;
-      }
-      // Supabase-ის `users` ცხრილის row — Login-ს დასჭირდება role-ის
-      // წასაკითხად (რომელ Home-ზე გადაიყვანოს ავტორიზაციის შემდეგ).
-      const record = {
-        role,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim(),
-        defaultAddress: isProvider ? '' : address.trim(),
-        phone: '',
-      };
-      try {
-        await userService.createUserRecord(uid, record);
-      } catch {
-        // ერთი ხელახალი ცდა მოკლე ქსელური შეფერხების გადასატანად
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        await userService.createUserRecord(uid, record);
-      }
-      // Task — უკან-ისრით ამ ეკრანზე დაბრუნებისას ღილაკი "რეგისტრაცია..."-ზე
-      // ჩარჩენილი აღარ დარჩეს (`navigate`-ის, არა `replace`-ის შემდეგ ეს
-      // ეკრანი აღარ იშლება, `loading`-ის reset კი მანამდე მხოლოდ catch-ში
-      // ხდებოდა — წარმატებაზე screen უბრალოდ ქრებოდა, state-ს არავინ
-      // კითხულობდა).
-      setLoading(false);
-      if (role === 'provider') {
-        setProviderProfile({ firstName: firstName.trim(), lastName: lastName.trim() });
-        // `navigate` (არა `replace`), რომ ეს ეკრანი სტეკში დარჩეს:
-        // ProviderSetup-ის ახალი უკან-ისარი (`navigation.goBack()`) ამ
-        // ზუსტად ამ ეკრანზე დაბრუნდეს, ზუსტად ისე, როგორც
-        // Google/Apple/Phone-ის რეგისტრაციის გზებზეც უკვე მუშაობდა
-        // (იქ `navigation.navigate('GoogleComplete'|...)`-ით მისული
-        // შუალედური ეკრანი `replace`-ავს საკუთარ თავს ProviderSetup-ით,
-        // Register კი სტეკში ხელუხლებელი რჩება).
-        navigation.navigate('ProviderSetup');
-      } else {
-        setProfile({
+
+      const completeWithUid = async (uid: string) => {
+        // Supabase-ის `users` ცხრილის row — Login-ს დასჭირდება role-ის
+        // წასაკითხად (რომელ Home-ზე გადაიყვანოს ავტორიზაციის შემდეგ).
+        const record = {
+          role,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           email: email.trim(),
-          defaultAddress: address.trim(),
+          defaultAddress: isProvider ? '' : address.trim(),
+          phone: '',
+          entrance: isProvider ? '' : addressDetails.entrance,
+          apartment: isProvider ? '' : addressDetails.apartment,
+          doorCode: isProvider ? '' : addressDetails.doorCode,
+          isPrivateHouse: isProvider ? false : addressDetails.isPrivateHouse,
+        };
+        try {
+          await userService.createUserRecord(uid, record);
+        } catch {
+          // ერთი ხელახალი ცდა მოკლე ქსელური შეფერხების გადასატანად
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          await userService.createUserRecord(uid, record);
+        }
+        // Task — უკან-ისრით ამ ეკრანზე დაბრუნებისას ღილაკი "რეგისტრაცია..."-ზე
+        // ჩარჩენილი აღარ დარჩეს (`navigate`-ის, არა `replace`-ის შემდეგ ეს
+        // ეკრანი აღარ იშლება, `loading`-ის reset კი მანამდე მხოლოდ catch-ში
+        // ხდებოდა — წარმატებაზე screen უბრალოდ ქრებოდა, state-ს არავინ
+        // კითხულობდა).
+        setLoading(false);
+        if (role === 'provider') {
+          setProviderProfile({ firstName: firstName.trim(), lastName: lastName.trim() });
+          // `navigate` (არა `replace`), რომ ეს ეკრანი სტეკში დარჩეს:
+          // ProviderSetup-ის ახალი უკან-ისარი (`navigation.goBack()`) ამ
+          // ზუსტად ამ ეკრანზე დაბრუნდეს, ზუსტად ისე, როგორც
+          // Google/Apple/Phone-ის რეგისტრაციის გზებზეც უკვე მუშაობდა
+          // (იქ `navigation.navigate('GoogleComplete'|...)`-ით მისული
+          // შუალედური ეკრანი `replace`-ავს საკუთარ თავს ProviderSetup-ით,
+          // Register კი სტეკში ხელუხლებელი რჩება).
+          navigation.navigate('ProviderSetup');
+        } else {
+          setProfile({
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            email: email.trim(),
+            defaultAddress: address.trim(),
+            entrance: addressDetails.entrance,
+            apartment: addressDetails.apartment,
+            doorCode: addressDetails.doorCode,
+            isPrivateHouse: addressDetails.isPrivateHouse,
+          });
+          navigation.navigate('CustomerSetup', { userName: `${firstName.trim()} ${lastName.trim()}` });
+        }
+      };
+
+      try {
+        const { uid, needsEmailVerification } = await authService.registerWithEmail({
+          email: email.trim(),
+          password: pass,
+          role,
         });
-        navigation.navigate('CustomerSetup', { userName: `${firstName.trim()} ${lastName.trim()}` });
+        if (needsEmailVerification) {
+          goToVerify();
+        } else {
+          // Dashboard-ის "Confirm email" ჯერ გამორთულია — ძველებური,
+          // დაუყოვნებელი დასრულება (verify-ის გარეშე).
+          await completeWithUid(uid);
+        }
+        return;
+      } catch (registerError) {
+        if ((registerError as { message?: string } | null)?.message !== 'User already registered') {
+          throw registerError;
+        }
+        // ნახევრად დასრულებული წინა მცდელობა: ან ჯერ არ დადასტურებულა
+        // ელფოსტა (Supabase-ის `Email not confirmed` — ანგარიში
+        // არსებობს, პაროლიც ემთხვევა, უბრალოდ verify ჯერ არ
+        // დასრულებულა → ვაგრძელებთ იმავე verify-ეკრანზე, ახალი კოდით),
+        // ან უკვე დადასტურებულია, მაგრამ `users`-ის row ვერ შეიქმნა
+        // (ქსელის გაწყვეტა createUserRecord-ამდე) → ვასრულებთ პირდაპირ,
+        // verify-ის გარეშე. ნებისმიერ სხვა შემთხვევაში (სხვისი ანგარიში,
+        // არასწორი პაროლი) — ჩვეულებრივი "უკვე დარეგისტრირებულია" შეცდომა.
+        let existingUid: string;
+        try {
+          existingUid = (await authService.signInWithEmail({ email: email.trim(), password: pass })).uid;
+        } catch (signInError) {
+          if ((signInError as { message?: string } | null)?.message === 'Email not confirmed') {
+            await authService.resendRegistrationOtp(email.trim()).catch(() => {});
+            goToVerify();
+            return;
+          }
+          throw registerError;
+        }
+        if (await userService.getUserRecord(existingUid)) {
+          await authService.signOut().catch(() => {});
+          throw registerError;
+        }
+        await completeWithUid(existingUid);
       }
     } catch (error) {
       setSubmitError(getAuthErrorMessage(error));
@@ -199,33 +272,23 @@ export function RegisterScreen({ navigation, route }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView
+    <SafeAreaView style={styles.container} edges={[]}>
+      <StatusBar style="light" />
+      <CurvedAuthHeader
+        onBack={() => navigation.goBack()}
+        brand={isProvider ? 'ოსტატი' : 'მომხმარებელი'}
+        emoji={isProvider ? '🔧' : '🏠'}
+      />
+      <KeyboardAwareForm
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.header}>
-            <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-              <ArrowLeft size={18} color={colors.foreground} />
-            </Pressable>
-            <ProgressBar step={0} total={role === 'provider' ? 3 : 2} />
-            {/* Nav-fix pass, task 6 — this used to reuse `styles.backButton`
-                (same visible circular muted-gray shape as the real button
-                on the left) purely to balance the ProgressBar's centering,
-                even though it had no icon and no onPress — a dead
-                icon-looking shape with no action. Still needed for layout
-                balance (`header` is `justifyContent: 'space-between'`), so
-                kept as a same-sized spacer, just invisible instead of
-                styled to look like a button. */}
-            <View style={styles.headerSpacer} />
-          </View>
+        <ProgressBar step={0} total={role === 'provider' ? 3 : 2} />
 
-          <Text style={styles.title}>ანგარიშის შექმნა</Text>
-          <Text style={styles.subtitle}>შეიყვანეთ თქვენი მონაცემები რეგისტრაციის გასაგრძელებლად.</Text>
+          <Reveal delay={260}>
+            <Text style={styles.subtitle}>შეიყვანეთ თქვენი მონაცემები რეგისტრაციის გასაგრძელებლად</Text>
+          </Reveal>
 
           {submitError ? (
             <View style={styles.errorBanner}>
@@ -274,15 +337,23 @@ export function RegisterScreen({ navigation, route }: Props) {
               autoCapitalize="none"
             />
             {!isProvider && (
-              <AddressAutocompleteField
-                label="მისამართი"
-                required
-                value={address}
-                onChangeText={setAddress}
-                onBlur={() => touch('address')}
-                placeholder="მაგ. ჭავჭავაძის 48"
-                error={errors.address}
-              />
+              <>
+                <AddressAutocompleteField
+                  label="მისამართი"
+                  required
+                  value={address}
+                  onChangeText={setAddress}
+                  onBlur={() => touch('address')}
+                  placeholder="მაგ. ჭავჭავაძის 48"
+                  error={errors.address}
+                />
+                <AddressDetailsField
+                  address={address}
+                  value={addressDetails}
+                  onChange={setAddressDetails}
+                  error={errors.entrance}
+                />
+              </>
             )}
             <TextField
               testID="register-password"
@@ -297,6 +368,7 @@ export function RegisterScreen({ navigation, route }: Props) {
               secureTextEntry
               autoCapitalize="none"
             />
+            <PasswordStrengthMeter password={pass} />
             <TextField
               testID="register-confirm-password"
               label="გაიმეორე პაროლი"
@@ -310,12 +382,6 @@ export function RegisterScreen({ navigation, route }: Props) {
               autoCapitalize="none"
             />
 
-            {/* Task — მომსახურების პირობების დათანხმება ორივე როლისთვის
-                გადატანილია მეორე გვერდის (ProviderSetup/CustomerSetup)
-                ბოლოში — Provider-ისთვის ჩნდება მხოლოდ იმ ეკრანის
-                სავალდებულო ველების შევსების შემდეგ, Customer-ისთვის კი
-                (მეორე გვერდს სავალდებულო ველი არ აქვს) დაუყოვნებლივ
-                ხელმისაწვდომია. */}
             <Button
               label="გაგრძელება"
               loadingLabel="გაგრძელება..."
@@ -330,26 +396,16 @@ export function RegisterScreen({ navigation, route }: Props) {
               <View style={styles.dividerLine} />
             </View>
 
-            <GoogleButton loading={gLoading} onPress={handleGoogle} />
-
-            {appleAvailable && (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                cornerRadius={radius.md}
-                style={styles.appleButton}
-                onPress={handleApple}
-              />
-            )}
-            {aLoading && <Text style={styles.appleLoadingText}>Apple-ით გაგრძელება...</Text>}
-
-            <Pressable
-              style={({ pressed }) => [styles.phoneButton, pressed && styles.phoneButtonPressed]}
-              onPress={() => navigation.navigate('PhoneRegister', { role })}
-            >
-              <Phone size={18} color={colors.foreground} />
-              <Text style={styles.phoneButtonText}>ტელეფონით გაგრძელება</Text>
-            </Pressable>
+            <SocialAuthRow
+              onGoogle={handleGoogle}
+              gLoading={gLoading}
+              onApple={handleApple}
+              aLoading={aLoading}
+              appleAvailable={appleAvailable}
+              appleButtonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+              appleLoadingLabel="Apple-ით გაგრძელება..."
+              onPhone={() => navigation.navigate('PhoneRegister', { role })}
+            />
 
             <View style={styles.loginRow}>
               <Text style={styles.loginText}>უკვე გაქვს ანგარიში? </Text>
@@ -358,8 +414,7 @@ export function RegisterScreen({ navigation, route }: Props) {
               </Pressable>
             </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareForm>
     </SafeAreaView>
   );
 }
@@ -374,35 +429,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.xl,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Task 6 — invisible layout-balance spacer (same width as backButton,
-  // no visible shape) — matches GoogleCompleteScreen.tsx/CustomerSetupScreen.tsx/
-  // ProviderSetupScreen.tsx's existing headerSpacer pattern.
-  headerSpacer: {
-    width: 36,
-  },
-  title: {
-    ...typography.h1,
-    color: colors.foreground,
-    marginBottom: spacing.xs,
-    textAlign: 'center',
-  },
   subtitle: {
-    ...typography.caption,
-    color: colors.mutedForeground,
+    ...typography.body,
+    color: colors.foreground,
+    marginTop: spacing.lg,
     marginBottom: spacing.lg,
     textAlign: 'center',
   },
@@ -449,36 +479,5 @@ const styles = StyleSheet.create({
   loginLink: {
     ...typography.captionMedium,
     color: colors.primary,
-  },
-  appleButton: {
-    minHeight: 52,
-    width: '100%',
-  },
-  appleLoadingText: {
-    ...typography.caption,
-    color: colors.mutedForeground,
-    textAlign: 'center',
-  },
-  // Task — GoogleButton-ის ზუსტად იგივე ზომა/ვიზუალი (minHeight/radius/
-  // border/background), რომ ორივე ღილაკი ერთნაირად გამოიყურებოდეს —
-  // ცალკე კომპონენტად არ გატანილა, რადგან მისი აიქონი (Phone, არა Google
-  // ლოგო) ერთადერთი განსხვავებაა და მხოლოდ აქ გამოიყენება.
-  phoneButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    minHeight: 52,
-    borderRadius: radius.md,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  phoneButtonPressed: {
-    opacity: 0.85,
-  },
-  phoneButtonText: {
-    ...typography.bodyMedium,
-    color: colors.foreground,
   },
 });

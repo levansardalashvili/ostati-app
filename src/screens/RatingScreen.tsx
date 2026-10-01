@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
 import { Image as ImageIcon, Star } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -154,7 +155,11 @@ export function RatingScreen({ navigation, route }: Props) {
           footer below it would otherwise end up hidden behind the
           keyboard — same bug as ChatConversationScreen's composer. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+        <KeyboardAwareForm
+        avoidKeyboard={false}
+          style={styles.body}
+          contentContainerStyle={styles.bodyContent}
+        >
         <View style={styles.providerCard}>
           <Avatar initials={providerInitials} color={providerColor} size={48} />
           <View>
@@ -193,7 +198,7 @@ export function RatingScreen({ navigation, route }: Props) {
           <Text style={styles.cardTitle}>
             დაწერეთ კომენტარი <Text style={styles.optionalText}>(სურვილისამებრ)</Text>
           </Text>
-          <TextInput
+          <ScrollAwareTextInput
             value={review}
             onChangeText={setReview}
             placeholder="რა მოგეწონათ? რა შეიძლება გაუმჯობესდეს?..."
@@ -217,7 +222,7 @@ export function RatingScreen({ navigation, route }: Props) {
             onPreview={setPreviewPhoto}
           />
         </View>
-        </ScrollView>
+        </KeyboardAwareForm>
 
         <View style={styles.footer}>
           {submitError && (

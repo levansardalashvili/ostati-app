@@ -1,19 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { ArrowLeft, Mail, Phone } from 'lucide-react-native';
+import { Mail } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
-import { GoogleButton } from '../components/GoogleButton';
+import { CurvedAuthHeader } from '../components/CurvedAuthHeader';
+import { Reveal } from '../components/Reveal';
+import { SocialAuthRow } from '../components/SocialAuthRow';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
@@ -87,6 +83,10 @@ export function LoginScreen({ navigation }: Props) {
         email: record.email,
         defaultAddress: record.defaultAddress,
         phone: record.phone,
+        entrance: record.entrance,
+        apartment: record.apartment,
+        doorCode: record.doorCode,
+        isPrivateHouse: record.isPrivateHouse,
       });
       navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
     }
@@ -134,108 +134,96 @@ export function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView
+    <SafeAreaView style={styles.container} edges={[]}>
+      <StatusBar style="light" />
+      <CurvedAuthHeader subtitle="კეთილი იყოს თქვენი დაბრუნება!" />
+      <KeyboardAwareForm
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeft size={18} color={colors.foreground} />
-          </Pressable>
-
+        <Reveal delay={300}>
           <Text style={styles.title}>შესვლა</Text>
-          <Text style={styles.subtitle}>კეთილი იყოს თქვენი დაბრუნება!</Text>
+        </Reveal>
 
-          {credError ? (
-            <View style={styles.errorBanner}>
-              <Text style={styles.errorBannerText}>{credError}</Text>
-            </View>
-          ) : null}
+        {credError ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorBannerText}>{credError}</Text>
+          </View>
+        ) : null}
 
-          <View style={styles.fields}>
+        <Reveal delay={340} style={styles.fields}>
+          <TextField
+            testID="login-email"
+            label="ელ. ფოსტა"
+            value={email}
+            onChangeText={(v) => {
+              setEmail(v);
+              setCredError('');
+            }}
+            onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+            placeholder="example@email.com"
+            error={emailError}
+            icon={Mail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <View>
             <TextField
-              testID="login-email"
-              label="ელ. ფოსტა"
-              value={email}
-              onChangeText={(v) => {
-                setEmail(v);
-                setCredError('');
-              }}
-              onBlur={() => setTouched((t) => ({ ...t, email: true }))}
-              placeholder="example@email.com"
-              error={emailError}
-              icon={Mail}
-              keyboardType="email-address"
+              testID="login-password"
+              label="პაროლი"
+              value={pass}
+              onChangeText={setPass}
+              onBlur={() => setTouched((t) => ({ ...t, pass: true }))}
+              placeholder="••••••••"
+              error={passError}
+              secureTextEntry
               autoCapitalize="none"
             />
-            <View>
-              <TextField
-                testID="login-password"
-                label="პაროლი"
-                value={pass}
-                onChangeText={setPass}
-                onBlur={() => setTouched((t) => ({ ...t, pass: true }))}
-                placeholder="••••••••"
-                error={passError}
-                secureTextEntry
-                autoCapitalize="none"
-              />
-              <Pressable
-                style={styles.forgotLink}
-                onPress={() => navigation.navigate('ForgotPassword')}
-              >
-                <Text style={styles.forgotLinkText}>დაგავიწყდა პაროლი?</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.actions}>
-            <Button
-              testID="login-submit-button"
-              label="შესვლა"
-              loadingLabel="შესვლა..."
-              onPress={handleLogin}
-              disabled={!canSubmit}
-              loading={loading}
-            />
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>ან</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <GoogleButton loading={gLoading} onPress={handleGoogle} />
-
-            {appleAvailable && (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                cornerRadius={radius.md}
-                style={styles.appleButton}
-                onPress={handleApple}
-              />
-            )}
-            {aLoading && <Text style={styles.appleLoadingText}>Apple-ით შესვლა...</Text>}
-
             <Pressable
-              style={({ pressed }) => [styles.phoneButton, pressed && styles.phoneButtonPressed]}
-              onPress={() => navigation.navigate('PhoneLogin')}
+              style={styles.forgotLink}
+              onPress={() => navigation.navigate('ForgotPassword')}
             >
-              <Phone size={18} color={colors.foreground} />
-              <Text style={styles.phoneButtonText}>ტელეფონით გაგრძელება</Text>
+              <Text style={styles.forgotLinkText}>დაგავიწყდა პაროლი?</Text>
             </Pressable>
-
-            <View style={styles.registerRow}>
-              <Text style={styles.registerText}>არ გაქვს ანგარიში? </Text>
-              <Pressable onPress={() => navigation.navigate('RoleSelect')}>
-                <Text style={styles.registerLink}>რეგისტრაცია</Text>
-              </Pressable>
-            </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </Reveal>
+
+        <Reveal delay={420} style={styles.actions}>
+          <Button
+            testID="login-submit-button"
+            label="შესვლა"
+            loadingLabel="შესვლა..."
+            onPress={handleLogin}
+            disabled={!canSubmit}
+            loading={loading}
+          />
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>ან</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <SocialAuthRow
+            onGoogle={handleGoogle}
+            gLoading={gLoading}
+            onApple={handleApple}
+            aLoading={aLoading}
+            appleAvailable={appleAvailable}
+            appleButtonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            appleLoadingLabel="Apple-ით შესვლა..."
+            onPhone={() => navigation.navigate('PhoneLogin')}
+          />
+
+          <View style={styles.registerRow}>
+            <Text style={styles.registerText}>არ გაქვს ანგარიში? </Text>
+            <Pressable onPress={() => navigation.navigate('RoleSelect')}>
+              <Text style={styles.registerLink}>რეგისტრაცია</Text>
+            </Pressable>
+          </View>
+        </Reveal>
+      </KeyboardAwareForm>
     </SafeAreaView>
   );
 }
@@ -247,26 +235,12 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-  },
   title: {
-    ...typography.h1,
+    ...typography.h2,
     color: colors.foreground,
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    ...typography.caption,
-    color: colors.mutedForeground,
     marginBottom: spacing.lg,
   },
   errorBanner: {
@@ -319,34 +293,5 @@ const styles = StyleSheet.create({
   registerLink: {
     ...typography.captionMedium,
     color: colors.primary,
-  },
-  appleButton: {
-    minHeight: 52,
-    width: '100%',
-  },
-  appleLoadingText: {
-    ...typography.caption,
-    color: colors.mutedForeground,
-    textAlign: 'center',
-  },
-  // Task — RegisterScreen.tsx-ის იგივე ცვლილება: GoogleButton-ის ზუსტად
-  // იგივე ზომა/ვიზუალი, Phone აიქონით.
-  phoneButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    minHeight: 52,
-    borderRadius: radius.md,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  phoneButtonPressed: {
-    opacity: 0.85,
-  },
-  phoneButtonText: {
-    ...typography.bodyMedium,
-    color: colors.foreground,
   },
 });

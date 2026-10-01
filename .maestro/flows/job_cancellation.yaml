@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # Job cancellation — covers both RPC paths: (A) Customer cancels a still-
 # 'pending' job directly, no reason required (`cancel_job`); (B) Provider
@@ -46,7 +46,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 - tapOn:
@@ -69,7 +69,7 @@ appId: com.ostati.app
 - evalScript: ${output.jobAMarker = 'CancelJobA' + Date.now()}
 - evalScript: ${output.jobBMarker = 'CancelJobB' + Date.now()}
 
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
@@ -204,7 +204,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 3: Provider registers, expresses interest on Job B ----------
 - tapOn: ".*შესვლა.*"
@@ -246,7 +246,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 4: Customer logs back in, selects the Provider for Job B ----
 - tapOn: ".*შესვლა.*"
@@ -278,7 +278,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 5: Provider logs back in, cancels the now-active Job B ------
 - tapOn: ".*შესვლა.*"
@@ -321,7 +321,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 6: Customer sees the Provider-cancelled Job B and reopens it (0097) ---
 # Cancelled jobs live in the "დასრულებული" tab. The Provider who cancelled is excluded, so after
@@ -362,4 +362,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

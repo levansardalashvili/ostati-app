@@ -1,5 +1,5 @@
 {
-  "name": "ostati-app",
+  "name": "ostato-app",
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
@@ -17,6 +17,7 @@
     "expo-device": "~57.0.1",
     "expo-image-picker": "~57.0.14",
     "expo-linear-gradient": "~57.0.1",
+    "expo-location": "~57.0.20",
     "expo-notifications": "~57.0.15",
     "expo-status-bar": "~57.0.1",
     "lucide-react-native": "^1.34.0",

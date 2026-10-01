@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, CheckCircle, Mail, Shield } from 'lucide-react-native';
+import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
+import { Mail } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
+import { RecoveryStepHeader } from '../components/RecoveryStepHeader';
 import { TextField } from '../components/TextField';
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -13,12 +15,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ForgotPassword'>;
 
 const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
-// A3 — პაროლის აღდგენის ეკრანი (product-spec.md, create-account-form.md)
+// A3 — პაროლის აღდგენის ეზარდის 1/3 (email OTP, #170-ის ვიდეო-რეფერენსის
+// 3-ნაბიჯიანი სტილი — ძველი magic-link-ის ნაცვლად, რომელსაც აპში
+// დასრულების ეკრანი არასდროს ჰქონია).
 export function ForgotPasswordScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
   const [sendError, setSendError] = useState('');
 
   const emailError = touched
@@ -32,20 +35,13 @@ export function ForgotPasswordScreen({ navigation }: Props) {
   const handleSend = async () => {
     setTouched(true);
     setSendError('');
-    if (!email || !isEmail(email)) return;
+    if (!email || !isEmail(email) || loading) return;
     setLoading(true);
     try {
-      await authService.sendPasswordReset(email.trim());
-      setSent(true);
+      await authService.sendEmailOtp(email.trim());
+      navigation.navigate('ForgotPasswordVerify', { email: email.trim() });
     } catch (error) {
-      const code = (error as { code?: string } | null)?.code;
-      // "მომხმარებელი ვერ მოიძებნა" შემთხვევასაც წარმატებულ state-ს ვაჩვენებთ —
-      // უსაფრთხოების პრინციპი (არ ვამხელთ, ანგარიში არსებობს თუ არა).
-      if (code === 'auth/user-not-found') {
-        setSent(true);
-      } else {
-        setSendError(getAuthErrorMessage(error));
-      }
+      setSendError(getAuthErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -53,68 +49,45 @@ export function ForgotPasswordScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.content}>
-        <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={18} color={colors.foreground} />
-        </Pressable>
+      <KeyboardAwareForm
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <RecoveryStepHeader icon={Mail} step={0} total={3} onBack={() => navigation.goBack()} />
 
-        {sent ? (
-          <View style={styles.successState}>
-            <View style={styles.successIcon}>
-              <CheckCircle size={36} color={colors.success} />
-            </View>
-            <Text style={styles.successTitle}>ბმული გამოგზავნილია</Text>
-            <Text style={styles.successSubtitle}>შეამოწმე შენი ელ. ფოსტა პაროლის აღსადგენად.</Text>
+        <Text style={styles.title}>პაროლი დაგავიწყდა?</Text>
+        <Text style={styles.subtitle}>
+          შეიყვანე შენი ელ. ფოსტა — გამოგიგზავნით 6-ციფრიან დასადასტურებელ კოდს.
+        </Text>
 
-            <View style={styles.emailBanner}>
-              <Mail size={18} color={colors.success} />
-              <Text style={styles.emailBannerText} numberOfLines={1}>
-                {email}
-              </Text>
-            </View>
-
-            <Button label="შესვლაზე დაბრუნება" onPress={() => navigation.goBack()} />
+        {sendError ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorBannerText}>{sendError}</Text>
           </View>
-        ) : (
-          <>
-            <View style={styles.headerIcon}>
-              <Shield size={24} color={colors.primary} />
-            </View>
-            <Text style={styles.title}>პაროლის აღდგენა</Text>
-            <Text style={styles.subtitle}>
-              შეიყვანე შენი ელ. ფოსტა და გამოგიგზავნით პაროლის აღდგენის ინსტრუქციას.
-            </Text>
+        ) : null}
 
-            {sendError ? (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorBannerText}>{sendError}</Text>
-              </View>
-            ) : null}
+        <View style={styles.field}>
+          <TextField
+            label="ელ. ფოსტა"
+            value={email}
+            onChangeText={setEmail}
+            onBlur={() => setTouched(true)}
+            placeholder="example@email.com"
+            error={emailError}
+            icon={Mail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+        </View>
 
-            <View style={styles.field}>
-              <TextField
-                label="ელ. ფოსტა"
-                value={email}
-                onChangeText={setEmail}
-                onBlur={() => setTouched(true)}
-                placeholder="example@email.com"
-                error={emailError}
-                icon={Mail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-
-            <Button
-              label="აღდგენის ბმულის გაგზავნა"
-              loadingLabel="გაგზავნა..."
-              onPress={handleSend}
-              disabled={!email || !isEmail(email)}
-              loading={loading}
-            />
-          </>
-        )}
-      </View>
+        <Button
+          label="კოდის გაგზავნა"
+          loadingLabel="იგზავნება..."
+          onPress={handleSend}
+          disabled={!email || !isEmail(email)}
+          loading={loading}
+        />
+      </KeyboardAwareForm>
     </SafeAreaView>
   );
 }
@@ -125,27 +98,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xl,
-  },
-  headerIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.lg,
-    backgroundColor: colors.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
+    paddingBottom: spacing.xl,
   },
   title: {
     ...typography.h1,
@@ -162,55 +118,12 @@ const styles = StyleSheet.create({
   },
   errorBanner: {
     backgroundColor: colors.dangerBackground,
-    borderRadius: radius.md,
+    borderRadius: 12,
     padding: spacing.md,
     marginBottom: spacing.md,
   },
   errorBannerText: {
     ...typography.caption,
     color: colors.destructive,
-  },
-  successState: {
-    alignItems: 'center',
-    paddingTop: spacing.lg,
-  },
-  successIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: radius.full,
-    backgroundColor: colors.successBackground,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-  },
-  successTitle: {
-    ...typography.h2,
-    color: colors.foreground,
-    marginBottom: spacing.xs,
-  },
-  successSubtitle: {
-    ...typography.caption,
-    color: colors.mutedForeground,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-    maxWidth: 280,
-  },
-  emailBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    alignSelf: 'stretch',
-    backgroundColor: colors.successBackground,
-    borderWidth: 1,
-    borderColor: colors.success,
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  emailBannerText: {
-    ...typography.captionMedium,
-    color: colors.success,
-    flexShrink: 1,
   },
 });

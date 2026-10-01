@@ -4,13 +4,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
 import { ArrowLeft, Award, Camera, Check, ChevronRight, Image as ImageIcon, MapPin, User } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -156,7 +156,7 @@ export function ProviderSetupScreen({ navigation }: Props) {
         portfolio: uploadedPortfolio,
         sqmPrices,
       });
-      navigation.reset({ index: 0, routes: [{ name: 'ProviderHome' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'RegistrationSuccess', params: { role: 'provider' } }] });
     } catch {
       setSaveError(true);
     } finally {
@@ -168,9 +168,17 @@ export function ProviderSetupScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <View style={styles.headerRow}>
-          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeft size={18} color={colors.foreground} />
-          </Pressable>
+          {navigation.canGoBack() ? (
+            <Pressable
+              testID="provider-setup-back-button"
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <ArrowLeft size={18} color={colors.foreground} />
+            </Pressable>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
           <ProgressBar step={2} total={2} />
           <View style={styles.headerSpacer} />
         </View>
@@ -183,7 +191,11 @@ export function ProviderSetupScreen({ navigation }: Props) {
           behind the keyboard, same bug as ChatConversationScreen's
           composer. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareForm
+        avoidKeyboard={false}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.photoSection}>
           <View style={styles.avatarWrap}>
             <View style={styles.avatar}>
@@ -257,7 +269,7 @@ export function ProviderSetupScreen({ navigation }: Props) {
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>ჩემ შესახებ</Text>
-          <TextInput
+          <ScrollAwareTextInput
             value={about}
             onChangeText={(v) => setAbout(v.slice(0, ABOUT_MAX))}
             placeholder="მოკლედ აღწერეთ თქვენი გამოცდილება, სამუშაო სტილი..."
@@ -296,7 +308,7 @@ export function ProviderSetupScreen({ navigation }: Props) {
             onPreview={setPreviewPortfolio}
           />
         </View>
-      </ScrollView>
+      </KeyboardAwareForm>
 
       <View style={styles.footer}>
         {saveError && (

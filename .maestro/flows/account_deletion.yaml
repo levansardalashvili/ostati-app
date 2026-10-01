@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # Account deletion (0095) — Customer registers, deletes the account from Profile, and can no longer log in.
 
@@ -42,7 +42,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 - tapOn:
@@ -61,7 +61,7 @@ appId: com.ostati.app
 
 - evalScript: ${output.email = 'e2e.delete.' + Date.now() + '@example.com'}
 
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
@@ -107,11 +107,13 @@ appId: com.ostati.app
 - tapOn:
     id: "delete-account-confirm-button"
 - extendedWaitUntil:
-    visible: ".*დაწყება.*"
+    visible: ".*შესვლა.*"
     timeout: 20000
 
-# the account is gone — login must fail
-- tapOn: ".*შესვლა.*"
+# the account is gone — login must fail. Welcome no longer has an
+# interactive "შესვლა" link (it auto-navigates to Login on its own) — the
+# extendedWaitUntil above already landed us on Login, so no extra tap is
+# needed to get there.
 - tapOn:
     id: "login-email"
 - inputText: "${output.email}"

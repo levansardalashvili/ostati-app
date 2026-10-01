@@ -1,9 +1,12 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft } from 'lucide-react-native';
+import { StatusBar } from 'expo-status-bar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { CurvedAuthHeader } from '../components/CurvedAuthHeader';
+import { Reveal } from '../components/Reveal';
 import { colors, radius, spacing, typography } from '../theme';
+import { staggerDelay } from '../utils/motion';
 import type { Role, RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoleSelect'>;
@@ -29,7 +32,9 @@ const ROLES: {
 ];
 
 // A2 — როლის არჩევის ეკრანი (product-spec.md; ტაპზე მაშინვე გრძელდება,
-// დიზაინის რეფერენსის RoleSelectScreen-ის მიხედვით)
+// დიზაინის რეფერენსის RoleSelectScreen-ის მიხედვით). Login/Register-ის
+// იგივე curved-header (#167/#168) — brand default-ზეა ("ოსტატო"), რადგან
+// როლი ჯერ არჩეული არაა.
 export function RoleSelectScreen({ navigation }: Props) {
   const handleSelect = (role: Role) => {
     navigation.navigate('Register', { role });
@@ -40,47 +45,39 @@ export function RoleSelectScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Nav-fix pass, task 7 — this screen previously had no Back
-          navigation at all (Welcome → RoleSelect was a normal stack push,
-          so goBack() already correctly returns to Welcome; it just had no
-          on-screen affordance to trigger it). A plain top-left button, not
-          a full header (no title needed alongside the existing eyebrow/
-          title text below) — kept outside the centered `content` block so
-          the role cards' vertical centering is unaffected. */}
-      <View style={styles.topRow}>
-        <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={18} color={colors.foreground} />
-        </Pressable>
-      </View>
+    <SafeAreaView style={styles.container} edges={[]}>
+      <StatusBar style="light" />
+      <CurvedAuthHeader subtitle="კეთილი იყოს თქვენი მობრძანება" onBack={() => navigation.goBack()} />
       <View style={styles.content}>
-        <Text style={styles.eyebrow}>კეთილი იყოს თქვენი მობრძანება</Text>
-        <Text style={styles.title}>აირჩიეთ თქვენი სტატუსი</Text>
+        <Reveal delay={260}>
+          <Text style={styles.title}>აირჩიეთ თქვენი სტატუსი</Text>
+        </Reveal>
 
         <View style={styles.cards}>
-          {ROLES.map(({ role, emoji, title, description }) => (
-            <Pressable
-              key={role}
-              onPress={() => handleSelect(role)}
-              style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-            >
-              <View style={styles.emojiBadge}>
-                <Text style={styles.emoji}>{emoji}</Text>
-              </View>
-              <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>{title}</Text>
-                <Text style={styles.cardDescription}>{description}</Text>
-              </View>
-            </Pressable>
+          {ROLES.map(({ role, emoji, title, description }, index) => (
+            <Reveal key={role} delay={staggerDelay(index, 340)}>
+              <Pressable
+                onPress={() => handleSelect(role)}
+                style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+              >
+                <View style={styles.emojiBadge}>
+                  <Text style={styles.emoji}>{emoji}</Text>
+                </View>
+                <View style={styles.cardText}>
+                  <Text style={styles.cardTitle}>{title}</Text>
+                  <Text style={styles.cardDescription}>{description}</Text>
+                </View>
+              </Pressable>
+            </Reveal>
           ))}
         </View>
 
-        <View style={styles.loginRow}>
+        <Reveal delay={480} style={styles.loginRow}>
           <Text style={styles.loginText}>უკვე გაქვს ანგარიში? </Text>
           <Pressable onPress={handleLogin}>
             <Text style={styles.loginLink}>შესვლა</Text>
           </Pressable>
-        </View>
+        </Reveal>
       </View>
     </SafeAreaView>
   );
@@ -91,31 +88,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  topRow: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   content: {
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
-  eyebrow: {
-    ...typography.caption,
-    color: colors.mutedForeground,
-    marginBottom: spacing.xs,
-    textAlign: 'center',
-  },
   title: {
-    ...typography.h1,
+    ...typography.h2,
     color: colors.foreground,
     marginBottom: spacing.xl,
     textAlign: 'center',

@@ -1,45 +1,41 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Wrench } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Button } from '../components/Button';
+import { BrandMark } from '../components/BrandMark';
 import { Reveal } from '../components/Reveal';
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, spacing, typography } from '../theme';
+import { useReduceMotion } from '../utils/motion';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 
-// A1 — Splash / Welcome ეკრანი (product-spec.md)
+// A1 — Splash ეკრანი. აღარ არის ინტერაქციული (ძველი "დაწყება"/"შესვლა"
+// ღილაკები მოცილებულია მომხმარებლის მოთხოვნით) — ლოგო/ბრენდი/ტექსტის
+// ანიმაციის დასრულების შემდეგ ავტომატურად გადადის Login-ზე (`replace`, არა
+// `navigate` — უკან დაბრუნება ამ ეკრანზე აზრს მოკლებულია).
 export function WelcomeScreen({ navigation }: Props) {
-  const handleStart = () => {
-    navigation.navigate('RoleSelect');
-  };
+  const reduceMotion = useReduceMotion();
 
-  const handleLogin = () => {
-    navigation.navigate('Login');
-  };
+  useEffect(() => {
+    const timer = setTimeout(() => navigation.replace('Login'), reduceMotion ? 500 : 2000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reduceMotion]);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Reveal from="none" scaleFrom={0.6} duration={560}>
-          <View style={styles.logoCircle}>
-            <Wrench size={40} color={colors.primary} strokeWidth={1.8} />
-          </View>
-        </Reveal>
+        <View style={styles.logoWrap}>
+          <BrandMark />
+        </View>
         <Reveal delay={180}>
-          <Text style={styles.appName}>ოსტატი</Text>
+          <Text style={styles.appName}>ოსტატო</Text>
         </Reveal>
         <Reveal delay={300}>
           <Text style={styles.tagline}>იპოვე სანდო ოსტატი შენთან ახლოს</Text>
         </Reveal>
       </View>
-
-      <Reveal delay={480} style={styles.actions}>
-        <Button label="დაწყება" variant="primary" onPress={handleStart} />
-        <Button label="შესვლა" variant="text" onPress={handleLogin} />
-      </Reveal>
     </SafeAreaView>
   );
 }
@@ -48,7 +44,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    justifyContent: 'space-between',
   },
   content: {
     flex: 1,
@@ -56,11 +51,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
   },
-  logoCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: radius.full,
-    backgroundColor: colors.secondary,
+  logoWrap: {
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.lg,
@@ -74,11 +65,5 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.mutedForeground,
     textAlign: 'center',
-  },
-  actions: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl,
-    gap: spacing.sm,
-    alignItems: 'center',
   },
 });

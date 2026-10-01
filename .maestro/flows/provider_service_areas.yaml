@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # ProviderServiceAreasScreen ("სამუშაო არეალი", Provider Profile menu) —
 # regression coverage for the real bug found and fixed in #85: this screen
@@ -58,7 +58,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 # Leftover-session cleanup, in case a previous run crashed mid-flow.
@@ -81,7 +81,7 @@ appId: com.ostati.app
 # hardcoded fake Tbilisi set, so a leftover-fake-data bug would be
 # impossible to miss). --------------------------------------------------
 - evalScript: ${output.email = 'e2e.areas.' + Date.now() + '@example.com'}
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*ოსტატი.*"
 
 - tapOn:
@@ -171,7 +171,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 - tapOn: ".*შესვლა.*"
 - tapOn:
@@ -207,4 +207,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

@@ -1,18 +1,12 @@
 import React, { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft } from 'lucide-react-native';
+import { StatusBar } from 'expo-status-bar';
+import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
+import { CurvedAuthHeader } from '../components/CurvedAuthHeader';
+import { Reveal } from '../components/Reveal';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
@@ -81,6 +75,10 @@ export function PhoneLoginScreen({ navigation }: Props) {
         email: record.email,
         defaultAddress: record.defaultAddress,
         phone: record.phone,
+        entrance: record.entrance,
+        apartment: record.apartment,
+        doorCode: record.doorCode,
+        isPrivateHouse: record.isPrivateHouse,
       });
       navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
     }
@@ -103,15 +101,17 @@ export function PhoneLoginScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeft size={18} color={colors.foreground} />
-          </Pressable>
-
-          <Text style={styles.title}>ტელეფონის ნომრით შესვლა</Text>
-          <Text style={styles.subtitle}>შეიყვანე ტელეფონის ნომერი და პაროლი.</Text>
+    <SafeAreaView style={styles.container} edges={[]}>
+      <StatusBar style="light" />
+      <CurvedAuthHeader subtitle="კეთილი იყოს თქვენი დაბრუნება!" onBack={() => navigation.goBack()} />
+      <KeyboardAwareForm
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+          <Reveal delay={300}>
+            <Text style={styles.title}>შესვლა</Text>
+          </Reveal>
 
           {!!error && (
             <View style={styles.errorBanner}>
@@ -119,61 +119,64 @@ export function PhoneLoginScreen({ navigation }: Props) {
             </View>
           )}
 
-          <View>
-            <Text style={styles.phoneLabel}>
-              ტელეფონის ნომერი<Text style={styles.requiredMark}> *</Text>
-            </Text>
-            <View style={[styles.phoneRow, phoneError && styles.phoneRowError]}>
-              <View style={styles.phonePrefix}>
-                <Text style={styles.phonePrefixText}>+995</Text>
+          <Reveal delay={340} style={styles.fields}>
+            <View>
+              <Text style={styles.phoneLabel}>
+                ტელეფონის ნომერი<Text style={styles.requiredMark}> *</Text>
+              </Text>
+              <View style={[styles.phoneRow, phoneError && styles.phoneRowError]}>
+                <View style={styles.phonePrefix}>
+                  <Text style={styles.phonePrefixText}>+995</Text>
+                </View>
+                <ScrollAwareTextInput
+                  value={phoneDigits}
+                  onChangeText={(v) => setPhoneDigits(v.replace(/\D/g, '').slice(0, 9))}
+                  onBlur={() => touch('phone')}
+                  placeholder="5XX XX XX XX"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="number-pad"
+                  maxLength={9}
+                  style={styles.phoneInput}
+                />
               </View>
-              <TextInput
-                value={phoneDigits}
-                onChangeText={(v) => setPhoneDigits(v.replace(/\D/g, '').slice(0, 9))}
-                onBlur={() => touch('phone')}
-                placeholder="5XX XX XX XX"
-                placeholderTextColor={colors.mutedForeground}
-                keyboardType="number-pad"
-                maxLength={9}
-                style={styles.phoneInput}
-              />
+              {!!phoneError && <Text style={styles.phoneErrorText}>{phoneError}</Text>}
             </View>
-            {!!phoneError && <Text style={styles.phoneErrorText}>{phoneError}</Text>}
-          </View>
 
-          <View>
-            <TextField
-              label="პაროლი"
-              required
-              value={password}
-              onChangeText={setPassword}
-              onBlur={() => touch('password')}
-              placeholder="••••••••"
-              error={passwordError}
-              secureTextEntry
-              autoCapitalize="none"
+            <View>
+              <TextField
+                label="პაროლი"
+                required
+                value={password}
+                onChangeText={setPassword}
+                onBlur={() => touch('password')}
+                placeholder="••••••••"
+                error={passwordError}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+              <Pressable style={styles.forgotLink} onPress={() => navigation.navigate('PhoneForgotPassword')}>
+                <Text style={styles.forgotLinkText}>დაგავიწყდა პაროლი?</Text>
+              </Pressable>
+            </View>
+          </Reveal>
+
+          <Reveal delay={420} style={styles.actions}>
+            <Button
+              label="შესვლა"
+              loadingLabel="შესვლა..."
+              onPress={handleLogin}
+              disabled={!canSubmit}
+              loading={loading}
             />
-            <Pressable style={styles.forgotLink} onPress={() => navigation.navigate('PhoneForgotPassword')}>
-              <Text style={styles.forgotLinkText}>დაგავიწყდა პაროლი?</Text>
-            </Pressable>
-          </View>
 
-          <Button
-            label="შესვლა"
-            loadingLabel="შესვლა..."
-            onPress={handleLogin}
-            disabled={!canSubmit}
-            loading={loading}
-          />
-
-          <View style={styles.registerRow}>
-            <Text style={styles.registerText}>არ გაქვს ანგარიში? </Text>
-            <Pressable onPress={() => navigation.navigate('RoleSelect')}>
-              <Text style={styles.registerLink}>რეგისტრაცია</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            <View style={styles.registerRow}>
+              <Text style={styles.registerText}>არ გაქვს ანგარიში? </Text>
+              <Pressable onPress={() => navigation.navigate('RoleSelect')}>
+                <Text style={styles.registerLink}>რეგისტრაცია</Text>
+              </Pressable>
+            </View>
+          </Reveal>
+      </KeyboardAwareForm>
     </SafeAreaView>
   );
 }
@@ -185,33 +188,26 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
-    gap: spacing.md,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
   },
   title: {
-    ...typography.h1,
+    ...typography.h2,
     color: colors.foreground,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.lg,
   },
-  subtitle: {
-    ...typography.caption,
-    color: colors.mutedForeground,
-    marginBottom: spacing.sm,
+  fields: {
+    gap: spacing.md,
+  },
+  actions: {
+    gap: spacing.md,
+    marginTop: spacing.lg,
   },
   errorBanner: {
     backgroundColor: colors.dangerBackground,
     borderRadius: radius.md,
     padding: spacing.md,
+    marginBottom: spacing.md,
   },
   errorBannerText: {
     ...typography.caption,

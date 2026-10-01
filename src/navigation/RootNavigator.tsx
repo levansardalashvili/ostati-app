@@ -11,8 +11,11 @@ import { useProviderProfile } from '../state/ProviderProfileContext';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
 import { RoleSelectScreen } from '../screens/RoleSelectScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
+import { RegisterVerifyEmailScreen } from '../screens/RegisterVerifyEmailScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
+import { ForgotPasswordVerifyScreen } from '../screens/ForgotPasswordVerifyScreen';
+import { ResetPasswordScreen } from '../screens/ResetPasswordScreen';
 import { GoogleCompleteScreen } from '../screens/GoogleCompleteScreen';
 import { AppleCompleteScreen } from '../screens/AppleCompleteScreen';
 import { PhoneRegisterScreen } from '../screens/PhoneRegisterScreen';
@@ -22,6 +25,7 @@ import { PhoneForgotPasswordScreen } from '../screens/PhoneForgotPasswordScreen'
 import { PhoneForgotPasswordVerifyScreen } from '../screens/PhoneForgotPasswordVerifyScreen';
 import { CustomerSetupScreen } from '../screens/CustomerSetupScreen';
 import { ProviderSetupScreen } from '../screens/ProviderSetupScreen';
+import { RegistrationSuccessScreen } from '../screens/RegistrationSuccessScreen';
 import { CustomerTabs } from './CustomerTabs';
 import { ProviderTabs } from './ProviderTabs';
 import { ProviderJobDetailScreen } from '../screens/ProviderJobDetailScreen';
@@ -104,6 +108,10 @@ export function RootNavigator() {
               lastName: record.lastName,
               email: record.email,
               defaultAddress: record.defaultAddress,
+              entrance: record.entrance,
+              apartment: record.apartment,
+              doorCode: record.doorCode,
+              isPrivateHouse: record.isPrivateHouse,
             });
             route = 'CustomerHome';
           }
@@ -144,8 +152,11 @@ export function RootNavigator() {
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="RegisterVerifyEmail" component={RegisterVerifyEmailScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="ForgotPasswordVerify" component={ForgotPasswordVerifyScreen} />
+      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
       <Stack.Screen name="GoogleComplete" component={GoogleCompleteScreen} />
       <Stack.Screen name="AppleComplete" component={AppleCompleteScreen} />
       <Stack.Screen name="PhoneRegister" component={PhoneRegisterScreen} />
@@ -155,6 +166,11 @@ export function RootNavigator() {
       <Stack.Screen name="PhoneForgotPasswordVerify" component={PhoneForgotPasswordVerifyScreen} />
       <Stack.Screen name="CustomerSetup" component={CustomerSetupScreen} />
       <Stack.Screen name="ProviderSetup" component={ProviderSetupScreen} />
+      <Stack.Screen
+        name="RegistrationSuccess"
+        component={RegistrationSuccessScreen}
+        options={{ animation: 'fade', gestureEnabled: false }}
+      />
       {/* CustomerHome/ProviderHome routes render the Bottom Tab navigators
           (Home/ჩატები/პროფილი) — route names kept as-is so every existing
           navigation.reset({routes:[{name:'CustomerHome'}]}) call still works. */}

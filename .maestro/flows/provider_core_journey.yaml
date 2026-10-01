@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # Provider core journey — register → complete mandatory setup (specialty +
 # work area) → express interest on a real open job from the feed → edit
@@ -51,7 +51,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 - tapOn:
@@ -76,7 +76,7 @@ appId: com.ostati.app
 # No address field for a Provider (product rule — a Provider never enters
 # a home address at registration, only a work area later in setup).
 - evalScript: ${output.email = 'e2e.provider.' + Date.now() + '@example.com'}
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*ოსტატი.*"
 
 - tapOn:
@@ -173,4 +173,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

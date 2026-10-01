@@ -7,6 +7,8 @@ type Props = {
   loading: boolean;
   onPress: () => void;
   label?: string;
+  // 'circle' — მხოლოდ აიქონი, მრგვალი ღილაკი (Login/Register-ის social-row, ვიდეო-რეფერენსის სტილი)
+  variant?: 'full' | 'circle';
 };
 
 function GoogleLogo() {
@@ -33,7 +35,23 @@ function GoogleLogo() {
 }
 
 // Google Sign-In ღილაკი (დიზაინის რეფერენსის GoogleButton-ის მიხედვით)
-export function GoogleButton({ loading, onPress, label = 'Google-ით გაგრძელება' }: Props) {
+export function GoogleButton({ loading, onPress, label = 'Google-ით გაგრძელება', variant = 'full' }: Props) {
+  if (variant === 'circle') {
+    return (
+      <Pressable
+        onPress={onPress}
+        disabled={loading}
+        accessibilityLabel={label}
+        style={({ pressed }) => [
+          styles.circle,
+          pressed && !loading && styles.pressed,
+          loading && styles.disabled,
+        ]}
+      >
+        {loading ? <ActivityIndicator size="small" color={colors.mutedForeground} /> : <GoogleLogo />}
+      </Pressable>
+    );
+  }
   return (
     <Pressable
       onPress={onPress}
@@ -65,6 +83,21 @@ const styles = StyleSheet.create({
   label: {
     ...typography.bodyMedium,
     color: colors.foreground,
+  },
+  circle: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 1,
   },
   pressed: {
     opacity: 0.85,

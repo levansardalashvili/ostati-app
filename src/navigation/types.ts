@@ -13,8 +13,27 @@ export type RootStackParamList = {
   Welcome: undefined;
   RoleSelect: undefined;
   Register: { role: Role };
+  // Task — Email/Password რეგისტრაციის სავალდებულო დადასტურება (6-ციფრიანი
+  // OTP, ელფოსტაზე) — Google/Apple/ტელეფონის გარდა, რომლებიც უკვე სხვა
+  // გზით ადასტურებენ ვინაობას. `password` აქ **არ** გადაეცემა (განსხვავებით
+  // PhoneRegisterVerify-სგან) — `signUp()` პაროლს ანგარიშის შექმნისთანავე
+  // აყენებს, OTP მხოლოდ ელფოსტის მფლობელობას ადასტურებს.
+  RegisterVerifyEmail: {
+    role: Role;
+    email: string;
+    firstName: string;
+    lastName: string;
+    defaultAddress: string;
+    entrance: string;
+    apartment: string;
+    doorCode: string;
+    isPrivateHouse: boolean;
+  };
   Login: undefined;
   ForgotPassword: undefined;
+  // 3-ნაბიჯიანი აღდგენის ეზარდი (email OTP, ბმულის ნაცვლად — #170) — 1/3
+  // ცნობილია email-ის ეკრანზევე, 2/3 (ეს) მხოლოდ კოდს ითხოვს.
+  ForgotPasswordVerify: { email: string };
   GoogleComplete: { role: Role };
   // #107 — Apple Sign-In + ტელეფონის OTP, email-ის/Google-ის გვერდით.
   AppleComplete: { role: Role; appleFullName?: { givenName: string | null; familyName: string | null } | null };
@@ -29,20 +48,30 @@ export type RootStackParamList = {
     firstName: string;
     lastName: string;
     defaultAddress: string;
+    entrance: string;
+    apartment: string;
+    doorCode: string;
+    isPrivateHouse: boolean;
     // OTP-ვერიფიკაციის წარმატების შემდეგ ახალ ანგარიშზე ეყენება
-    // (authService.setPhonePassword) — მანამდე ამ ანგარიშს
+    // (authService.setNewPassword) — მანამდე ამ ანგარიშს
     // საერთოდ არ ჰქონდა პაროლის ცნება.
     password: string;
   };
-  // Task — ForgotPassword-ის (email) ანალოგიური, ტელეფონის ანგარიშისთვის:
-  // OTP-ით დასტურდება ვინაობა, ამის შემდეგ ახალი პაროლი ეყენება
-  // (ForgotPassword-ის "ბმულის გაგზავნის" ნაცვლად — ტელეფონს ბმული
-  // ფიზიკურად არ შეესაბამება, OTP-ის ვერიფიკაცია თავად წარმოადგენს
-  // დამადასტურებელ ნაბიჯს).
+  // 3-ნაბიჯიანი აღდგენის ეზარდი, ტელეფონისთვის — 1/3 (ეს ეკრანი), 2/3
+  // (PhoneForgotPasswordVerify, მხოლოდ OTP-კოდი), 3/3 (გაზიარებული
+  // ResetPassword, email-თან ერთად).
   PhoneForgotPassword: undefined;
   PhoneForgotPasswordVerify: { phone: string };
+  // ორივე აღდგენის ეზარდის საერთო ბოლო ნაბიჯი — param არ სჭირდება,
+  // მუშაობს უკვე ავტორიზებულ სესიაზე (email OTP-იც, ტელეფონის OTP-იც
+  // ვერიფიკაციის წარმატებაზე თავად ქმნის სესიას).
+  ResetPassword: undefined;
   CustomerSetup: { userName: string };
   ProviderSetup: undefined;
+  // რეგისტრაციის ეზარდის ბოლო, ავტომატურად-გამძვინვარებადი "ფანჯარა"
+  // (Welcome-ის ბრენდის ვიზუალით) — ორივე Setup-screen ამაზე reset-ავს
+  // Home-ის ნაცვლად, ეს კი თავად აგრძელებს სწორ Home-ზე.
+  RegistrationSuccess: { role: Role };
   CustomerHome: undefined;
   ProviderHome: undefined;
   // `job` — არასავალდებულო, უკვე წამოღებული FeedJob (real Supabase-ის

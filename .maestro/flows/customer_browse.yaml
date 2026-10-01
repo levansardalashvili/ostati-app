@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # Customer browse — covers three CustomerHomeScreen entry points that had
 # zero E2E coverage: "ყველა სერვისი" → CustomerCategoriesScreen (15-category
@@ -51,7 +51,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 # Leftover-session cleanup, in case a previous run crashed mid-flow.
@@ -75,7 +75,7 @@ appId: com.ostati.app
 - evalScript: ${output.customerEmail = 'e2e.browse.customer.' + Date.now() + '@example.com'}
 - evalScript: ${output.providerFirstName = 'BrowseProviderE2E' + Date.now()}
 
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*ოსტატი.*"
 - tapOn:
     id: "register-first-name"
@@ -130,10 +130,10 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 2: Customer registers -----------------------------------------
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
@@ -227,4 +227,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

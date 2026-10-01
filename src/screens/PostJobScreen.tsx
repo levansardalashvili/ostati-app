@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
 import {
   AlertCircle,
   Camera,
@@ -334,7 +335,12 @@ export function PostJobScreen({ navigation, route }: Props) {
           behind the keyboard, same bug as ChatConversationScreen's
           composer. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareForm
+        avoidKeyboard={false}
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.field}>
           <FieldLabel text="კატეგორია" required />
           <Pressable
@@ -356,7 +362,7 @@ export function PostJobScreen({ navigation, route }: Props) {
 
         <View style={styles.field}>
           <FieldLabel text="სამუშაოს აღწერა" required />
-          <TextInput
+          <ScrollAwareTextInput
             testID="post-job-description"
             value={description}
             onChangeText={(v) => setDescription(v.slice(0, DESCRIPTION_MAX))}
@@ -412,7 +418,7 @@ export function PostJobScreen({ navigation, route }: Props) {
 
         <View style={styles.field}>
           <FieldLabel text="მისამართი" required />
-          <TextInput
+          <ScrollAwareTextInput
             value={address}
             onChangeText={setAddress}
             placeholder="მაგ. ვაკე, ჭავჭავაძის 45"
@@ -455,7 +461,7 @@ export function PostJobScreen({ navigation, route }: Props) {
             </Text>
           </View>
         </View>
-      </ScrollView>
+      </KeyboardAwareForm>
 
       <View style={styles.footer}>
         {publishError && (

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
 import { Award, Camera, ChevronRight, Image as ImageIcon, MapPin } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -195,7 +196,11 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
           შესახებ" textarea + save footer below it would be hidden behind
           the keyboard, same bug as ChatConversationScreen's composer. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+        <KeyboardAwareForm
+        avoidKeyboard={false}
+          style={styles.body}
+          contentContainerStyle={styles.bodyContent}
+        >
         <View style={styles.avatarRow}>
           <View style={styles.avatarWrap}>
             <Avatar
@@ -270,7 +275,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
 
           <View>
             <Text style={styles.fieldLabel}>ჩემ შესახებ</Text>
-            <TextInput
+            <ScrollAwareTextInput
               value={about}
               onChangeText={setAbout}
               placeholder="მოკლედ აღწერეთ თქვენი გამოცდილება, სამუშაო სტილი..."
@@ -307,7 +312,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
             />
           </View>
         </View>
-        </ScrollView>
+        </KeyboardAwareForm>
 
         <View style={styles.footer}>
           {saveError && (

@@ -14,6 +14,12 @@ type UserRow = {
   default_address: string;
   // #107 — supabase/migrations/0083.
   phone: string;
+  // supabase/migrations/0140.
+  entrance: string;
+  apartment: string;
+  // supabase/migrations/0141.
+  door_code: string;
+  is_private_house: boolean;
   suspended_at: string | null;
   suspension_reason: string | null;
 };
@@ -34,6 +40,10 @@ function fromRow(row: UserRow): UserRecord {
     email: row.email,
     defaultAddress: row.default_address,
     phone: row.phone ?? '',
+    entrance: row.entrance ?? '',
+    apartment: row.apartment ?? '',
+    doorCode: row.door_code ?? '',
+    isPrivateHouse: !!row.is_private_house,
     suspended: !!row.suspended_at,
     suspensionReason: row.suspension_reason ?? null,
   };
@@ -170,6 +180,10 @@ const DEFAULT_CUSTOMER_PROFILE: CustomerProfile = {
   email: '',
   defaultAddress: '',
   phone: '',
+  entrance: '',
+  apartment: '',
+  doorCode: '',
+  isPrivateHouse: false,
 };
 
 const DEFAULT_PROVIDER_PROFILE: ProviderProfile = {
@@ -273,6 +287,10 @@ export const userService: UserService = {
       email: record.email,
       default_address: record.defaultAddress,
       phone: record.phone,
+      entrance: record.entrance,
+      apartment: record.apartment,
+      door_code: record.doorCode,
+      is_private_house: record.isPrivateHouse,
     });
     if (error) throw error;
   },
@@ -290,6 +308,10 @@ export const userService: UserService = {
     if (patch.email !== undefined) row.email = patch.email;
     if (patch.defaultAddress !== undefined) row.default_address = patch.defaultAddress;
     if (patch.phone !== undefined) row.phone = patch.phone;
+    if (patch.entrance !== undefined) row.entrance = patch.entrance;
+    if (patch.apartment !== undefined) row.apartment = patch.apartment;
+    if (patch.doorCode !== undefined) row.door_code = patch.doorCode;
+    if (patch.isPrivateHouse !== undefined) row.is_private_house = patch.isPrivateHouse;
     const { error } = await supabase.from('users').update(row).eq('id', uid);
     if (error) throw error;
   },

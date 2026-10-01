@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # Customer core journey — register → post a job → verify it's listed →
 # edit profile → logout. Runs against the real dev Supabase project (no
@@ -71,7 +71,7 @@ appId: com.ostati.app
 # Wait for either possible landing screen (regex alternation) so the
 # optional taps below aren't racing that gap and silently no-op'ing.
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 # If a previous run (or a manual session) left an active login, log out
@@ -90,7 +90,7 @@ appId: com.ostati.app
 
 # --- Register a brand-new Customer account ---------------------------------
 - evalScript: ${output.email = 'e2e.customer.' + Date.now() + '@example.com'}
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 
 - tapOn:
@@ -193,4 +193,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

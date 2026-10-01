@@ -16,6 +16,13 @@ export type AuthResult = {
   uid: string;
   email: string | null;
   appleFullName?: { givenName: string | null; familyName: string | null } | null;
+  // Task — `registerWithEmail()`-ის მიერ შევსებული: `true`, თუ Supabase-ის
+  // "Confirm email" ჩართულია და ეს ახალი ანგარიში ჯერ დაუდასტურებელია
+  // (signUp()-მა სესია არ დააბრუნა) — caller-მა OTP-ვერიფიკაციაზე უნდა
+  // გადაიყვანოს. გამორთულზე (ან ნებისმიერ სხვა auth მეთოდზე) ყოველთვის
+  // `undefined`/falsy — non-breaking, Dashboard-ის toggle-ის გარეშეც
+  // ძველებურად მუშაობს.
+  needsEmailVerification?: boolean;
 };
 
 // FirebaseUser-ის მსუბუქი შესატყვისი — GoogleCompleteScreen-ს displayName
@@ -44,20 +51,43 @@ export interface AuthService {
   // ზუსტად ისე, როგორც Google-ისთვისაც ხდება `LoginScreen`-ში.
   sendPhoneOtp(phone: string): Promise<void>;
   verifyPhoneOtp(phone: string, token: string): Promise<AuthResult>;
+  // პაროლის აღდგენის OTP — რეგისტრაციის `sendPhoneOtp`-ისგან განსხვავებით
+  // (რომელსაც ახალი ანგარიშის შექმნაც შეუძლია), აქ `shouldCreateUser:
+  // false` — არარეგისტრირებული ნომრისთვის "დამავიწყდა პაროლი"-ს მოთხოვნამ
+  // არასდროს არ უნდა შექმნას ახალი, ცარიელი auth-ანგარიში.
+  sendPhoneOtpForReset(phone: string): Promise<void>;
+  // იგივე პრინციპი, ტელეფონის ნაცვლად ელფოსტისთვის — Supabase-ის ელფოსტის
+  // OTP (6-ციფრიანი კოდი, არა "magic link"). `verifyEmailOtp`-ის
+  // წარმატება უკვე ავტორიზებულ სესიას ქმნის, ისე როგორც ტელეფონისთვისაც.
+  sendEmailOtp(email: string): Promise<void>;
+  verifyEmailOtp(email: string, token: string): Promise<AuthResult>;
+  // Task — ელფოსტის რეგისტრაციის დადასტურება (სავალდებულო OTP, Google/
+  // Apple/ტელეფონის გარდა — ეს სამი უკვე სხვა გზით ადასტურებს ვინაობას).
+  // `signUp()` თავად აგზავნის პირველ კოდს ავტომატურად (Supabase-ის
+  // "Confirm signup" email template-ით, OTP-ტოკენის ვარიანტზე
+  // კონფიგურირებული); `type: 'signup'` აქ **განზრახ** სხვაა
+  // `verifyEmailOtp`-ის `type: 'email'`-ისგან — ეს ორი ცალკე Supabase
+  // OTP-კატეგორიაა (signup-confirmation vs passwordless-login/reset-ის
+  // magic-code), ერთმანეთს ჯვარედინად არ ამოწმებენ.
+  verifyRegistrationOtp(email: string, token: string): Promise<AuthResult>;
+  // ხელახლა გაგზავნა — `sendEmailOtp`-ისგან (`shouldCreateUser: false`)
+  // განსხვავებით `auth.resend({type:'signup'})`-ს იძახებს, რომელიც
+  // ახალ ანგარიშს არ ქმნის/არ ითხოვს — უბრალოდ იმეორებს უკვე
+  // დაწყებული, დაუდასტურებელი რეგისტრაციის კოდს.
+  resendRegistrationOtp(email: string): Promise<void>;
   // Task — დარეგისტრირებული ტელეფონის ანგარიშისთვის login ყოველ ჯერზე
   // აღარ ითხოვს ახალ SMS-კოდს — Supabase-ის `signInWithPassword` `phone`-ს
   // `email`-ის ტოლფასად იღებს. საჭიროებს, რომ ანგარიშს უკვე ჰქონდეს
-  // პაროლი დაყენებული (`setPhonePassword`, რეგისტრაციისას, ერთხელ).
+  // პაროლი დაყენებული (`setNewPassword`, რეგისტრაციისას, ერთხელ).
   signInWithPhonePassword(phone: string, password: string): Promise<AuthResult>;
-  // OTP-ით ახლახან ვერიფიცირებული ტელეფონის სესიაზე პაროლის (თავიდან)
-  // დაყენება — არსებული პაროლის ხელახლა-დადასტურება აქ საჭირო არაა
-  // (updatePassword-ისგან განსხვავებით, სადაც ეს რეაუთენთიფიკაციაა),
+  // OTP-ით (ტელეფონი ან ელფოსტა) ახლახან ვერიფიცირებულ სესიაზე პაროლის
+  // (თავიდან) დაყენება — არსებული პაროლის ხელახლა-დადასტურება აქ საჭირო
+  // არაა (updatePassword-ისგან განსხვავებით, სადაც ეს რეაუთენთიფიკაციაა),
   // რადგან თავად OTP-ის ვერიფიკაცია უკვე საკმარისი დამტკიცებაა ვინაობის.
-  // ორი გამომძახებელი: PhoneRegisterVerifyScreen (ახალი ანგარიშისთვის,
-  // პაროლი პირველად ეყენება) და PhoneForgotPasswordVerifyScreen
-  // (არსებული ანგარიშისთვის, პაროლის აღდგენისას — ძველს გადაწერს).
-  setPhonePassword(password: string): Promise<void>;
-  sendPasswordReset(email: string): Promise<void>;
+  // გამომძახებლები: PhoneRegisterVerifyScreen (ახალი ანგარიშისთვის,
+  // პაროლი პირველად ეყენება), ResetPasswordScreen (არსებული
+  // ანგარიშისთვის, პაროლის აღდგენისას — ელფოსტითაც, ტელეფონითაც).
+  setNewPassword(password: string): Promise<void>;
   // Re-authenticates with the current password first (Supabase's
   // updateUser() itself does not verify it — only the active session is
   // required), then changes it. Throws on a wrong current password
@@ -150,6 +180,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   'Invalid token': 'კოდი არასწორია — გადაამოწმე და სცადე თავიდან.',
   'Unable to validate phone number: invalid format': 'შეიყვანე სწორი ტელეფონის ნომერი.',
   'Signups not allowed for this instance': 'რეგისტრაცია ამ მეთოდით ამჟამად დახურულია.',
+  // ეს ანგარიში ვერ მოიძებნა — `shouldCreateUser: false`-ის ზუსტი
+  // Supabase-ის შეცდომა (რეალურად ცოცხლად დადასტურებული, #170).
+  'Signups not allowed for otp': 'ამ ელფოსტით/ნომრით ანგარიში ვერ მოიძებნა.',
 };
 
 export function getAuthErrorMessage(error: unknown): string {
@@ -163,8 +196,13 @@ export const authService: AuthService = {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
     if (!data.user) throw new Error('რეგისტრაცია ვერ დასრულდა.');
-    cachedUser = data.user;
-    return toAuthResult(data.user);
+    // `data.session` მხოლოდ მაშინაა `null`, თუ Supabase-ის "Confirm email"
+    // ჩართულია — ასეთ შემთხვევაში ეს ანგარიში ჯერ დაუდასტურებელია და
+    // ამ (სესიის-გარეშე) მომხმარებელს `cachedUser`-ში ჩაწერა არასწორი
+    // იქნებოდა (getCurrentUser() "შესულს" აჩვენებდა, რეალურ auth
+    // token-ის გარეშე — RLS-ით დაცული write-ები ჩუმად ჩავარდებოდა).
+    if (data.session) cachedUser = data.user;
+    return { ...toAuthResult(data.user), needsEmailVerification: !data.session };
   },
   async signInWithEmail({ email, password }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -224,6 +262,10 @@ export const authService: AuthService = {
     const { error } = await supabase.auth.signInWithOtp({ phone });
     if (error) throw error;
   },
+  async sendPhoneOtpForReset(phone) {
+    const { error } = await supabase.auth.signInWithOtp({ phone, options: { shouldCreateUser: false } });
+    if (error) throw error;
+  },
   async verifyPhoneOtp(phone, token) {
     const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
     if (error) throw error;
@@ -231,18 +273,36 @@ export const authService: AuthService = {
     cachedUser = data.user;
     return toAuthResult(data.user);
   },
+  async sendEmailOtp(email) {
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    if (error) throw error;
+  },
+  async verifyEmailOtp(email, token) {
+    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+    if (error) throw error;
+    if (!data.user) throw new Error('ვერიფიკაცია ვერ დასრულდა.');
+    cachedUser = data.user;
+    return toAuthResult(data.user);
+  },
+  async verifyRegistrationOtp(email, token) {
+    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'signup' });
+    if (error) throw error;
+    if (!data.user) throw new Error('ვერიფიკაცია ვერ დასრულდა.');
+    cachedUser = data.user;
+    return toAuthResult(data.user);
+  },
+  async resendRegistrationOtp(email) {
+    const { error } = await supabase.auth.resend({ type: 'signup', email });
+    if (error) throw error;
+  },
   async signInWithPhonePassword(phone, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ phone, password });
     if (error) throw error;
     cachedUser = data.user;
     return toAuthResult(data.user);
   },
-  async setPhonePassword(password) {
+  async setNewPassword(password) {
     const { error } = await supabase.auth.updateUser({ password });
-    if (error) throw error;
-  },
-  async sendPasswordReset(email) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
     if (error) throw error;
   },
   async updatePassword(currentPassword, newPassword) {

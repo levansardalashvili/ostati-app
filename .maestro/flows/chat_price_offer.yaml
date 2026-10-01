@@ -1,4 +1,4 @@
-appId: com.ostati.app
+appId: com.ostato.app
 ---
 # D3 — chat-ის სტრუქტურირებული ფასის შეთავაზება. Provider ხსნის ჩატს job
 # ჯერ კიდევ 'pending'-ზე (job_responses-ით უკვე დაინტერესებული, არჩეული
@@ -48,7 +48,7 @@ appId: com.ostati.app
     commands:
       - back
 - extendedWaitUntil:
-    visible: ".*(პროფილი|დაწყება).*"
+    visible: ".*(პროფილი|დაწყება|შესვლა).*"
     timeout: 90000
 
 - tapOn:
@@ -70,7 +70,7 @@ appId: com.ostati.app
 - evalScript: ${output.providerEmail = 'verified.provider@e2e.example.com'}
 - evalScript: ${output.jobMarker = 'ChatOfferE2E' + Date.now()}
 
-- tapOn: ".*დაწყება.*"
+- tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
     id: "register-first-name"
@@ -141,7 +141,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 2: Provider registers, expresses interest, sends a chat offer
 - tapOn: ".*შესვლა.*"
@@ -210,7 +210,7 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"
 
 # --- Phase 3: Customer logs back in, sees the offer, accepts it --------
 - tapOn: ".*შესვლა.*"
@@ -241,4 +241,4 @@ appId: com.ostati.app
 - tapOn: ".*გასვლა.*"
 - tapOn:
     id: "logout-confirm-button"
-- assertVisible: ".*დაწყება.*"
+- assertVisible: ".*შესვლა.*"

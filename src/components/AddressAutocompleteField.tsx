@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, LayoutChangeEvent, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { AlertCircle, MapPin } from 'lucide-react-native';
+import * as Location from 'expo-location';
+import { AlertCircle, LocateFixed, MapPin } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
+import { useScrollIntoViewOnFocus } from './KeyboardAwareForm';
 
 type Suggestion = { id: string; label: string };
 
@@ -100,9 +102,12 @@ export function AddressAutocompleteField({ label, value, onChangeText, onSelect,
   const [loading, setLoading] = useState(false);
   const [showList, setShowList] = useState(false);
   const [fieldHeight, setFieldHeight] = useState(0);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestSeq = useRef(0);
+  const { ref: scrollRef, onFocus: scrollOnFocus } = useScrollIntoViewOnFocus();
 
   useEffect(() => {
     return () => {
@@ -126,7 +131,7 @@ export function AddressAutocompleteField({ label, value, onChangeText, onSelect,
         // shortened display format (task 1) and a meaningful dedup key
         // (task 2); without it we'd only ever have the long raw string.
         const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=ge&accept-language=ka&q=${encodeURIComponent(query)}`;
-        const res = await fetch(url, { headers: { 'User-Agent': 'ostati-app (Georgia local services marketplace)' } });
+        const res = await fetch(url, { headers: { 'User-Agent': 'ostato-app (Georgia local services marketplace)' } });
         const data = await res.json();
         if (seq !== requestSeq.current) return;
 
@@ -175,6 +180,7 @@ export function AddressAutocompleteField({ label, value, onChangeText, onSelect,
   const handleFocus = () => {
     if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
     if (value.trim().length >= MIN_QUERY_LEN) setShowList(true);
+    scrollOnFocus();
   };
 
   const handleBlur = () => {
@@ -183,6 +189,40 @@ export function AddressAutocompleteField({ label, value, onChangeText, onSelect,
   };
 
   const onFieldLayout = (e: LayoutChangeEvent) => setFieldHeight(e.nativeEvent.layout.height);
+
+  // "ჩემი მდებარეობის გამოყენება" — მომხმარებლის მოთხოვნა, Bolt Food-ის
+  // მსგავსი ნაკადით: ნებართვის მოთხოვნა → GPS-კოორდინატი →
+  // Nominatim-ის reverse-geocoding (იგივე `shortAddressLabel()`, რასაც
+  // ტექსტური ძებნაც იყენებს — ერთი ფორმატი ორივე გზისთვის).
+  const handleUseLocation = async () => {
+    if (locating) return;
+    setLocationError('');
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationError('მდებარეობაზე წვდომის ნებართვა არ მოგვეცა');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=ka&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`;
+      const res = await fetch(url, { headers: { 'User-Agent': 'ostato-app (Georgia local services marketplace)' } });
+      const data = (await res.json()) as NominatimResult & { error?: string };
+      if (data?.error || !data?.display_name) {
+        setLocationError('მისამართი ვერ დადგინდა — შეიყვანე ხელით');
+        return;
+      }
+      const label = shortAddressLabel(data);
+      onChangeText(label);
+      onSelect?.(label);
+      setSuggestions([]);
+      setShowList(false);
+    } catch {
+      setLocationError('მდებარეობის დადგენა ვერ მოხერხდა');
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const dropdownOpen = showList && value.trim().length >= MIN_QUERY_LEN && (loading || suggestions.length > 0);
 
@@ -198,6 +238,7 @@ export function AddressAutocompleteField({ label, value, onChangeText, onSelect,
             <MapPin size={15} color={colors.mutedForeground} />
           </View>
           <TextInput
+            ref={scrollRef}
             value={value}
             onChangeText={handleChangeText}
             onFocus={handleFocus}
@@ -218,6 +259,15 @@ export function AddressAutocompleteField({ label, value, onChangeText, onSelect,
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
+        <Pressable style={styles.locateRow} onPress={handleUseLocation} disabled={locating}>
+          {locating ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <LocateFixed size={14} color={colors.primary} />
+          )}
+          <Text style={styles.locateText}>{locating ? 'მდებარეობა დგინდება...' : 'ჩემი მდებარეობის გამოყენება'}</Text>
+        </Pressable>
+        {!!locationError && <Text style={styles.locateErrorText}>{locationError}</Text>}
       </View>
 
       {dropdownOpen && (
@@ -304,6 +354,23 @@ const styles = StyleSheet.create({
   errorText: {
     ...typography.small,
     color: colors.destructive,
+  },
+  locateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  locateText: {
+    ...typography.small,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  locateErrorText: {
+    ...typography.small,
+    color: colors.destructive,
+    marginTop: 4,
   },
   dropdown: {
     position: 'absolute',
