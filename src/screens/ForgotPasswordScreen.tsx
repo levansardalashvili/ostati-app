@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
@@ -7,7 +7,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
 import { RecoveryStepHeader } from '../components/RecoveryStepHeader';
 import { TextField } from '../components/TextField';
-import { TurnstileCaptcha, type TurnstileCaptchaHandle } from '../components/TurnstileCaptcha';
 import { colors, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
 import type { RootStackParamList } from '../navigation/types';
@@ -24,8 +23,6 @@ export function ForgotPasswordScreen({ navigation }: Props) {
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sendError, setSendError] = useState('');
-  const [captchaToken, setCaptchaToken] = useState('');
-  const captchaRef = useRef<TurnstileCaptchaHandle>(null);
 
   const emailError = touched
     ? !email
@@ -38,15 +35,13 @@ export function ForgotPasswordScreen({ navigation }: Props) {
   const handleSend = async () => {
     setTouched(true);
     setSendError('');
-    if (!email || !isEmail(email) || !captchaToken || loading) return;
+    if (!email || !isEmail(email) || loading) return;
     setLoading(true);
     try {
-      await authService.sendEmailOtp(email.trim(), { captchaToken });
+      await authService.sendEmailOtp(email.trim());
       navigation.navigate('ForgotPasswordVerify', { email: email.trim() });
     } catch (error) {
       setSendError(getAuthErrorMessage(error));
-      setCaptchaToken('');
-      captchaRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -85,19 +80,11 @@ export function ForgotPasswordScreen({ navigation }: Props) {
           />
         </View>
 
-        <View style={styles.field}>
-          <TurnstileCaptcha
-            ref={captchaRef}
-            onVerify={setCaptchaToken}
-            onExpire={() => setCaptchaToken('')}
-          />
-        </View>
-
         <Button
           label="კოდის გაგზავნა"
           loadingLabel="იგზავნება..."
           onPress={handleSend}
-          disabled={!email || !isEmail(email) || !captchaToken}
+          disabled={!email || !isEmail(email)}
           loading={loading}
         />
       </KeyboardAwareForm>

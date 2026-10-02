@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -12,7 +12,6 @@ import { PasswordStrengthMeter } from '../components/PasswordStrengthMeter';
 import { ProgressBar } from '../components/ProgressBar';
 import { Reveal } from '../components/Reveal';
 import { TextField } from '../components/TextField';
-import { TurnstileCaptcha, type TurnstileCaptchaHandle } from '../components/TurnstileCaptcha';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
 import type { RootStackParamList } from '../navigation/types';
@@ -50,8 +49,6 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const [captchaToken, setCaptchaToken] = useState('');
-  const captchaRef = useRef<TurnstileCaptchaHandle>(null);
 
   const touch = (field: string) => setTouched((t) => ({ ...t, [field]: true }));
 
@@ -93,8 +90,7 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
       (addressDetails.entrance.trim() && addressDetails.apartment.trim())) &&
     PHONE_RE.test(phoneDigits) &&
     password.length >= 8 &&
-    password === confirmPassword &&
-    !!captchaToken;
+    password === confirmPassword;
 
   const handleSendCode = async () => {
     setTouched({
@@ -111,7 +107,7 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
     setLoading(true);
     try {
       const e164 = `+995${phoneDigits}`;
-      await authService.sendPhoneOtp(e164, { captchaToken });
+      await authService.sendPhoneOtp(e164);
       navigation.navigate('PhoneRegisterVerify', {
         role,
         phone: e164,
@@ -126,8 +122,6 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
       });
     } catch (error) {
       setSubmitError(getAuthErrorMessage(error));
-      setCaptchaToken('');
-      captchaRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -249,12 +243,6 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
               error={errors.confirmPassword}
               secureTextEntry
               autoCapitalize="none"
-            />
-
-            <TurnstileCaptcha
-              ref={captchaRef}
-              onVerify={setCaptchaToken}
-              onExpire={() => setCaptchaToken('')}
             />
 
             <Button

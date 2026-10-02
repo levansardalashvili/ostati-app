@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -11,7 +11,6 @@ import { CurvedAuthHeader } from '../components/CurvedAuthHeader';
 import { Reveal } from '../components/Reveal';
 import { SocialAuthRow } from '../components/SocialAuthRow';
 import { TextField } from '../components/TextField';
-import { TurnstileCaptcha, type TurnstileCaptchaHandle } from '../components/TurnstileCaptcha';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
 import { userService } from '../services/userService';
@@ -33,8 +32,6 @@ export function LoginScreen({ navigation }: Props) {
   const [aLoading, setALoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [credError, setCredError] = useState('');
-  const [captchaToken, setCaptchaToken] = useState('');
-  const captchaRef = useRef<TurnstileCaptchaHandle>(null);
   const { setProfile } = useCustomerProfile();
   const { setProfile: setProviderProfile } = useProviderProfile();
 
@@ -50,7 +47,7 @@ export function LoginScreen({ navigation }: Props) {
         : ''
     : '';
   const passError = touched.pass && !pass ? 'ეს ველი სავალდებულოა' : '';
-  const canSubmit = email && isEmail(email) && pass && !!captchaToken && !loading;
+  const canSubmit = email && isEmail(email) && pass && !loading;
 
   // საავტორიზაციო call-ის წარმატების შემდეგ საერთო ნაბიჯი (email-ითაც,
   // Google-ითაც) — users/{uid}-დან როლის წაკითხვა, შესაბამისი Context-ის
@@ -101,14 +98,10 @@ export function LoginScreen({ navigation }: Props) {
     if (!canSubmit) return;
     setLoading(true);
     try {
-      await authService.signInWithEmail({ email: email.trim(), password: pass }, { captchaToken });
+      await authService.signInWithEmail({ email: email.trim(), password: pass });
       await completeSignIn();
     } catch (error) {
       setCredError(getAuthErrorMessage(error));
-      // Turnstile token ერთჯერადია — წარუმატებელი მცდელობის შემდეგ ახალი
-      // გამოწვევა სჭირდება.
-      setCaptchaToken('');
-      captchaRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -197,11 +190,6 @@ export function LoginScreen({ navigation }: Props) {
         </Reveal>
 
         <Reveal delay={420} style={styles.actions}>
-          <TurnstileCaptcha
-            ref={captchaRef}
-            onVerify={setCaptchaToken}
-            onExpire={() => setCaptchaToken('')}
-          />
           <Button
             testID="login-submit-button"
             label="შესვლა"
