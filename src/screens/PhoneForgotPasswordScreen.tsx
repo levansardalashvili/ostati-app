@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
@@ -6,6 +6,7 @@ import { Phone } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button } from '../components/Button';
 import { RecoveryStepHeader } from '../components/RecoveryStepHeader';
+import { TurnstileCaptcha, type TurnstileCaptchaHandle } from '../components/TurnstileCaptcha';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
 import type { RootStackParamList } from '../navigation/types';
@@ -23,9 +24,11 @@ export function PhoneForgotPasswordScreen({ navigation }: Props) {
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaRef = useRef<TurnstileCaptchaHandle>(null);
 
   const phoneError = touched && !PHONE_RE.test(phoneDigits) ? 'შეიყვანე სწორი მობილურის ნომერი' : '';
-  const canSubmit = PHONE_RE.test(phoneDigits) && !loading;
+  const canSubmit = PHONE_RE.test(phoneDigits) && !!captchaToken && !loading;
 
   const handleSend = async () => {
     setTouched(true);
@@ -34,10 +37,12 @@ export function PhoneForgotPasswordScreen({ navigation }: Props) {
     setLoading(true);
     try {
       const e164 = `+995${phoneDigits}`;
-      await authService.sendPhoneOtpForReset(e164);
+      await authService.sendPhoneOtpForReset(e164, { captchaToken });
       navigation.navigate('PhoneForgotPasswordVerify', { phone: e164 });
     } catch (err) {
       setError(getAuthErrorMessage(err));
+      setCaptchaToken('');
+      captchaRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -80,6 +85,14 @@ export function PhoneForgotPasswordScreen({ navigation }: Props) {
             />
           </View>
           {!!phoneError && <Text style={styles.phoneErrorText}>{phoneError}</Text>}
+        </View>
+
+        <View style={styles.field}>
+          <TurnstileCaptcha
+            ref={captchaRef}
+            onVerify={setCaptchaToken}
+            onExpire={() => setCaptchaToken('')}
+          />
         </View>
 
         <Button

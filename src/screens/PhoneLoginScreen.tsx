@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -8,6 +8,7 @@ import { Button } from '../components/Button';
 import { CurvedAuthHeader } from '../components/CurvedAuthHeader';
 import { Reveal } from '../components/Reveal';
 import { TextField } from '../components/TextField';
+import { TurnstileCaptcha, type TurnstileCaptchaHandle } from '../components/TurnstileCaptcha';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
 import { userService } from '../services/userService';
@@ -39,12 +40,14 @@ export function PhoneLoginScreen({ navigation }: Props) {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaRef = useRef<TurnstileCaptchaHandle>(null);
 
   const touch = (field: string) => setTouched((t) => ({ ...t, [field]: true }));
 
   const phoneError = touched.phone && !PHONE_RE.test(phoneDigits) ? 'შეიყვანე სწორი მობილურის ნომერი' : '';
   const passwordError = touched.password && !password ? 'ეს ველი სავალდებულოა' : '';
-  const canSubmit = PHONE_RE.test(phoneDigits) && !!password && !loading;
+  const canSubmit = PHONE_RE.test(phoneDigits) && !!password && !!captchaToken && !loading;
 
   const completeSignIn = async () => {
     const user = authService.getCurrentUser();
@@ -91,10 +94,12 @@ export function PhoneLoginScreen({ navigation }: Props) {
     setLoading(true);
     try {
       const e164 = `+995${phoneDigits}`;
-      await authService.signInWithPhonePassword(e164, password);
+      await authService.signInWithPhonePassword(e164, password, { captchaToken });
       await completeSignIn();
     } catch (err) {
       setError(getAuthErrorMessage(err));
+      setCaptchaToken('');
+      captchaRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -161,6 +166,11 @@ export function PhoneLoginScreen({ navigation }: Props) {
           </Reveal>
 
           <Reveal delay={420} style={styles.actions}>
+            <TurnstileCaptcha
+              ref={captchaRef}
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken('')}
+            />
             <Button
               label="შესვლა"
               loadingLabel="შესვლა..."

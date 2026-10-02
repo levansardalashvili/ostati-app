@@ -8,6 +8,11 @@ import type { Role } from '../types/user';
 
 export type EmailCredentials = { email: string; password: string };
 export type RegisterInput = EmailCredentials & { role: Role };
+// Turnstile CAPTCHA token (TurnstileCaptcha.tsx) — Supabase-ის auth.captcha
+// გლობალურად ჩართვისას სავალდებულოა ყველა sign-up/sign-in/password-reset
+// გამოძახებაზე, თორემ Supabase უარყოფს მოთხოვნას. გამორთულზე (ან პარამეტრის
+// გამოტოვებაზე) Supabase-ი უბრალოდ უგულებელყოფს — non-breaking.
+export type CaptchaOptions = { captchaToken?: string };
 // #107 — `appleFullName` მხოლოდ `signInWithApple()`-ის შედეგზეა შევსებული
 // (Apple `fullName`-ს მხოლოდ ამ ერთი, პირველი ავტორიზაციის პასუხში
 // აბრუნებს — არასდროს მეორედ, არც `getCurrentUser()`/`cachedUser`-იდან) —
@@ -33,8 +38,8 @@ export type AuthResult = {
 export type AppUser = { uid: string; email: string | null; phone: string | null; displayName: string | null };
 
 export interface AuthService {
-  registerWithEmail(input: RegisterInput): Promise<AuthResult>;
-  signInWithEmail(credentials: EmailCredentials): Promise<AuthResult>;
+  registerWithEmail(input: RegisterInput, captcha?: CaptchaOptions): Promise<AuthResult>;
+  signInWithEmail(credentials: EmailCredentials, captcha?: CaptchaOptions): Promise<AuthResult>;
   signInWithGoogle(): Promise<AuthResult>;
   // #107 — `signInWithGoogle()`-ის ზუსტად იგივე ნიმუშით (native identity
   // token → Supabase `signInWithIdToken`). iOS-only — `Platform.OS`-ის
@@ -49,17 +54,17 @@ export interface AuthService {
   // ერთი და იგივე call ემსახურება რეგისტრაციასაც და login-საც — "ახალი
   // uid-ია თუ არსებული" client-ის მხარეს დგინდება (`getUserRecord`-ით),
   // ზუსტად ისე, როგორც Google-ისთვისაც ხდება `LoginScreen`-ში.
-  sendPhoneOtp(phone: string): Promise<void>;
+  sendPhoneOtp(phone: string, captcha?: CaptchaOptions): Promise<void>;
   verifyPhoneOtp(phone: string, token: string): Promise<AuthResult>;
   // პაროლის აღდგენის OTP — რეგისტრაციის `sendPhoneOtp`-ისგან განსხვავებით
   // (რომელსაც ახალი ანგარიშის შექმნაც შეუძლია), აქ `shouldCreateUser:
   // false` — არარეგისტრირებული ნომრისთვის "დამავიწყდა პაროლი"-ს მოთხოვნამ
   // არასდროს არ უნდა შექმნას ახალი, ცარიელი auth-ანგარიში.
-  sendPhoneOtpForReset(phone: string): Promise<void>;
+  sendPhoneOtpForReset(phone: string, captcha?: CaptchaOptions): Promise<void>;
   // იგივე პრინციპი, ტელეფონის ნაცვლად ელფოსტისთვის — Supabase-ის ელფოსტის
   // OTP (6-ციფრიანი კოდი, არა "magic link"). `verifyEmailOtp`-ის
   // წარმატება უკვე ავტორიზებულ სესიას ქმნის, ისე როგორც ტელეფონისთვისაც.
-  sendEmailOtp(email: string): Promise<void>;
+  sendEmailOtp(email: string, captcha?: CaptchaOptions): Promise<void>;
   verifyEmailOtp(email: string, token: string): Promise<AuthResult>;
   // Task — ელფოსტის რეგისტრაციის დადასტურება (სავალდებულო OTP, Google/
   // Apple/ტელეფონის გარდა — ეს სამი უკვე სხვა გზით ადასტურებს ვინაობას).
@@ -79,7 +84,7 @@ export interface AuthService {
   // აღარ ითხოვს ახალ SMS-კოდს — Supabase-ის `signInWithPassword` `phone`-ს
   // `email`-ის ტოლფასად იღებს. საჭიროებს, რომ ანგარიშს უკვე ჰქონდეს
   // პაროლი დაყენებული (`setNewPassword`, რეგისტრაციისას, ერთხელ).
-  signInWithPhonePassword(phone: string, password: string): Promise<AuthResult>;
+  signInWithPhonePassword(phone: string, password: string, captcha?: CaptchaOptions): Promise<AuthResult>;
   // OTP-ით (ტელეფონი ან ელფოსტა) ახლახან ვერიფიცირებულ სესიაზე პაროლის
   // (თავიდან) დაყენება — არსებული პაროლის ხელახლა-დადასტურება აქ საჭირო
   // არაა (updatePassword-ისგან განსხვავებით, სადაც ეს რეაუთენთიფიკაციაა),
@@ -197,8 +202,12 @@ export function getAuthErrorMessage(error: unknown): string {
 }
 
 export const authService: AuthService = {
-  async registerWithEmail({ email, password }) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+  async registerWithEmail({ email, password }, captcha) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: captcha?.captchaToken ? { captchaToken: captcha.captchaToken } : undefined,
+    });
     if (error) throw error;
     if (!data.user) throw new Error('რეგისტრაცია ვერ დასრულდა.');
     // `data.session` მხოლოდ მაშინაა `null`, თუ Supabase-ის "Confirm email"
@@ -209,8 +218,12 @@ export const authService: AuthService = {
     if (data.session) cachedUser = data.user;
     return { ...toAuthResult(data.user), needsEmailVerification: !data.session };
   },
-  async signInWithEmail({ email, password }) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  async signInWithEmail({ email, password }, captcha) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: captcha?.captchaToken ? { captchaToken: captcha.captchaToken } : undefined,
+    });
     if (error) throw error;
     cachedUser = data.user;
     return toAuthResult(data.user);
@@ -263,12 +276,18 @@ export const authService: AuthService = {
         : null,
     };
   },
-  async sendPhoneOtp(phone) {
-    const { error } = await supabase.auth.signInWithOtp({ phone });
+  async sendPhoneOtp(phone, captcha) {
+    const { error } = await supabase.auth.signInWithOtp({
+      phone,
+      options: captcha?.captchaToken ? { captchaToken: captcha.captchaToken } : undefined,
+    });
     if (error) throw error;
   },
-  async sendPhoneOtpForReset(phone) {
-    const { error } = await supabase.auth.signInWithOtp({ phone, options: { shouldCreateUser: false } });
+  async sendPhoneOtpForReset(phone, captcha) {
+    const { error } = await supabase.auth.signInWithOtp({
+      phone,
+      options: { shouldCreateUser: false, captchaToken: captcha?.captchaToken },
+    });
     if (error) throw error;
   },
   async verifyPhoneOtp(phone, token) {
@@ -278,8 +297,11 @@ export const authService: AuthService = {
     cachedUser = data.user;
     return toAuthResult(data.user);
   },
-  async sendEmailOtp(email) {
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+  async sendEmailOtp(email, captcha) {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false, captchaToken: captcha?.captchaToken },
+    });
     if (error) throw error;
   },
   async verifyEmailOtp(email, token) {
@@ -300,8 +322,12 @@ export const authService: AuthService = {
     const { error } = await supabase.auth.resend({ type: 'signup', email });
     if (error) throw error;
   },
-  async signInWithPhonePassword(phone, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ phone, password });
+  async signInWithPhonePassword(phone, password, captcha) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      phone,
+      password,
+      options: captcha?.captchaToken ? { captchaToken: captcha.captchaToken } : undefined,
+    });
     if (error) throw error;
     cachedUser = data.user;
     return toAuthResult(data.user);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -15,6 +15,7 @@ import { ProgressBar } from '../components/ProgressBar';
 import { Reveal } from '../components/Reveal';
 import { SocialAuthRow } from '../components/SocialAuthRow';
 import { TextField } from '../components/TextField';
+import { TurnstileCaptcha, type TurnstileCaptchaHandle } from '../components/TurnstileCaptcha';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
 import { userService } from '../services/userService';
@@ -58,6 +59,8 @@ export function RegisterScreen({ navigation, route }: Props) {
   const [aLoading, setALoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const captchaRef = useRef<TurnstileCaptchaHandle>(null);
 
   useEffect(() => {
     AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
@@ -103,7 +106,8 @@ export function RegisterScreen({ navigation, route }: Props) {
       addressDetails.isPrivateHouse ||
       (addressDetails.entrance.trim() && addressDetails.apartment.trim())) &&
     pass.length >= 8 &&
-    pass === confirm;
+    pass === confirm &&
+    !!captchaToken;
 
   const handleSubmit = async () => {
     setTouched({
@@ -197,11 +201,10 @@ export function RegisterScreen({ navigation, route }: Props) {
       };
 
       try {
-        const { uid, needsEmailVerification } = await authService.registerWithEmail({
-          email: email.trim(),
-          password: pass,
-          role,
-        });
+        const { uid, needsEmailVerification } = await authService.registerWithEmail(
+          { email: email.trim(), password: pass, role },
+          { captchaToken },
+        );
         if (needsEmailVerification) {
           goToVerify();
         } else {
@@ -224,7 +227,9 @@ export function RegisterScreen({ navigation, route }: Props) {
         // არასწორი პაროლი) — ჩვეულებრივი "უკვე დარეგისტრირებულია" შეცდომა.
         let existingUid: string;
         try {
-          existingUid = (await authService.signInWithEmail({ email: email.trim(), password: pass })).uid;
+          existingUid = (
+            await authService.signInWithEmail({ email: email.trim(), password: pass }, { captchaToken })
+          ).uid;
         } catch (signInError) {
           if ((signInError as { message?: string } | null)?.message === 'Email not confirmed') {
             await authService.resendRegistrationOtp(email.trim()).catch(() => {});
@@ -242,6 +247,11 @@ export function RegisterScreen({ navigation, route }: Props) {
     } catch (error) {
       setSubmitError(getAuthErrorMessage(error));
       setLoading(false);
+      // Turnstile token ერთჯერადია — წარუმატებელი მცდელობის შემდეგ
+      // ახალი გამოწვევა სჭირდება, თორემ "Save changes"-ის მორე ცდას
+      // Supabase ისევ უარყოფს (already-used token).
+      setCaptchaToken('');
+      captchaRef.current?.reset();
     }
   };
 
@@ -380,6 +390,12 @@ export function RegisterScreen({ navigation, route }: Props) {
               error={errors.confirm}
               secureTextEntry
               autoCapitalize="none"
+            />
+
+            <TurnstileCaptcha
+              ref={captchaRef}
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken('')}
             />
 
             <Button
