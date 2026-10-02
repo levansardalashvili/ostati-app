@@ -183,6 +183,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   // ეს ანგარიში ვერ მოიძებნა — `shouldCreateUser: false`-ის ზუსტი
   // Supabase-ის შეცდომა (რეალურად ცოცხლად დადასტურებული, #170).
   'Signups not allowed for otp': 'ამ ელფოსტით/ნომრით ანგარიში ვერ მოიძებნა.',
+  // Supabase-ის ჩაშენებული მეილერის გაგზავნის ლიმიტი (`over_email_send_rate_limit`,
+  // #174-ის OTP-დადასტურების ერთი ცნობილი შეზღუდვა — "სცადე თავიდან"-ის
+  // ნაცვლად კონკრეტული, ამოსაცნობი ტექსტი, რომ მომხმარებელმა არ იფიქროს
+  // საკუთარ ველებში შეცდომა დაუშვა).
+  'email rate limit exceeded': 'ელ. ფოსტების გაგზავნის ლიმიტი ამოიწურა — სცადე რამდენიმე წუთში.',
 };
 
 export function getAuthErrorMessage(error: unknown): string {
