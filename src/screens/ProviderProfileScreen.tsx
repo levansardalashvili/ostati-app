@@ -22,7 +22,6 @@ import { Avatar } from '../components/Avatar';
 import { HELP_URL } from '../config/site';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
-import { DeleteAccountRow } from '../components/DeleteAccountRow';
 import { ProfileMenuRow } from '../components/ProfileMenuRow';
 import { VerificationRequestCard } from '../components/VerificationRequestCard';
 import { colors, radius, spacing, typography } from '../theme';
@@ -181,11 +180,6 @@ export function ProviderProfileScreen({ navigation }: Props) {
             <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit>გამოცდილება</Text>
           </View>
         </View>
-
-        <View style={styles.availabilityRow}>
-          <View style={styles.availabilityDot} />
-          <Text style={styles.availabilityText}>ხელმისაწვდომი</Text>
-        </View>
       </View>
 
       <ScrollView
@@ -229,8 +223,6 @@ export function ProviderProfileScreen({ navigation }: Props) {
           </View>
           <Text style={styles.logoutText}>გასვლა</Text>
         </Pressable>
-
-        <DeleteAccountRow onDeleted={() => navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Welcome' }] })} />
       </ScrollView>
 
       <BottomSheet visible={logoutSheetOpen} onClose={() => setLogoutSheetOpen(false)}>
@@ -345,22 +337,6 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
     marginTop: 2,
-  },
-  availabilityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  availabilityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.success,
-  },
-  availabilityText: {
-    ...typography.small,
-    color: colors.success,
-    fontWeight: '700',
   },
   body: {
     flex: 1,

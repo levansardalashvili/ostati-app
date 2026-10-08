@@ -328,7 +328,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
                   </Text>
                 </View>
               </View>
-              <Button label="დეტალების ნახვა" variant="outline" onPress={handleOpenCurrentJob} />
+              <Button label="დეტალების ნახვა" variant="outline" compact onPress={handleOpenCurrentJob} />
             </View>
           </View>
         )}

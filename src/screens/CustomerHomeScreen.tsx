@@ -289,10 +289,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
                   </Text>
                   <Text style={styles.currentJobDate}>{currentJob.date}</Text>
                 </View>
-                <View style={styles.currentJobRight}>
-                  <StatusPill status={currentJob.status} />
-                  <ChevronRight size={16} color={colors.mutedForeground} />
-                </View>
+                <StatusPill status={currentJob.status} />
               </Pressable>
             </Animated.View>
           </View>
@@ -555,10 +552,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
     marginTop: 2,
-  },
-  currentJobRight: {
-    alignItems: 'flex-end',
-    gap: spacing.xs + 2,
   },
   serviceGrid: {
     flexDirection: 'row',

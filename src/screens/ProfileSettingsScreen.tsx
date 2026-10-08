@@ -6,6 +6,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
+import { DeleteAccountRow } from '../components/DeleteAccountRow';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
 import type { RootStackParamList } from '../navigation/types';
@@ -61,6 +62,8 @@ export function ProfileSettingsScreen({ navigation }: Props) {
           <ChevronRight size={15} color={colors.mutedForeground} />
         </Pressable>
         <Text style={styles.footNote}>Google-ის ანგარიშით შესვლის შემთხვევაში პაროლის მართვა ხდება Google-ის მეშვეობით.</Text>
+
+        <DeleteAccountRow onDeleted={() => navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] })} />
       </View>
 
       <BottomSheet visible={pwSheetOpen} onClose={closeSheet}>

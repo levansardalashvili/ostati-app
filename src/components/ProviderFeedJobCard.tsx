@@ -79,11 +79,11 @@ export function ProviderFeedJobCard({ job, sent, onDetail, onChat }: Props) {
             დაინტერესებული ამ job-ზე — "interestedCount" აქაც არ ჩანს. */}
         <View style={styles.jobActionRow}>
           <View style={styles.actionButton}>
-            <Button label="დეტალების ნახვა" variant="outline" onPress={onDetail} />
+            <Button label="დეტალების ნახვა" variant="outline" compact onPress={onDetail} />
           </View>
           {sent && (
             <View style={styles.actionButton}>
-              <Button label="ჩატის გახსნა" onPress={onChat} />
+              <Button label="ჩატის გახსნა" compact onPress={onChat} />
             </View>
           )}
         </View>

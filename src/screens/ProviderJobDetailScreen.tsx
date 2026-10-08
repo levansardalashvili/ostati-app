@@ -12,7 +12,6 @@ import {
   MessageCircle,
   MoreVertical,
   ShieldCheck,
-  ThumbsUp,
   X,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -333,27 +332,24 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   // სერვერზე; client-ის `variant === 'browse'` მხოლოდ ღილაკის ჩვენებას
   // განსაზღვრავს).
   const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawSheetOpen, setWithdrawSheetOpen] = useState(false);
   const handleWithdraw = () => {
     if (withdrawing) return;
-    Alert.alert('დაინტერესების გაუქმება', 'ნამდვილად გინდა ამ job-ზე გამოხატული ინტერესის გაუქმება?', [
-      { text: 'არა', style: 'cancel' },
-      {
-        text: 'დიახ, გავაუქმებ',
-        style: 'destructive',
-        onPress: async () => {
-          setWithdrawing(true);
-          try {
-            await quoteService.withdrawInterest(job.id);
-            setExpressed(false);
-            setOfferPrice('');
-          } catch {
-            Alert.alert('ვერ მოხერხდა', 'ვერ გავაუქმეთ — job შეიძლება უკვე მინიჭებული იყოს, სცადე ხელახლა.');
-          } finally {
-            setWithdrawing(false);
-          }
-        },
-      },
-    ]);
+    setWithdrawSheetOpen(true);
+  };
+  const confirmWithdraw = async () => {
+    setWithdrawing(true);
+    try {
+      await quoteService.withdrawInterest(job.id);
+      setExpressed(false);
+      setOfferPrice('');
+      setWithdrawSheetOpen(false);
+    } catch {
+      setWithdrawSheetOpen(false);
+      Alert.alert('ვერ მოხერხდა', 'ვერ გავაუქმეთ — job შეიძლება უკვე მინიჭებული იყოს, სცადე ხელახლა.');
+    } finally {
+      setWithdrawing(false);
+    }
   };
 
   // ერთი მუდმივი JSX ხე jobLoading→loaded გადასვლისას (Fabric-ის "child
@@ -553,11 +549,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               setOfferSheetOpen(true);
             }}
           >
-            {expressed ? (
-              <CheckCircle size={17} color={colors.primaryForeground} />
-            ) : (
-              <ThumbsUp size={17} color={colors.primaryForeground} />
-            )}
+            {expressed && <CheckCircle size={17} color={colors.primaryForeground} />}
             <Text style={styles.interestButtonText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
               {expressed ? (offerPrice ? `შეთავაზდა: ${offerPrice} ₾` : 'დაინტ. ხარ') : 'ფასის შეთავაზება'}
             </Text>
@@ -681,6 +673,24 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         />
         <Pressable style={styles.sheetCancelLink} onPress={() => setVerifySheetOpen(false)}>
           <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
+        </Pressable>
+      </BottomSheet>
+
+      <BottomSheet visible={withdrawSheetOpen} onClose={() => setWithdrawSheetOpen(false)}>
+        <View style={styles.cancelIcon}>
+          <X size={22} color={colors.destructive} />
+        </View>
+        <Text style={styles.sheetTitle}>დაინტერესების გაუქმება</Text>
+        <Text style={styles.sheetSubtitle}>ნამდვილად გინდა ამ job-ზე გამოხატული ინტერესის გაუქმება?</Text>
+        <Button
+          label="დიახ, გავაუქმებ"
+          loadingLabel="უქმდება..."
+          variant="destructive"
+          onPress={confirmWithdraw}
+          loading={withdrawing}
+        />
+        <Pressable style={styles.sheetCancelLink} onPress={() => setWithdrawSheetOpen(false)}>
+          <Text style={styles.sheetCancelLinkText}>არა</Text>
         </Pressable>
       </BottomSheet>
 

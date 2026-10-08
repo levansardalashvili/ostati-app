@@ -26,6 +26,7 @@ type Props = {
   loading?: boolean;
   loadingLabel?: string;
   fullWidth?: boolean;
+  compact?: boolean;
   style?: ViewStyle;
   // E2E (Maestro) support — several screens have more than one button with
   // the same label text (e.g. a menu row and its confirmation sheet both
@@ -43,6 +44,7 @@ export function Button({
   loading = false,
   loadingLabel,
   fullWidth = true,
+  compact = false,
   style,
   testID,
 }: Props) {
@@ -60,6 +62,7 @@ export function Button({
         style={({ pressed }) => [
           styles.base,
           variantStyles[variant],
+          compact && styles.compact,
           isDisabled && styles.disabled,
           pressed && !isDisabled && styles.pressed,
           style,
@@ -73,7 +76,7 @@ export function Button({
               style={styles.spinner}
             />
             <Text
-              style={[styles.label, { color: textColorFor(variant) }]}
+              style={[styles.label, compact && styles.labelCompact, { color: textColorFor(variant) }]}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.8}
@@ -83,7 +86,7 @@ export function Button({
           </>
         ) : (
           <Text
-            style={[styles.label, { color: textColorFor(variant) }]}
+            style={[styles.label, compact && styles.labelCompact, { color: textColorFor(variant) }]}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.8}
@@ -124,8 +127,15 @@ const styles = StyleSheet.create({
   fullWidth: {
     alignSelf: 'stretch',
   },
+  compact: {
+    minHeight: 40,
+    paddingHorizontal: spacing.md,
+  },
   label: {
     ...typography.bodyMedium,
+  },
+  labelCompact: {
+    ...typography.captionMedium,
   },
   spinner: {
     marginRight: spacing.sm,

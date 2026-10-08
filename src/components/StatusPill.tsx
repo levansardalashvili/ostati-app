@@ -51,8 +51,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: radius.full,
   },
   dot: {
@@ -63,5 +63,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: '700',
+    lineHeight: 14,
   },
 });

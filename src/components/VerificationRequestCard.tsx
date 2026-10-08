@@ -92,7 +92,6 @@ export function VerificationRequestCard({ profile, onUpdated, onEditProfile }: P
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.titleVerified}>ვერიფიცირებული ოსტატი</Text>
-          <Text style={styles.subtitle}>შენი ანგარიში დადასტურებულია — მომხმარებლები ხედავენ ვერიფიკაციის ბეჯს.</Text>
         </View>
       </View>
     );
