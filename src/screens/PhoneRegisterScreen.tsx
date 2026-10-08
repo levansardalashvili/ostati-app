@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
@@ -49,6 +49,14 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  // Keyboard "შემდეგი"-ის ჯაჭვი — RegisterScreen.tsx-ის იგივე ფიქსი
+  // (ველი, რომელიც ტაპის მომენტში კლავიატურის მიღმაა, ხელით ვეღარ
+  // დაიტაპება).
+  const lastNameRef = useRef<TextInput>(null);
+  const addressRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
 
   const touch = (field: string) => setTouched((t) => ({ ...t, [field]: true }));
 
@@ -163,10 +171,13 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
                   onBlur={() => touch('firstName')}
                   placeholder={role === 'provider' ? 'მაგ. გიორგი' : 'მაგ. ნინო'}
                   error={errors.firstName}
+                  returnKeyType="next"
+                  onSubmitEditing={() => lastNameRef.current?.focus()}
                 />
               </View>
               <View style={{ flex: 1 }}>
                 <TextField
+                  ref={lastNameRef}
                   label="გვარი"
                   required
                   value={lastName}
@@ -174,6 +185,8 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
                   onBlur={() => touch('lastName')}
                   placeholder={role === 'provider' ? 'მაგ. ბერიძე' : 'მაგ. სულაბერიძე'}
                   error={errors.lastName}
+                  returnKeyType="next"
+                  onSubmitEditing={() => (isProvider ? phoneRef : addressRef).current?.focus()}
                 />
               </View>
             </View>
@@ -181,6 +194,7 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
             {!isProvider && (
               <>
                 <AddressAutocompleteField
+                  ref={addressRef}
                   label="მისამართი"
                   required
                   value={address}
@@ -188,6 +202,7 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
                   onBlur={() => touch('address')}
                   placeholder="მაგ. ჭავჭავაძის 48"
                   error={errors.address}
+                  onSubmitEditing={() => phoneRef.current?.focus()}
                 />
                 <AddressDetailsField
                   address={address}
@@ -207,6 +222,7 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
                   <Text style={styles.phonePrefixText}>+995</Text>
                 </View>
                 <ScrollAwareTextInput
+                  ref={phoneRef}
                   value={phoneDigits}
                   onChangeText={(v) => setPhoneDigits(v.replace(/\D/g, '').slice(0, 9))}
                   onBlur={() => touch('phone')}
@@ -214,6 +230,8 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
                   placeholderTextColor={colors.mutedForeground}
                   keyboardType="number-pad"
                   maxLength={9}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
                   style={styles.phoneInput}
                 />
               </View>
@@ -221,6 +239,7 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
             </View>
 
             <TextField
+              ref={passwordRef}
               label="პაროლი"
               required
               value={password}
@@ -231,9 +250,12 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
               helperText={errors.password ? undefined : 'მინიმუმ 8 სიმბოლო'}
               secureTextEntry
               autoCapitalize="none"
+              returnKeyType="next"
+              onSubmitEditing={() => confirmPasswordRef.current?.focus()}
             />
             <PasswordStrengthMeter password={password} />
             <TextField
+              ref={confirmPasswordRef}
               label="გაიმეორე პაროლი"
               required
               value={confirmPassword}
@@ -243,6 +265,8 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
               error={errors.confirmPassword}
               secureTextEntry
               autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={handleSendCode}
             />
 
             <Button

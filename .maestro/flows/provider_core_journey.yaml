@@ -75,7 +75,7 @@ appId: com.ostato.app
 # --- Register a brand-new Provider account ----------------------------
 # No address field for a Provider (product rule — a Provider never enters
 # a home address at registration, only a work area later in setup).
-- evalScript: ${output.email = 'e2e.provider.' + Date.now() + '@example.com'}
+- evalScript: ${output.email = 'e2e.provider.' + Date.now() + '@gmail.com'}
 - tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*ოსტატი.*"
 
@@ -105,9 +105,15 @@ appId: com.ostato.app
 - tapOn:
     text: "Never"
     optional: true
+- evalScript: ${output.otpEmail = output.email}
+- assertVisible: ".*დაადასტურე ელ. ფოსტა.*"
+- runScript: ../scripts/fetch_otp.js
+- inputText: "${output.otp}"
 
 # --- ProviderSetup (mandatory — no skip option exists by product rule) -----
-- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- extendedWaitUntil:
+    visible: ".*შექმენი ოსტატის პროფილი.*"
+    timeout: 20000
 - tapOn: ".*აირჩიე სპეციალობა.*"
 - tapOn: ".*სანტექნიკა.*"
 - tapOn: "^არჩევა$"

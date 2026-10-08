@@ -89,7 +89,7 @@ appId: com.ostato.app
     optional: true
 
 # --- Register a brand-new Customer account ---------------------------------
-- evalScript: ${output.email = 'e2e.customer.' + Date.now() + '@example.com'}
+- evalScript: ${output.email = 'e2e.customer.' + Date.now() + '@gmail.com'}
 - tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 
@@ -102,9 +102,22 @@ appId: com.ostato.app
 - tapOn:
     id: "register-email"
 - inputText: "${output.email}"
+- pressKey: Enter
 - tapOn: ".*ჭავჭავაძის.*"
 - inputText: "Test address 1"
 - hideKeyboard
+- tapOn:
+    id: "address-details-button"
+- tapOn:
+    id: "address-details-entrance"
+- inputText: "2"
+- tapOn:
+    id: "address-details-apartment"
+- inputText: "14"
+- hideKeyboard
+- tapOn:
+    id: "address-details-done-button"
+- pressKey: Enter
 - tapOn:
     id: "register-password"
 - inputText: "TestPass123"
@@ -125,9 +138,16 @@ appId: com.ostato.app
 - tapOn:
     text: "Never"
     optional: true
+- evalScript: ${output.otpEmail = output.email}
+- assertVisible: ".*დაადასტურე ელ. ფოსტა.*"
+- runScript: ../scripts/fetch_otp.js
+- inputText: "${output.otp}"
 
 # --- CustomerSetup (no photo — nothing required, just finish) --------------
-- assertVisible: ".*პროფილის დასრულება.*"
+- extendedWaitUntil:
+    visible: ".*პროფილის დასრულება.*"
+    timeout: 20000
+- hideKeyboard
 # Anchored exact match here on purpose — ".*დასრულება.*" also matches the
 # screen's own "პროფილის დასრულება" header text (confirmed via a failed
 # run: the tap landed on the non-interactive header, not the button, and

@@ -69,7 +69,7 @@ appId: com.ostato.app
     optional: true
 
 # --- Provider registers, completes setup (no photo) ---------------------
-- evalScript: ${output.providerEmail = 'e2e.verify.provider.' + Date.now() + '@example.com'}
+- evalScript: ${output.providerEmail = 'e2e.verify.provider.' + Date.now() + '@gmail.com'}
 
 - tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*ოსტატი.*"
@@ -98,8 +98,14 @@ appId: com.ostato.app
 - tapOn:
     text: "Never"
     optional: true
+- evalScript: ${output.otpEmail = output.providerEmail}
+- assertVisible: ".*დაადასტურე ელ. ფოსტა.*"
+- runScript: ../scripts/fetch_otp.js
+- inputText: "${output.otp}"
 
-- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- extendedWaitUntil:
+    visible: ".*შექმენი ოსტატის პროფილი.*"
+    timeout: 20000
 - tapOn: ".*აირჩიე სპეციალობა.*"
 - tapOn: ".*სანტექნიკა.*"
 - tapOn: "^არჩევა$"

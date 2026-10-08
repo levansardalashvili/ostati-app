@@ -74,7 +74,7 @@ appId: com.ostato.app
     optional: true
 
 # --- Phase 1: Register a Customer ----------------------------------------
-- evalScript: ${output.email = 'e2e.notifsettings.' + Date.now() + '@example.com'}
+- evalScript: ${output.email = 'e2e.notifsettings.' + Date.now() + '@gmail.com'}
 - tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*მომხმარებელი.*"
 - tapOn:
@@ -86,9 +86,22 @@ appId: com.ostato.app
 - tapOn:
     id: "register-email"
 - inputText: "${output.email}"
+- pressKey: Enter
 - tapOn: ".*ჭავჭავაძის.*"
 - inputText: "Test address 1"
 - hideKeyboard
+- tapOn:
+    id: "address-details-button"
+- tapOn:
+    id: "address-details-entrance"
+- inputText: "2"
+- tapOn:
+    id: "address-details-apartment"
+- inputText: "14"
+- hideKeyboard
+- tapOn:
+    id: "address-details-done-button"
+- pressKey: Enter
 - tapOn:
     id: "register-password"
 - inputText: "TestPass123"
@@ -104,8 +117,15 @@ appId: com.ostato.app
 - tapOn:
     text: "Never"
     optional: true
+- evalScript: ${output.otpEmail = output.email}
+- assertVisible: ".*დაადასტურე ელ. ფოსტა.*"
+- runScript: ../scripts/fetch_otp.js
+- inputText: "${output.otp}"
 
-- assertVisible: ".*პროფილის დასრულება.*"
+- extendedWaitUntil:
+    visible: ".*პროფილის დასრულება.*"
+    timeout: 20000
+- hideKeyboard
 - tapOn:
     id: "setup-terms-checkbox"
     optional: true

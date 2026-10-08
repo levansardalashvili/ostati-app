@@ -67,7 +67,7 @@ export function AddressDetailsField({ address, value, onChange, error }: Props) 
   return (
     <>
       <Text style={styles.fieldLabel}>მისამართის დეტალები</Text>
-      <Pressable style={[styles.field, error && styles.fieldError]} onPress={openSheet}>
+      <Pressable testID="address-details-button" style={[styles.field, error && styles.fieldError]} onPress={openSheet}>
         <DoorOpen size={16} color={colors.mutedForeground} />
         <Text style={[styles.fieldText, !summary && styles.fieldPlaceholder]} numberOfLines={1}>
           {summary || 'მიუთითეთ შესასვლელი'}
@@ -97,6 +97,7 @@ export function AddressDetailsField({ address, value, onChange, error }: Props) 
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
               <TextField
+                testID="address-details-entrance"
                 label="შესასვლელი"
                 required
                 value={draft.entrance}
@@ -106,6 +107,7 @@ export function AddressDetailsField({ address, value, onChange, error }: Props) 
             </View>
             <View style={{ flex: 1 }}>
               <TextField
+                testID="address-details-apartment"
                 label="ბინა"
                 required
                 value={draft.apartment}
@@ -126,7 +128,7 @@ export function AddressDetailsField({ address, value, onChange, error }: Props) 
           />
         </View>
 
-        <Button label="დასრულება" onPress={save} disabled={!canSave} />
+        <Button testID="address-details-done-button" label="დასრულება" onPress={save} disabled={!canSave} />
       </BottomSheet>
     </>
   );

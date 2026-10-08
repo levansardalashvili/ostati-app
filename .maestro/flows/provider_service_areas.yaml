@@ -80,7 +80,7 @@ appId: com.ostato.app
 # (ბათუმი, in აჭარა — a region/district that is nowhere near the old
 # hardcoded fake Tbilisi set, so a leftover-fake-data bug would be
 # impossible to miss). --------------------------------------------------
-- evalScript: ${output.email = 'e2e.areas.' + Date.now() + '@example.com'}
+- evalScript: ${output.email = 'e2e.areas.' + Date.now() + '@gmail.com'}
 - tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*ოსტატი.*"
 
@@ -110,8 +110,14 @@ appId: com.ostato.app
 - tapOn:
     text: "Never"
     optional: true
+- evalScript: ${output.otpEmail = output.email}
+- assertVisible: ".*დაადასტურე ელ. ფოსტა.*"
+- runScript: ../scripts/fetch_otp.js
+- inputText: "${output.otp}"
 
-- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- extendedWaitUntil:
+    visible: ".*შექმენი ოსტატის პროფილი.*"
+    timeout: 20000
 - tapOn: ".*აირჩიე სპეციალობა.*"
 - tapOn: ".*ელექტროობა.*"
 - tapOn: "^არჩევა$"

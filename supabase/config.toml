@@ -229,8 +229,14 @@ enable_confirmations = true
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1m0s"
-# Number of characters used in the email OTP.
-otp_length = 8
+# Number of characters used in the email OTP. Must match OtpCodeInput's
+# fixed 6-box UI (RegisterVerifyEmailScreen/PhoneRegisterVerifyScreen) —
+# was left at the CLI's 8-digit default, so the real emailed code could
+# never fit the 6-box input. A real, previously-never-live-tested bug
+# (found via Admin API generateLink during E2E debugging): every email
+# registration was unverifiable for real users since mandatory email OTP
+# (#174) shipped.
+otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
@@ -52,6 +52,14 @@ export function RegisterScreen({ navigation, route }: Props) {
   });
   const [pass, setPass] = useState('');
   const [confirm, setConfirm] = useState('');
+  // Keyboard "შემდეგი"-ით ჯაჭვი — ამის გარეშე ველი, რომელიც კლავიატურის
+  // გახსნის შემდეგ ეკრანის ბოლოში აღმოჩნდება (მაგ. მისამართი, ელ.ფოსტის
+  // მერე), ფიზიკურად ვერ ტაპდება (ნაპოვნი რეალური ბაგი).
+  const lastNameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const addressRef = useRef<TextInput>(null);
+  const passRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [gLoading, setGLoading] = useState(false);
@@ -308,10 +316,13 @@ export function RegisterScreen({ navigation, route }: Props) {
                   onBlur={() => touch('firstName')}
                   placeholder={role === 'provider' ? 'მაგ. გიორგი' : 'მაგ. ნინო'}
                   error={errors.firstName}
+                  returnKeyType="next"
+                  onSubmitEditing={() => lastNameRef.current?.focus()}
                 />
               </View>
               <View style={{ flex: 1 }}>
                 <TextField
+                  ref={lastNameRef}
                   testID="register-last-name"
                   label="გვარი"
                   required
@@ -320,10 +331,13 @@ export function RegisterScreen({ navigation, route }: Props) {
                   onBlur={() => touch('lastName')}
                   placeholder={role === 'provider' ? 'მაგ. ბერიძე' : 'მაგ. სულაბერიძე'}
                   error={errors.lastName}
+                  returnKeyType="next"
+                  onSubmitEditing={() => emailRef.current?.focus()}
                 />
               </View>
             </View>
             <TextField
+              ref={emailRef}
               testID="register-email"
               label="ელ. ფოსტა"
               required
@@ -335,10 +349,13 @@ export function RegisterScreen({ navigation, route }: Props) {
               icon={Mail}
               keyboardType="email-address"
               autoCapitalize="none"
+              returnKeyType="next"
+              onSubmitEditing={() => (isProvider ? passRef : addressRef).current?.focus()}
             />
             {!isProvider && (
               <>
                 <AddressAutocompleteField
+                  ref={addressRef}
                   label="მისამართი"
                   required
                   value={address}
@@ -346,6 +363,7 @@ export function RegisterScreen({ navigation, route }: Props) {
                   onBlur={() => touch('address')}
                   placeholder="მაგ. ჭავჭავაძის 48"
                   error={errors.address}
+                  onSubmitEditing={() => passRef.current?.focus()}
                 />
                 <AddressDetailsField
                   address={address}
@@ -356,6 +374,7 @@ export function RegisterScreen({ navigation, route }: Props) {
               </>
             )}
             <TextField
+              ref={passRef}
               testID="register-password"
               label="პაროლი"
               required
@@ -367,9 +386,12 @@ export function RegisterScreen({ navigation, route }: Props) {
               helperText={errors.pass ? undefined : 'მინიმუმ 8 სიმბოლო'}
               secureTextEntry
               autoCapitalize="none"
+              returnKeyType="next"
+              onSubmitEditing={() => confirmRef.current?.focus()}
             />
             <PasswordStrengthMeter password={pass} />
             <TextField
+              ref={confirmRef}
               testID="register-confirm-password"
               label="გაიმეორე პაროლი"
               required
@@ -380,6 +402,8 @@ export function RegisterScreen({ navigation, route }: Props) {
               error={errors.confirm}
               secureTextEntry
               autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={handleSubmit}
             />
 
             <Button

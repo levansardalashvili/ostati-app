@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
 import { Camera } from 'lucide-react-native';
@@ -44,6 +44,9 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  // Keyboard "შემდეგი"-ის ჯაჭვი — RegisterScreen.tsx-ის იგივე ფიქსი.
+  const lastNameRef = useRef<TextInput>(null);
+  const addressRef = useRef<TextInput>(null);
 
   const firstNameErr = !firstName.trim() ? 'ეს ველი სავალდებულოა' : '';
   const lastNameErr = !lastName.trim() ? 'ეს ველი სავალდებულოა' : '';
@@ -102,13 +105,37 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
           <View style={{ gap: spacing.md }}>
             <View style={styles.nameRow}>
               <View style={{ flex: 1 }}>
-                <TextField testID="customer-edit-first-name" label="სახელი" value={firstName} onChangeText={setFirstName} error={firstNameErr} />
+                <TextField
+                  testID="customer-edit-first-name"
+                  label="სახელი"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  error={firstNameErr}
+                  returnKeyType="next"
+                  onSubmitEditing={() => lastNameRef.current?.focus()}
+                />
               </View>
               <View style={{ flex: 1 }}>
-                <TextField testID="customer-edit-last-name" label="გვარი" value={lastName} onChangeText={setLastName} error={lastNameErr} />
+                <TextField
+                  ref={lastNameRef}
+                  testID="customer-edit-last-name"
+                  label="გვარი"
+                  value={lastName}
+                  onChangeText={setLastName}
+                  error={lastNameErr}
+                  returnKeyType="next"
+                  onSubmitEditing={() => addressRef.current?.focus()}
+                />
               </View>
             </View>
-            <TextField label="მისამართი" value={address} onChangeText={setAddress} placeholder="ქ., არეალი" />
+            <TextField
+              ref={addressRef}
+              label="მისამართი"
+              value={address}
+              onChangeText={setAddress}
+              placeholder="ქ., არეალი"
+              returnKeyType="done"
+            />
             <AddressDetailsField address={address} value={addressDetails} onChange={setAddressDetails} />
             {(!!profile.email || !!profile.phone) && (
               <View>

@@ -65,7 +65,7 @@ appId: com.ostato.app
     optional: true
 
 # --- Phase 1: Customer registers, posts a job -------------------------
-- evalScript: ${output.customerEmail = 'e2e.report.customer.' + Date.now() + '@example.com'}
+- evalScript: ${output.customerEmail = 'e2e.report.customer.' + Date.now() + '@gmail.com'}
 - evalScript: ${output.providerEmail = 'verified.provider@e2e.example.com'}
 - evalScript: ${output.jobMarker = 'ReportJobE2E' + Date.now()}
 
@@ -80,9 +80,22 @@ appId: com.ostato.app
 - tapOn:
     id: "register-email"
 - inputText: "${output.customerEmail}"
+- pressKey: Enter
 - tapOn: ".*ჭავჭავაძის.*"
 - inputText: "Test address 1"
 - hideKeyboard
+- tapOn:
+    id: "address-details-button"
+- tapOn:
+    id: "address-details-entrance"
+- inputText: "2"
+- tapOn:
+    id: "address-details-apartment"
+- inputText: "14"
+- hideKeyboard
+- tapOn:
+    id: "address-details-done-button"
+- pressKey: Enter
 - tapOn:
     id: "register-password"
 - inputText: "TestPass123"
@@ -98,8 +111,15 @@ appId: com.ostato.app
 - tapOn:
     text: "Never"
     optional: true
+- evalScript: ${output.otpEmail = output.customerEmail}
+- assertVisible: ".*დაადასტურე ელ. ფოსტა.*"
+- runScript: ../scripts/fetch_otp.js
+- inputText: "${output.otp}"
 
-- assertVisible: ".*პროფილის დასრულება.*"
+- extendedWaitUntil:
+    visible: ".*პროფილის დასრულება.*"
+    timeout: 20000
+- hideKeyboard
 - tapOn:
     id: "setup-terms-checkbox"
     optional: true

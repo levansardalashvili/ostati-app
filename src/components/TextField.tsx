@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   KeyboardTypeOptions,
   Pressable,
+  ReturnKeyTypeOptions,
   StyleSheet,
   Text,
   TextInput,
@@ -36,12 +37,19 @@ type Props = {
   // Task — წითელი "*" ველის ლეიბლის გვერდით, სავალდებულო ველების
   // მკაფიო ვიზუალური მონიშვნისთვის (მომხმარებლის მოთხოვნით).
   required?: boolean;
+  // Keyboard "შემდეგი"-ით შემდეგ ველზე გადასვლა — ამის გარეშე, თუ
+  // შემდეგი ველი კლავიატურის მიღმა აღმოჩნდება (ეკრანის ბოლოში),
+  // მომხმარებელს არანაირი გზა არ რჩება მასთან მისასვლელად (ტაპი
+  // შეუძლებელია ჰიდირებულ ელემენტზე) — ნაპოვნი რეალური ბაგი
+  // რეგისტრაციის ფორმაში (ელ.ფოსტის მერე მისამართის ველი).
+  returnKeyType?: ReturnKeyTypeOptions;
+  onSubmitEditing?: () => void;
 };
 
 // საერთო ტექსტური ველი — label, არასავალდებულო წამყვანი აიქონი,
 // პაროლის ჩვენება/დამალვა, error/helper ტექსტი (app-states.md-ის
 // ვალიდაციის სტილის მიხედვით).
-export function TextField({
+export const TextField = React.forwardRef<TextInput, Props>(function TextField({
   label,
   value,
   onChangeText,
@@ -56,7 +64,9 @@ export function TextField({
   maxLength,
   testID,
   required,
-}: Props) {
+  returnKeyType,
+  onSubmitEditing,
+}, forwardedRef) {
   const [hidden, setHidden] = useState(!!secureTextEntry);
   const { ref: scrollRef, onFocus } = useScrollIntoViewOnFocus();
 
@@ -73,7 +83,11 @@ export function TextField({
           </View>
         )}
         <TextInput
-          ref={scrollRef}
+          ref={(node) => {
+            scrollRef.current = node;
+            if (typeof forwardedRef === 'function') forwardedRef(node);
+            else if (forwardedRef) (forwardedRef as React.MutableRefObject<TextInput | null>).current = node;
+          }}
           testID={testID}
           value={value}
           onChangeText={onChangeText}
@@ -85,6 +99,9 @@ export function TextField({
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           maxLength={maxLength}
+          returnKeyType={returnKeyType}
+          onSubmitEditing={onSubmitEditing}
+          blurOnSubmit={!onSubmitEditing}
           style={[
             styles.input,
             Icon ? styles.inputWithLeftIcon : null,
@@ -112,7 +129,7 @@ export function TextField({
       ) : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   label: {

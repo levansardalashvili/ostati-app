@@ -90,7 +90,7 @@ appId: com.ostato.app
 #   adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Pictures/e2e_test_photo.png
 
 # --- Phase 1: Register a Provider ----------------------------------------
-- evalScript: ${output.email = 'e2e.extras.' + Date.now() + '@example.com'}
+- evalScript: ${output.email = 'e2e.extras.' + Date.now() + '@gmail.com'}
 - tapOn: ".*რეგისტრაცია.*"
 - tapOn: ".*ოსტატი.*"
 - tapOn:
@@ -118,10 +118,16 @@ appId: com.ostato.app
 - tapOn:
     text: "Never"
     optional: true
+- evalScript: ${output.otpEmail = output.email}
+- assertVisible: ".*დაადასტურე ელ. ფოსტა.*"
+- runScript: ../scripts/fetch_otp.js
+- inputText: "${output.otp}"
 
 # --- Phase 2: ProviderSetupScreen — multi-select specialty + custom
 # "სხვა" entry + sqm price + profile photo + area. ------------------------
-- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- extendedWaitUntil:
+    visible: ".*შექმენი ოსტატის პროფილი.*"
+    timeout: 20000
 - tapOn: ".*აირჩიე სპეციალობა.*"
 - tapOn: ".*სანტექნიკა.*"
 - tapOn: ".*შეღებვა.*"

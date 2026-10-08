@@ -79,6 +79,8 @@ type Props = {
   error?: string;
   // TextField.tsx-ის იგივე პრინციპი — წითელი "*" ლეიბლის გვერდით.
   required?: boolean;
+  // TextField.tsx-ის იგივე "შემდეგი"-ით ჯაჭვის პრინციპი.
+  onSubmitEditing?: () => void;
 };
 
 const MIN_QUERY_LEN = 3;
@@ -97,7 +99,10 @@ const BLUR_HIDE_DELAY_MS = 200;
 // შენიშვნა: Nominatim-ის უფასო public API-ს აქვს rate-limit (~1 req/sec) —
 // მასშტაბის ზრდისას განსახილველია საკუთარი Nominatim instance ან ფასიანი
 // providers (Google Places).
-export function AddressAutocompleteField({ label, value, onChangeText, onSelect, onBlur, placeholder, error, required }: Props) {
+export const AddressAutocompleteField = React.forwardRef<TextInput, Props>(function AddressAutocompleteField(
+  { label, value, onChangeText, onSelect, onBlur, placeholder, error, required, onSubmitEditing },
+  forwardedRef,
+) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [showList, setShowList] = useState(false);
@@ -238,13 +243,20 @@ export function AddressAutocompleteField({ label, value, onChangeText, onSelect,
             <MapPin size={15} color={colors.mutedForeground} />
           </View>
           <TextInput
-            ref={scrollRef}
+            ref={(node) => {
+              scrollRef.current = node;
+              if (typeof forwardedRef === 'function') forwardedRef(node);
+              else if (forwardedRef) (forwardedRef as React.MutableRefObject<TextInput | null>).current = node;
+            }}
             value={value}
             onChangeText={handleChangeText}
             onFocus={handleFocus}
             onBlur={handleBlur}
             placeholder={placeholder}
             placeholderTextColor={colors.mutedForeground}
+            returnKeyType={onSubmitEditing ? 'next' : undefined}
+            onSubmitEditing={onSubmitEditing}
+            blurOnSubmit={!onSubmitEditing}
             style={[styles.input, styles.inputWithLeftIcon, loading ? styles.inputWithRightIcon : null, error ? styles.inputError : null]}
           />
           {loading && (
@@ -294,7 +306,7 @@ export function AddressAutocompleteField({ label, value, onChangeText, onSelect,
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: {

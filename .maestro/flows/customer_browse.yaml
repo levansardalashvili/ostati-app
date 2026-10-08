@@ -71,8 +71,8 @@ appId: com.ostato.app
 
 # --- Phase 1: Provider registers (just needs a real provider_profiles row,
 # under the "ელექტრიკოსი"/"ელექტროობა" specialty/category) -------------
-- evalScript: ${output.providerEmail = 'e2e.browse.provider.' + Date.now() + '@example.com'}
-- evalScript: ${output.customerEmail = 'e2e.browse.customer.' + Date.now() + '@example.com'}
+- evalScript: ${output.providerEmail = 'e2e.browse.provider.' + Date.now() + '@gmail.com'}
+- evalScript: ${output.customerEmail = 'e2e.browse.customer.' + Date.now() + '@gmail.com'}
 - evalScript: ${output.providerFirstName = 'BrowseProviderE2E' + Date.now()}
 
 - tapOn: ".*რეგისტრაცია.*"
@@ -102,8 +102,14 @@ appId: com.ostato.app
 - tapOn:
     text: "Never"
     optional: true
+- evalScript: ${output.otpEmail = output.providerEmail}
+- assertVisible: ".*დაადასტურე ელ. ფოსტა.*"
+- runScript: ../scripts/fetch_otp.js
+- inputText: "${output.otp}"
 
-- assertVisible: ".*შექმენი ოსტატის პროფილი.*"
+- extendedWaitUntil:
+    visible: ".*შექმენი ოსტატის პროფილი.*"
+    timeout: 20000
 - tapOn: ".*აირჩიე სპეციალობა.*"
 - tapOn: ".*ელექტროობა.*"
 - tapOn: "^არჩევა$"
@@ -144,9 +150,22 @@ appId: com.ostato.app
 - tapOn:
     id: "register-email"
 - inputText: "${output.customerEmail}"
+- pressKey: Enter
 - tapOn: ".*ჭავჭავაძის.*"
 - inputText: "Test address 1"
 - hideKeyboard
+- tapOn:
+    id: "address-details-button"
+- tapOn:
+    id: "address-details-entrance"
+- inputText: "2"
+- tapOn:
+    id: "address-details-apartment"
+- inputText: "14"
+- hideKeyboard
+- tapOn:
+    id: "address-details-done-button"
+- pressKey: Enter
 - tapOn:
     id: "register-password"
 - inputText: "TestPass123"
@@ -162,8 +181,15 @@ appId: com.ostato.app
 - tapOn:
     text: "Never"
     optional: true
+- evalScript: ${output.otpEmail = output.customerEmail}
+- assertVisible: ".*დაადასტურე ელ. ფოსტა.*"
+- runScript: ../scripts/fetch_otp.js
+- inputText: "${output.otp}"
 
-- assertVisible: ".*პროფილის დასრულება.*"
+- extendedWaitUntil:
+    visible: ".*პროფილის დასრულება.*"
+    timeout: 20000
+- hideKeyboard
 - tapOn:
     id: "setup-terms-checkbox"
     optional: true
