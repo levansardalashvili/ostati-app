@@ -184,6 +184,12 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
       portfolio: uploadedPortfolio,
       sqmPrices,
     });
+    // 0155 — the save may have moved a verified profile back to `pending`
+    const uidAfter = authService.getCurrentUser()?.uid;
+    if (uidAfter) {
+      const fresh = await userService.getProviderProfileRecord(uidAfter).catch(() => null);
+      if (fresh) setProfile({ verificationStatus: fresh.verificationStatus });
+    }
     setIsSaving(false);
     navigation.goBack();
   };
@@ -201,6 +207,13 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
           style={styles.body}
           contentContainerStyle={styles.bodyContent}
         >
+        {profile.verificationStatus === 'verified' && (
+          // 0155 — photo/name changes on a verified profile send it back to review
+          <InlineBanner
+            type="warning"
+            msg="ფოტოს ან სახელის შეცვლის შემდეგ ვერიფიკაციას ადმინისტრაცია ხელახლა გადაამოწმებს — მანამდე ფასს ვერ შესთავაზებ."
+          />
+        )}
         <View style={styles.avatarRow}>
           <View style={styles.avatarWrap}>
             <Avatar

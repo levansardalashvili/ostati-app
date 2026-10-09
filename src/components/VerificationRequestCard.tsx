@@ -77,8 +77,16 @@ export function VerificationRequestCard({ profile, onUpdated, onEditProfile }: P
       } else {
         onUpdated({ verificationStatus: 'pending', verificationRequestedAt: new Date().toISOString(), verificationRejectionReason: null });
       }
-    } catch {
-      Alert.alert('ვერ მოხერხდა', 'ვერიფიკაციის მოთხოვნა ვერ გაიგზავნა — სცადე თავიდან.');
+    } catch (e) {
+      const msg = (e as { message?: string } | null)?.message ?? '';
+      Alert.alert(
+        'ვერ მოხერხდა',
+        msg.includes('PROFILE_INCOMPLETE')
+          ? 'ჯერ შეავსე პროფილი: სახელი, გვარი, სპეციალობა, სამუშაო არეალი და პროფილის ფოტო.'
+          : msg.includes('INVALID_SELFIE')
+            ? 'სელფი ვერ აიტვირთა — გადაიღე ხელახლა და სცადე თავიდან.'
+            : 'ვერიფიკაციის მოთხოვნა ვერ გაიგზავნა — სცადე თავიდან.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -106,7 +114,9 @@ export function VerificationRequestCard({ profile, onUpdated, onEditProfile }: P
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.titlePending}>ვერიფიკაცია განხილვის პროცესშია</Text>
-            <Text style={styles.subtitle}>მოთხოვნა გაგზავნილია — შედეგს ვაცნობებთ.</Text>
+            <Text style={styles.subtitle}>
+              მოთხოვნა გაგზავნილია — შედეგს ვაცნობებთ. მანამდე ფასს ვერ შესთავაზებ.
+            </Text>
           </View>
         </View>
         <Button label="განხილვის პროცესშია" onPress={() => {}} disabled variant="outline" />
@@ -132,7 +142,7 @@ export function VerificationRequestCard({ profile, onUpdated, onEditProfile }: P
           <Text style={styles.subtitle}>
             {status === 'rejected'
               ? 'შეგიძლია ხელახლა გააგზავნო მოთხოვნა.'
-              : 'ვერიფიკაცია ზრდის მომხმარებლების ნდობას შენს პროფილში.'}
+              : 'ვერიფიკაციის გარეშე ფასს ვერ შესთავაზებ და მომხმარებლები ვერ მოგწერენ — გაიარე ახლავე.'}
           </Text>
         </View>
       </View>
