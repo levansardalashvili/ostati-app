@@ -15,6 +15,7 @@ import { SuccessCheck } from '../components/SuccessCheck';
 import { Reveal } from '../components/Reveal';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService } from '../services/authService';
+import { reviewService } from '../services/reviewService';
 import { storageService } from '../services/storageService';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -34,7 +35,7 @@ const STAR_LABELS = ['', 'ძალიან ცუდი', 'ცუდი', 'ს
 // გაგზავნის შემდეგ Customer პირდაპირ Customer Home-ზე ბრუნდება
 // (`navigation.reset`), არა CustomerJobDetailScreen-ზე უკან.
 export function RatingScreen({ navigation, route }: Props) {
-  const { jobId, providerName, providerInitials, providerColor, onRate } = route.params;
+  const { jobId, providerName, providerInitials, providerColor, providerId, onRate } = route.params;
 
   const [stars, setStars] = useState(0);
   const [review, setReview] = useState('');
@@ -103,7 +104,15 @@ export function RatingScreen({ navigation, route }: Props) {
       uploadedPhotos = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
     }
     try {
-      await onRate?.({ stars, review, chips, photos: uploadedPhotos.length > 0 ? uploadedPhotos : undefined });
+      const data = { stars, review, chips, photos: uploadedPhotos.length > 0 ? uploadedPhotos : undefined };
+      if (onRate) {
+        await onRate(data);
+      } else {
+        // Opened by the launch-time pending-rating check (CustomerTabs), not
+        // from CustomerJobDetail — submit directly.
+        if (!uid || !providerId) throw new Error('rating: missing user or provider');
+        await reviewService.submitReview(jobId, uid, providerId, data);
+      }
     } catch {
       // ჩაწერა ვერ მოხერხდა — "მადლობას" არ ვაჩვენებთ, შეფასება უნდა გაიგზავნოს თავიდან
       // უკვე ატვირთული ფოტოები state-ში ვინახავთ — ხელახალ ცდაზე თავიდან აღარ აიტვირთება

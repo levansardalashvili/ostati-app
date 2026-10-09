@@ -143,6 +143,9 @@ export type RootStackParamList = {
     providerName: string;
     providerInitials: string;
     providerColor: string;
+    // onRate-ის გარეშე (აპის გახსნისას გაუგზავნელ შეფასებაზე დაბრუნება)
+    // RatingScreen თავად წერს შეფასებას ამ id-ით
+    providerId?: string;
     // უნდა დაარეჯექთოს, თუ შეფასება ვერ ჩაიწერა — RatingScreen მაშინ შეცდომას აჩვენებს
     onRate?: (data: RatingData) => void | Promise<void>;
   };

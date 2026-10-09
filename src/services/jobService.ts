@@ -200,6 +200,9 @@ export interface JobService {
   // "ეტაპი B" (Provider-ის Job Feed, ღია job-ების საჯარო წაკითხვა).
   createCustomerJob(customerId: string, input: NewJobPostInput): Promise<CustomerJob>;
   listMyJobPosts(customerId: string): Promise<CustomerJob[]>;
+  // The customer's oldest job confirmed but not yet rated — rating is
+  // mandatory, so the app reopens RatingScreen for it on every launch.
+  getPendingRatingJob(customerId: string): Promise<{ id: string; providerId: string; providerName: string } | null>;
   // onlyMine — მხოლოდ ოსტატის საკუთარი სპეციალობების კატეგორიები (0098)
   getOpenProviderFeedPosts(onlyMine?: boolean): Promise<FeedJob[]>;
 
@@ -375,6 +378,20 @@ export const jobService: JobService = {
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data as JobPostRow[]).map(fromJobPostRow);
+  },
+  async getPendingRatingJob(customerId) {
+    const { data, error } = await supabase
+      .from('job_posts')
+      .select('id, provider_id, provider_name')
+      .eq('customer_id', customerId)
+      .eq('status', 'confirmed_awaiting_rating')
+      .not('provider_id', 'is', null)
+      .order('updated_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return { id: data.id, providerId: data.provider_id, providerName: data.provider_name ?? 'ოსტატი' };
   },
   async getOpenProviderFeedPosts(onlyMine = false) {
     // Third hardening pass, priority 1 — `get_open_provider_feed()` RPC

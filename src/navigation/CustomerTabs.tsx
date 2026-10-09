@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { FilePlus2, Home, MessageCircle, User } from 'lucide-react-native';
 import { CustomerHomeScreen } from '../screens/CustomerHomeScreen';
 import { CustomerJobsScreen } from '../screens/CustomerJobsScreen';
@@ -12,8 +14,9 @@ import { PopBadge } from '../components/PopBadge';
 import { colors, radius } from '../theme';
 import { authService } from '../services/authService';
 import { chatService } from '../services/chatService';
+import { jobService } from '../services/jobService';
 import { TabBarScrollProvider } from '../state/TabBarScrollContext';
-import type { CustomerTabParamList } from './types';
+import type { CustomerTabParamList, RootStackParamList } from './types';
 
 const Tab = createBottomTabNavigator<CustomerTabParamList>();
 
@@ -31,6 +34,37 @@ export function CustomerTabs() {
     if (!uid) return;
     return chatService.subscribeToUnreadCount(uid, 'customer', setUnreadChats);
   }, []);
+
+  // Rating is mandatory: a confirmed-but-unrated job reopens RatingScreen on
+  // every launch / login / return to foreground until the review is sent
+  // (covers app kill mid-rating and the 72h auto-confirm path).
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  useEffect(() => {
+    const check = () => {
+      const uid = authService.getCurrentUser()?.uid;
+      if (!uid) return;
+      jobService
+        .getPendingRatingJob(uid)
+        .then((job) => {
+          if (!job) return;
+          const state = navigation.getState();
+          if (state?.routes[state.index]?.name === 'RatingScreen') return;
+          navigation.navigate('RatingScreen', {
+            jobId: job.id,
+            providerId: job.providerId,
+            providerName: job.providerName,
+            providerInitials: job.providerName.charAt(0).toUpperCase() || 'O',
+            providerColor: colors.primary,
+          });
+        })
+        .catch(() => {});
+    };
+    check();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') check();
+    });
+    return () => sub.remove();
+  }, [navigation]);
 
   return (
     // Task — scroll-ზე დაფუძნებული ოდნავ-დიდდება/პატარავდება ეფექტი
