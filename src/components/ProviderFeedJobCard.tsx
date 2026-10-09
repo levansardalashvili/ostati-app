@@ -1,8 +1,8 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Camera, Check, Clock, MapPin } from 'lucide-react-native';
-import { Button } from './Button';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Camera, Check, ChevronRight, Clock, MapPin, MessageCircle } from 'lucide-react-native';
 import { CategoryIcon } from './CategoryIcon';
+import { usePressScale } from '../utils/usePressScale';
 import { Skeleton } from './Skeleton';
 import { colors, radius, spacing, typography } from '../theme';
 import { CATEGORIES } from '../data/categories';
@@ -23,10 +23,11 @@ type Props = {
 // ჯერ სამუშაოს სრული დეტალები/აღწერა/ფოტოები უნდა ნახოს ("დეტ. ნახვა"),
 // ინტერესის/ფასის გაგზავნა კი მხოლოდ Job Detail-ის ეკრანზეა შესაძლებელი
 // (ქვედა footer, "დაინტერესება" ღილაკი). `sent`-ის შემდეგ კვლავ ჩანს
-// "ჩატის გახსნა" (ეს არ იცვლება — ცალკე, დასრულებული ინტერესის
+// "მიწერა" (Customer-ის ProviderCard-ის იგივე ზოლი — ცალკე, დასრულებული ინტერესის
 // შემდგომი მოქმედებაა).
 export function ProviderFeedJobCard({ job, sent, onDetail, onChat }: Props) {
   const category = CATEGORIES.find((c) => c.id === job.category) ?? CATEGORIES[0];
+  const message = usePressScale();
 
   return (
     <View style={styles.jobCard}>
@@ -75,18 +76,28 @@ export function ProviderFeedJobCard({ job, sent, onDetail, onChat }: Props) {
           )}
         </View>
 
-        {/* Provider-ს არ უნდა დაინახოს, რამდენი კონკურენტი-ოსტატია
-            დაინტერესებული ამ job-ზე — "interestedCount" აქაც არ ჩანს. */}
-        <View style={styles.jobActionRow}>
-          <View style={styles.actionButton}>
-            <Button label="დეტალების ნახვა" variant="outline" compact onPress={onDetail} />
-          </View>
-          {sent && (
-            <View style={styles.actionButton}>
-              <Button label="ჩატის გახსნა" compact onPress={onChat} />
-            </View>
-          )}
-        </View>
+      </View>
+
+      {/* Same action row as the Customer's ProviderCard: "დეტალების ნახვა ›"
+          link + blue "მიწერა" pill (the pill only after interest was sent). */}
+      <View style={styles.jobActionRow}>
+        <Pressable style={styles.detailLink} onPress={onDetail} hitSlop={6}>
+          <Text style={styles.detailLinkText}>დეტალების ნახვა</Text>
+          <ChevronRight size={12} color={colors.primary} />
+        </Pressable>
+        {sent && (
+          <Animated.View style={[styles.messageButtonWrap, { transform: [{ scale: message.scale }] }]}>
+            <Pressable
+              style={styles.messageButton}
+              onPress={onChat}
+              onPressIn={message.onPressIn}
+              onPressOut={message.onPressOut}
+            >
+              <MessageCircle size={14} color={colors.primaryForeground} />
+              <Text style={styles.messageButtonText}>მიწერა</Text>
+            </Pressable>
+          </Animated.View>
+        )}
       </View>
 
       {sent && (
@@ -186,12 +197,45 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
   },
+  // Mirrors ProviderCard's action row (Customer side).
   jobActionRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
   },
-  actionButton: {
+  detailLink: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  detailLinkText: {
+    ...typography.small,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  messageButtonWrap: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  messageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm - 2,
+  },
+  messageButtonText: {
+    ...typography.small,
+    color: colors.primaryForeground,
+    fontWeight: '700',
   },
   sentStrip: {
     flexDirection: 'row',
