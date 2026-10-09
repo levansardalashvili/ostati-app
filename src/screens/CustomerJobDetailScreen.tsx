@@ -208,6 +208,18 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   // submitProblem-იც იყენებენ — `sharedStatus` თავად უკვე ასახავს.
   const effectiveStatus: JobStatus = sharedStatus;
   const showCompletionConfirmCard = effectiveStatus === 'awaiting_customer_confirmation';
+  // 0149 — Customer can mark an active job done once its scheduled start
+  // (Georgia time) has passed; the server re-checks the same rule.
+  const scheduledStart = job.preferredDate
+    ? new Date(
+        `${job.preferredDate}T${
+          job.timeSlot && job.timeSlot !== 'flexible' ? job.timeSlot.split('-')[0].padStart(2, '0') : '00'
+        }:00:00+04:00`,
+      )
+    : null;
+  const canMarkCompleted =
+    effectiveStatus === 'active' && !!job.providerId && (!scheduledStart || Date.now() >= scheduledStart.getTime());
+  const [markCompletedOpen, setMarkCompletedOpen] = useState(false);
 
   // supabase/migrations/0079 — opportunistic, fire-and-forget auto-expiry
   // check (ProviderJobDetailScreen-ის იგივე ეფექტის სარკე). RPC-ივე
@@ -355,6 +367,24 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       openRating();
     } catch {
       Alert.alert('ვერ მოხერხდა', 'დასრულების დადასტურება ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setConfirming(false);
+    }
+  };
+  const markCompleted = async () => {
+    if (confirming) return;
+    setConfirming(true);
+    try {
+      await jobService.customerMarkCompleted(job.id);
+      setStatus(job.id, 'confirmed_awaiting_rating');
+      setMarkCompletedOpen(false);
+      openRating();
+    } catch (e) {
+      const early = ((e as { message?: string } | null)?.message ?? '').includes('SCHEDULED_TIME_NOT_REACHED');
+      Alert.alert(
+        'ვერ მოხერხდა',
+        early ? 'სამუშაოს დაგეგმილი დრო ჯერ არ დამდგარა.' : 'დასრულების მონიშვნა ვერ მოხერხდა — სცადე თავიდან.',
+      );
     } finally {
       setConfirming(false);
     }
@@ -543,6 +573,24 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
               loadingLabel="იხსნება..."
               onPress={reopenJob}
               loading={reopening}
+            />
+          </View>
+        )}
+
+        {canMarkCompleted && (
+          <View style={styles.completionCard}>
+            <View style={styles.completionHeaderRow}>
+              <Clock size={15} color={colors.warning} />
+              <Text style={styles.completionTitle}>სამუშაო უკვე შესრულდა?</Text>
+            </View>
+            <Text style={styles.completionSubtitle}>
+              თუ ოსტატმა სამუშაო შეასრულა, მაგრამ დასრულებულად არ მონიშნა, შეგიძლიათ თავად მონიშნოთ.
+            </Text>
+            <Button
+              testID="mark-completed-button"
+              label="სამუშაო შესრულდა"
+              variant="outline"
+              onPress={() => setMarkCompletedOpen(true)}
             />
           </View>
         )}
@@ -888,6 +936,23 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
             setCancelReason('');
           }}
         >
+          <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
+        </Pressable>
+      </BottomSheet>
+
+      <BottomSheet visible={markCompletedOpen} onClose={() => setMarkCompletedOpen(false)}>
+        <Text style={styles.sheetTitle}>სამუშაო შესრულდა?</Text>
+        <Text style={styles.sheetSubtitle}>
+          დაადასტურეთ, რომ ოსტატმა სამუშაო შეასრულა — შემდეგ საჭირო იქნება მისი შეფასება.
+        </Text>
+        <Button
+          testID="mark-completed-confirm"
+          label="დიახ, შესრულდა"
+          loadingLabel="დადასტურდება..."
+          onPress={markCompleted}
+          loading={confirming}
+        />
+        <Pressable style={styles.sheetCancelLink} onPress={() => setMarkCompletedOpen(false)}>
           <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
         </Pressable>
       </BottomSheet>

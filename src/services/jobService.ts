@@ -236,6 +236,9 @@ export interface JobService {
   selectProvider(jobId: string, providerId: string): Promise<void>;
   providerRequestCompletion(jobId: string): Promise<void>;
   customerConfirmCompletion(jobId: string): Promise<void>;
+  // 0149 — Customer marks an active job done after its scheduled start
+  // (when the Provider never pressed "დავასრულე") → confirmed_awaiting_rating.
+  customerMarkCompleted(jobId: string): Promise<void>;
   customerReportProblem(jobId: string, reason: string): Promise<void>;
 
   // Job cancellation — supabase/migrations/0032_job_cancellation.sql,
@@ -486,6 +489,10 @@ export const jobService: JobService = {
   },
   async customerConfirmCompletion(jobId) {
     const { error } = await supabase.rpc('customer_confirm_completion', { p_job_id: jobId });
+    if (error) throw error;
+  },
+  async customerMarkCompleted(jobId) {
+    const { error } = await supabase.rpc('customer_mark_completed', { p_job_id: jobId });
     if (error) throw error;
   },
   async customerReportProblem(jobId, reason) {
