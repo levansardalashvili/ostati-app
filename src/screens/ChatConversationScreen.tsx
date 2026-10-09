@@ -417,6 +417,9 @@ export function ChatConversationScreen({ navigation, route }: Props) {
   const composerLocked = awaitingProviderResponse || blockedByMe;
   const [imgPreview, setImgPreview] = useState<string | null>(null);
   const [offerSheetOpen, setOfferSheetOpen] = useState(false);
+  // Accepting a chat offer also selects this Provider (respond_to_chat_offer
+  // -> assign_job_provider) and closes the job to everyone else — confirm first.
+  const [acceptOfferId, setAcceptOfferId] = useState<string | null>(null);
   const [offerAmount, setOfferAmount] = useState('');
   const [offerComment, setOfferComment] = useState('');
   const scrollRef = useRef<ScrollView>(null);
@@ -588,6 +591,8 @@ if (
       retryingRef.current.delete(id);
     }
   };
+
+  const acceptOffer = acceptOfferId ? messages.find((m) => m.id === acceptOfferId) : undefined;
 
   const respondToOffer = (id: string, offerStatus: 'accepted' | 'declined') => {
     const previous = messages.find((m) => m.id === id)?.offerStatus;
@@ -829,7 +834,7 @@ if (
 
                       {canRespond ? (
                         <View style={styles.offerActionsRow}>
-                          <Pressable style={styles.offerAcceptButton} onPress={() => respondToOffer(m.id, 'accepted')}>
+                          <Pressable style={styles.offerAcceptButton} onPress={() => setAcceptOfferId(m.id)}>
                             <Text style={styles.offerAcceptText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                               დათანხმება
                             </Text>
@@ -1134,6 +1139,27 @@ if (
           onPress={sendOffer}
           disabled={!offerAmount || parseInt(offerAmount, 10) <= 0}
         />
+      </BottomSheet>
+
+      <BottomSheet visible={!!acceptOfferId} onClose={() => setAcceptOfferId(null)}>
+        <Text style={styles.sheetTitle}>
+          ფასზე დათანხმება{acceptOffer?.amount ? `: ${acceptOffer.amount} ₾` : ''}
+        </Text>
+        <Text style={styles.sheetSubtitle}>
+          {acceptOffer?.jobId
+            ? 'დათანხმებით ამ ოსტატს აირჩევთ სამუშაოსთვის — განცხადება სხვა ოსტატებისთვის დაიხურება.'
+            : 'დარწმუნებული ხართ, რომ ეთანხმებით ამ ფასს?'}
+        </Text>
+        <Button
+          testID="accept-offer-confirm"
+          label="დათანხმება"
+          onPress={() => {
+            const id = acceptOfferId;
+            setAcceptOfferId(null);
+            if (id) respondToOffer(id, 'accepted');
+          }}
+        />
+        <Button label="გაუქმება" variant="text" onPress={() => setAcceptOfferId(null)} />
       </BottomSheet>
 
       <BottomSheet

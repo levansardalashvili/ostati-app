@@ -85,6 +85,9 @@ export function getPublishErrorMessage(err: unknown): string {
   if (message.includes('DATE_TIME_REQUIRED')) {
     return 'სასურველი თარიღი და დრო სავალდებულოა — აირჩიე ორივე და სცადე თავიდან.';
   }
+  if (message.includes('DATE_IN_PAST')) {
+    return 'სასურველი თარიღი წარსულშია — აირჩიე დღევანდელი ან მომავალი თარიღი.';
+  }
   if (message.includes('exact address is required')) {
     return 'მისამართი სავალდებულოა — შეავსე ველი და სცადე თავიდან.';
   }

@@ -253,6 +253,8 @@ appId: com.ostato.app
 - tapOn: ".*მიწერა.*"
 - assertVisible: ".*180 ₾.*"
 - tapOn: "^დათანხმება$"
+- tapOn:
+    id: "accept-offer-confirm"
 - assertVisible: ".*ფასი შეთანხმებულია.*"
 
 - back
