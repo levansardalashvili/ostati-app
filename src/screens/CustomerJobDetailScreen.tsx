@@ -3,6 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Briefcase,
+  CalendarClock,
   Check,
   Clock,
   Flag,
@@ -19,8 +20,12 @@ import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
+import { formatPickedDate, toIsoDateString } from '../components/CalendarPicker';
 import { CategoryIcon } from '../components/CategoryIcon';
+import { DatePickerField } from '../components/DatePickerField';
 import { ReportJobSheet } from '../components/ReportJobSheet';
+import { TimePickerField } from '../components/TimePickerField';
+import { timeSlotLabel } from '../data/timeSlots';
 import { SecureStorageImage } from '../components/SecureStorageImage';
 import { Skeleton } from '../components/Skeleton';
 import { StatusPill, type JobStatus } from '../components/StatusPill';
@@ -220,6 +225,29 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const canMarkCompleted =
     effectiveStatus === 'active' && !!job.providerId && (!scheduledStart || Date.now() >= scheduledStart.getTime());
   const [markCompletedOpen, setMarkCompletedOpen] = useState(false);
+
+  // 0150 — change date/time of an active job (Provider gets notified).
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [newDate, setNewDate] = useState<Date | null>(null);
+  const [newTime, setNewTime] = useState('');
+  const [newTimeOpen, setNewTimeOpen] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
+  const reschedule = async () => {
+    if (!newDate || !newTime || rescheduling) return;
+    setRescheduling(true);
+    const iso = toIsoDateString(newDate);
+    const label = `${formatPickedDate(newDate)} ${timeSlotLabel(newTime)}`.trim();
+    try {
+      await jobService.rescheduleActiveJob(job.id, iso, newTime, label);
+      setJob((prev) => ({ ...prev, preferredDate: iso, timeSlot: newTime, date: label }));
+      setRescheduleOpen(false);
+    } catch (e) {
+      const past = ((e as { message?: string } | null)?.message ?? '').includes('DATE_IN_PAST');
+      Alert.alert('ვერ მოხერხდა', past ? 'არჩეული თარიღი წარსულშია.' : 'დროის შეცვლა ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setRescheduling(false);
+    }
+  };
 
   // supabase/migrations/0079 — opportunistic, fire-and-forget auto-expiry
   // check (ProviderJobDetailScreen-ის იგივე ეფექტის სარკე). RPC-ივე
@@ -833,6 +861,21 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
             <Text style={styles.menuRowText}>რედაქტირება</Text>
           </Pressable>
         )}
+        {effectiveStatus === 'active' && (
+          <Pressable
+            testID="job-reschedule-menu-row"
+            style={styles.menuRow}
+            onPress={() => {
+              setMenuOpen(false);
+              setNewDate(null);
+              setNewTime('');
+              setRescheduleOpen(true);
+            }}
+          >
+            <CalendarClock size={15} color={colors.mutedForeground} />
+            <Text style={styles.menuRowText}>დროის შეცვლა</Text>
+          </Pressable>
+        )}
         {effectiveStatus !== 'pending' && (
           <Pressable
             style={styles.menuRow}
@@ -936,6 +979,49 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
             setCancelReason('');
           }}
         >
+          <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
+        </Pressable>
+      </BottomSheet>
+
+      <BottomSheet visible={rescheduleOpen} onClose={() => setRescheduleOpen(false)}>
+        <Text style={styles.sheetTitle}>დროის შეცვლა</Text>
+        <Text style={styles.sheetSubtitle}>
+          შეთანხმდით ოსტატთან ჩატში და აირჩიეთ ახალი თარიღი და დრო — ოსტატი მიიღებს შეტყობინებას.
+        </Text>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+          <View style={{ flex: 1 }}>
+            <DatePickerField
+              testID="reschedule-date"
+              value={newDate}
+              onChange={(d) => {
+                setNewDate(d);
+                setNewTimeOpen(true);
+              }}
+              placeholder="თარიღი"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <TimePickerField
+              testID="reschedule-time"
+              value={newTime}
+              onChange={setNewTime}
+              disabled={!newDate}
+              placeholder="დრო"
+              disabledPlaceholder="დრო"
+              open={newTimeOpen}
+              onOpenChange={setNewTimeOpen}
+            />
+          </View>
+        </View>
+        <Button
+          testID="reschedule-save"
+          label="შენახვა"
+          loadingLabel="ინახება..."
+          onPress={reschedule}
+          disabled={!newDate || !newTime}
+          loading={rescheduling}
+        />
+        <Pressable style={styles.sheetCancelLink} onPress={() => setRescheduleOpen(false)}>
           <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
         </Pressable>
       </BottomSheet>

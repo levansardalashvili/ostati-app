@@ -167,6 +167,30 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
                   ? 'active'
                   : 'browse';
 
+  // 0150 — the Customer's dispute reason + the Provider's own written side
+  // (shown to the admin who resolves the dispute).
+  const [dispute, setDispute] = useState<{ reason: string | null; providerResponse: string | null } | null>(null);
+  const [disputeDraft, setDisputeDraft] = useState('');
+  const [sendingDispute, setSendingDispute] = useState(false);
+  useEffect(() => {
+    if (variant !== 'disputed' || !job.id) return;
+    jobService.getDisputeInfo(job.id).then(setDispute).catch(() => {});
+  }, [variant, job.id]);
+  const sendDisputeResponse = async () => {
+    const text = disputeDraft.trim();
+    if (text.length < 5 || sendingDispute) return;
+    setSendingDispute(true);
+    try {
+      await jobService.respondToDispute(job.id, text);
+      setDispute((d) => ({ reason: d?.reason ?? null, providerResponse: text }));
+      setDisputeDraft('');
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'პასუხის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setSendingDispute(false);
+    }
+  };
+
   // supabase/migrations/0079 — opportunistic, fire-and-forget check: no
   // cron exists in this project, so simply loading this screen while the
   // job has sat in awaiting_customer_confirmation is what "self-heals" a
@@ -407,6 +431,41 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               <Text style={styles.disputedBannerTitle}>მომხმარებელმა პრობლემა აღნიშნა</Text>
             </View>
             <Text style={styles.disputedBannerText}>დაუკავშირდი მომხმარებელს ჩატში პრობლემის გასარკვევად.</Text>
+            {!!dispute?.reason && (
+              <Text style={[styles.disputedBannerText, styles.disputeQuote]}>„{dispute.reason}“</Text>
+            )}
+            <Text style={[styles.disputedBannerTitle, { marginTop: spacing.md }]}>შენი მხარე</Text>
+            {dispute?.providerResponse ? (
+              <Text style={styles.disputedBannerText}>
+                {dispute.providerResponse}
+                {'\n'}ადმინისტრაცია განიხილავს ორივე მხარეს.
+              </Text>
+            ) : (
+              <>
+                <Text style={styles.disputedBannerText}>
+                  აღწერე, როგორ შესრულდა სამუშაო — ადმინისტრაცია ორივე მხარეს განიხილავს.
+                </Text>
+                <TextInput
+                  testID="dispute-response-input"
+                  value={disputeDraft}
+                  onChangeText={setDisputeDraft}
+                  placeholder="შენი პასუხი..."
+                  placeholderTextColor={colors.mutedForeground}
+                  multiline
+                  maxLength={1000}
+                  style={styles.disputeInput}
+                />
+                <Button
+                  testID="dispute-response-send"
+                  label="გაგზავნა"
+                  loadingLabel="იგზავნება..."
+                  compact
+                  onPress={sendDisputeResponse}
+                  disabled={disputeDraft.trim().length < 5}
+                  loading={sendingDispute}
+                />
+              </>
+            )}
           </View>
         )}
 
@@ -843,6 +902,22 @@ const styles = StyleSheet.create({
   disputedBannerText: {
     ...typography.small,
     color: colors.destructive,
+  },
+  disputeQuote: {
+    marginTop: spacing.sm,
+    fontStyle: 'italic',
+  },
+  disputeInput: {
+    ...typography.caption,
+    color: colors.foreground,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    minHeight: 72,
+    textAlignVertical: 'top',
+    marginVertical: spacing.sm,
   },
   headerCard: {
     backgroundColor: colors.card,

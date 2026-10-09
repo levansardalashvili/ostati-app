@@ -1,6 +1,18 @@
 import { supabase } from './supabaseClient';
 import { categoryService } from './categoryService';
 import type { CustomerJob, FeedJob, TimeSlot } from '../types/job';
+import { formatPickedDate } from '../components/CalendarPicker';
+import { timeSlotLabel } from '../data/timeSlots';
+
+// The stored `date` text was written once with relative words ("დღეს"/"ხვალ"),
+// which go stale the next day. When the canonical preferred_date exists,
+// build the label at read time instead; old rows keep their stored text.
+function displayDate(row: { date: string; preferred_date: string | null; time_slot: TimeSlot | null }): string {
+  if (!row.preferred_date) return row.date;
+  const [y, m, d] = row.preferred_date.split('-').map(Number);
+  const slot = timeSlotLabel(row.time_slot);
+  return `${formatPickedDate(new Date(y, m - 1, d))}${slot ? ` ${slot}` : ''}`;
+}
 
 // `job_posts` ცხრილის Postgres row shape — CustomerJob-ის (camelCase)
 // შესატყვისი, სერვისის საზღვარზე კონვერტაციით. `provider_id`/`provider_name`
@@ -102,7 +114,7 @@ function fromJobPostRow(row: JobPostRow): CustomerJob {
     status: row.status,
     provider: row.provider_name,
     providerId: row.provider_id ?? undefined,
-    date: row.date,
+    date: displayDate(row),
     address: row.address,
     district: row.district ?? undefined,
     desc: row.description,
@@ -132,7 +144,7 @@ function fromJobPostRowToFeedJob(row: JobPostRow): FeedJob {
     title: deriveJobTitle(row.category),
     customer: row.customer_name,
     location: row.address,
-    date: row.date,
+    date: displayDate(row),
     ago: formatAgo(row.created_at),
     urgent: false,
     hasPhoto: row.photos.length > 0,
@@ -239,6 +251,11 @@ export interface JobService {
   // 0149 — Customer marks an active job done after its scheduled start
   // (when the Provider never pressed "დავასრულე") → confirmed_awaiting_rating.
   customerMarkCompleted(jobId: string): Promise<void>;
+  // 0150 — Customer changes date/time of an active job; Provider is notified.
+  rescheduleActiveJob(jobId: string, preferredDate: string, timeSlot: string, dateLabel: string): Promise<void>;
+  // 0150 — Provider's side of a dispute (shown to admin) + the current dispute texts.
+  respondToDispute(jobId: string, response: string): Promise<void>;
+  getDisputeInfo(jobId: string): Promise<{ reason: string | null; providerResponse: string | null }>;
   customerReportProblem(jobId: string, reason: string): Promise<void>;
 
   // Job cancellation — supabase/migrations/0032_job_cancellation.sql,
@@ -494,6 +511,28 @@ export const jobService: JobService = {
   async customerMarkCompleted(jobId) {
     const { error } = await supabase.rpc('customer_mark_completed', { p_job_id: jobId });
     if (error) throw error;
+  },
+  async rescheduleActiveJob(jobId, preferredDate, timeSlot, dateLabel) {
+    const { error } = await supabase.rpc('reschedule_active_job', {
+      p_job_id: jobId,
+      p_preferred_date: preferredDate,
+      p_time_slot: timeSlot,
+      p_date: dateLabel,
+    });
+    if (error) throw error;
+  },
+  async respondToDispute(jobId, response) {
+    const { error } = await supabase.rpc('provider_respond_to_dispute', { p_job_id: jobId, p_response: response });
+    if (error) throw error;
+  },
+  async getDisputeInfo(jobId) {
+    const { data, error } = await supabase
+      .from('job_posts')
+      .select('dispute_reason, dispute_provider_response')
+      .eq('id', jobId)
+      .maybeSingle();
+    if (error) throw error;
+    return { reason: data?.dispute_reason ?? null, providerResponse: data?.dispute_provider_response ?? null };
   },
   async customerReportProblem(jobId, reason) {
     const { error } = await supabase.rpc('customer_report_problem', { p_job_id: jobId, p_reason: reason });
