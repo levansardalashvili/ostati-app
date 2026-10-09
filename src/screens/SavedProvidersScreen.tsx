@@ -220,12 +220,18 @@ function SavedProviderCard({
             <ChevronRight size={12} color={colors.primary} />
           </Pressable>
         </View>
-        <Animated.View style={{ flex: 1, alignItems: 'center', transform: [{ scale: message.scale }] }}>
-          <Pressable style={styles.messageButton} onPress={onMessage} onPressIn={message.onPressIn} onPressOut={message.onPressOut}>
-            <MessageCircle size={14} color={colors.primaryForeground} />
-            <Text style={styles.messageButtonText}>მიწერა</Text>
-          </Pressable>
-        </Animated.View>
+        {p.verified ? (
+          <Animated.View style={{ flex: 1, alignItems: 'center', transform: [{ scale: message.scale }] }}>
+            <Pressable style={styles.messageButton} onPress={onMessage} onPressIn={message.onPressIn} onPressOut={message.onPressOut}>
+              <MessageCircle size={14} color={colors.primaryForeground} />
+              <Text style={styles.messageButtonText}>მიწერა</Text>
+            </Pressable>
+          </Animated.View>
+        ) : (
+          <Text style={[styles.messageButtonText, { flex: 1, textAlign: 'center', color: colors.mutedForeground, fontWeight: '400' }]}>
+            ჯერ არ არის ვერიფიცირებული
+          </Text>
+        )}
       </View>
     </View>
   );

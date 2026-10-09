@@ -92,17 +92,25 @@ export function ProviderCard({
           <Text style={styles.viewProfileLinkText}>პროფილის ნახვა</Text>
           <ChevronRight size={12} color={colors.primary} />
         </Pressable>
-        <Animated.View style={[styles.messageButtonWrap, { transform: [{ scale: message.scale }] }]}>
-          <Pressable
-            style={styles.messageButton}
-            onPress={onMessage}
-            onPressIn={message.onPressIn}
-            onPressOut={message.onPressOut}
-          >
-            <MessageCircle size={14} color={colors.primaryForeground} />
-            <Text style={styles.messageButtonText}>მიწერა</Text>
-          </Pressable>
-        </Animated.View>
+        {provider.verified ? (
+          <Animated.View style={[styles.messageButtonWrap, { transform: [{ scale: message.scale }] }]}>
+            <Pressable
+              style={styles.messageButton}
+              onPress={onMessage}
+              onPressIn={message.onPressIn}
+              onPressOut={message.onPressOut}
+            >
+              <MessageCircle size={14} color={colors.primaryForeground} />
+              <Text style={styles.messageButtonText}>მიწერა</Text>
+            </Pressable>
+          </Animated.View>
+        ) : (
+          // Unverified Providers can't send a price offer (0084) — a direct
+          // job to them would dead-end, so messaging is not offered.
+          <View style={styles.messageButtonWrap}>
+            <Text style={styles.unverifiedText}>ჯერ არ არის ვერიფიცირებული</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -264,5 +272,10 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.primaryForeground,
     fontWeight: '700',
+  },
+  unverifiedText: {
+    ...typography.small,
+    color: colors.mutedForeground,
+    textAlign: 'center',
   },
 });

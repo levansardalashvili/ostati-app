@@ -44,3 +44,13 @@ export function providerRankScore(p: Pick<Provider, 'rating' | 'reviews' | 'jobs
   const recentActivityBoost = p.online ? 0.05 : 0;
   return weightedRating(p) + completedJobsBoost + recentActivityBoost;
 }
+
+// Directory order: verified Providers always first (only they can send a
+// price offer, 0084), then by rank score. Use for every Provider list sort.
+export function compareProviders(
+  a: Pick<Provider, 'rating' | 'reviews' | 'jobs' | 'online' | 'verified'>,
+  b: Pick<Provider, 'rating' | 'reviews' | 'jobs' | 'online' | 'verified'>,
+): number {
+  if (a.verified !== b.verified) return a.verified ? -1 : 1;
+  return providerRankScore(b) - providerRankScore(a);
+}

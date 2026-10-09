@@ -17,7 +17,7 @@ import { TBILISI_AREAS as DISTRICTS } from '../data/districts';
 import { userService } from '../services/userService';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import type { Provider } from '../types/provider';
-import { providerRankScore } from '../utils/providerRank';
+import { compareProviders } from '../utils/providerRank';
 import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerProviderList'>;
@@ -94,7 +94,7 @@ export function CustomerProviderListScreen({ navigation }: Props) {
         }
         return true;
       })
-      .sort((a, b) => providerRankScore(b) - providerRankScore(a));
+      .sort(compareProviders);
   }, [providers, search, selCategory, areaSearch]);
 
   const clearFilters = () => {

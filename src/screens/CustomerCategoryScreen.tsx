@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
+import { compareProviders } from '../utils/providerRank';
 import { ProviderCard } from '../components/ProviderCard';
 import { StartJobChatSheet } from '../components/StartJobChatSheet';
 import { Reveal } from '../components/Reveal';
@@ -83,7 +84,7 @@ export function CustomerCategoryScreen({ navigation, route }: Props) {
         </View>
       ) : (
         <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          {providers.map((p, i) => (
+          {[...providers].sort(compareProviders).map((p, i) => (
             <Reveal key={p.id} delay={staggerDelay(i)}>
             <ProviderCard
               provider={p}

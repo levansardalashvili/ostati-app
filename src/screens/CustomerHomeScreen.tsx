@@ -34,7 +34,7 @@ import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useTabBarScroll } from '../state/TabBarScrollContext';
 import type { CustomerJob } from '../types/job';
 import type { Provider } from '../types/provider';
-import { providerRankScore } from '../utils/providerRank';
+import { compareProviders } from '../utils/providerRank';
 import type { CustomerTabParamList, RootStackParamList } from '../navigation/types';
 
 type Props = CompositeScreenProps<
@@ -113,7 +113,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
         }
         return true;
       })
-      .sort((a, b) => providerRankScore(b) - providerRankScore(a));
+      .sort(compareProviders);
   }, [providers, search, selCats, myDistrict]);
   // Home-ზე მხოლოდ ტოპ 5 ჩანს — "ყველას ნახვა" ხსნის სრულ სიას
   // (CustomerProviderListScreen), საკუთარი არეალის/სხვა ფილტრებით.

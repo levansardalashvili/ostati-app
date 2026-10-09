@@ -318,11 +318,19 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pressable style={styles.chatButton} onPress={handleChat}>
-          <MessageCircle size={18} color={colors.primaryForeground} />
-          <Text style={styles.chatButtonText}>მიწერა</Text>
-        </Pressable>
-        <Text style={styles.footerNote}>თქვენი ადგილმდებარეობა ოსტატისთვის მიუწვდომელია, ოსტატთან შეთანხმებამდე</Text>
+        {p.verified ? (
+          <>
+            <Pressable style={styles.chatButton} onPress={handleChat}>
+              <MessageCircle size={18} color={colors.primaryForeground} />
+              <Text style={styles.chatButtonText}>მიწერა</Text>
+            </Pressable>
+            <Text style={styles.footerNote}>თქვენი ადგილმდებარეობა ოსტატისთვის მიუწვდომელია, ოსტატთან შეთანხმებამდე</Text>
+          </>
+        ) : (
+          <Text style={styles.footerNote}>
+            ოსტატი ჯერ არ არის ვერიფიცირებული — ვერიფიკაციის შემდეგ შეძლებთ მისთვის მიწერას.
+          </Text>
+        )}
       </View>
         </>
       )}

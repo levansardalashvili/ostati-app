@@ -99,6 +99,9 @@ export function getPublishErrorMessage(err: unknown): string {
   if (message.includes('DATE_TIME_REQUIRED')) {
     return 'სასურველი თარიღი და დრო სავალდებულოა — აირჩიე ორივე და სცადე თავიდან.';
   }
+  if (message.includes('PROVIDER_NOT_VERIFIED')) {
+    return 'ეს ოსტატი ჯერ არ არის ვერიფიცირებული — აირჩიეთ სხვა ოსტატი ან გამოაქვეყნეთ განცხადება ყველასთვის.';
+  }
   if (message.includes('DATE_IN_PAST')) {
     return 'სასურველი თარიღი წარსულშია — აირჩიე დღევანდელი ან მომავალი თარიღი.';
   }
