@@ -7,7 +7,6 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { type CompositeScreenProps, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
-import { Button } from '../components/Button';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { ProviderFeedJobCard, ProviderFeedJobCardSkeleton } from '../components/ProviderFeedJobCard';
 import { PopBadge } from '../components/PopBadge';
@@ -328,7 +327,10 @@ export function ProviderHomeScreen({ navigation }: Props) {
                   </Text>
                 </View>
               </View>
-              <Button label="დეტალების ნახვა" variant="outline" compact onPress={handleOpenCurrentJob} />
+              <Pressable style={styles.currentJobLink} onPress={handleOpenCurrentJob} hitSlop={6}>
+                <Text style={styles.currentJobLinkText}>დეტალების ნახვა</Text>
+                <ChevronRight size={12} color={colors.primary} />
+              </Pressable>
             </View>
           </View>
         )}
@@ -694,5 +696,20 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
     flexShrink: 1,
+  },
+  // Same "დეტალების ნახვა ›" link as ProviderFeedJobCard.
+  currentJobLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingTop: spacing.sm + 2,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  currentJobLinkText: {
+    ...typography.small,
+    color: colors.primary,
+    fontWeight: '700',
   },
 });
