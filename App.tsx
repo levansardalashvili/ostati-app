@@ -6,6 +6,10 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { AppGateOverlay } from './src/components/AppGateOverlay';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { installGlobalErrorHandler } from './src/services/errorReporter';
+
+installGlobalErrorHandler();
 import { navigationRef } from './src/navigation/navigationRef';
 import { PushNotificationsBootstrap } from './src/components/PushNotificationsBootstrap';
 import { colors } from './src/theme';
@@ -32,12 +36,14 @@ export default function App() {
           <FavoriteProvidersProvider>
             <ProviderProfileProvider>
               <JobStatusProvider>
-                <NavigationContainer ref={navigationRef} theme={navigationTheme}>
-                  <RootNavigator />
-                  <PushNotificationsBootstrap />
-                  <AppGateOverlay />
-                  <StatusBar style="dark" />
-                </NavigationContainer>
+                <ErrorBoundary>
+                  <NavigationContainer ref={navigationRef} theme={navigationTheme}>
+                    <RootNavigator />
+                    <PushNotificationsBootstrap />
+                    <AppGateOverlay />
+                    <StatusBar style="dark" />
+                  </NavigationContainer>
+                </ErrorBoundary>
               </JobStatusProvider>
             </ProviderProfileProvider>
           </FavoriteProvidersProvider>
