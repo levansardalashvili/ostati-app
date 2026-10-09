@@ -122,6 +122,10 @@ export type FeedJob = {
 // `createCustomerJob`/`listMyJobPosts`/`getJobPostById`).
 export type CustomerJob = {
   id: string;
+  // 0094/0152 — private job sent to one Provider ("მიწერა"/rehire), and
+  // whether that Provider declined it.
+  invitedProviderId?: string | null;
+  inviteDeclinedAt?: string | null;
   // job_posts-ს აღარ აქვს `title` სვეტი (#72) — იხ. FeedJob.title-ის
   // იგივე შენიშვნა ზემოთ.
   title: string;

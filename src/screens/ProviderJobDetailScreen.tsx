@@ -167,6 +167,28 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
                   ? 'active'
                   : 'browse';
 
+  // 0152 — private job sent only to this Provider: they can decline it.
+  const [isInvite, setIsInvite] = useState(false);
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declining, setDeclining] = useState(false);
+  useEffect(() => {
+    if (variant !== 'browse' || !job.id) return;
+    jobService.isMyJobInvite(job.id).then(setIsInvite).catch(() => {});
+  }, [variant, job.id]);
+  const declineInvite = async () => {
+    if (declining) return;
+    setDeclining(true);
+    try {
+      await jobService.declineInvitedJob(job.id);
+      setDeclineOpen(false);
+      navigation.goBack();
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'უარის გაგზავნა ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setDeclining(false);
+    }
+  };
+
   // 0150 — the Customer's dispute reason + the Provider's own written side
   // (shown to the admin who resolves the dispute).
   const [dispute, setDispute] = useState<{ reason: string | null; providerResponse: string | null } | null>(null);
@@ -469,6 +491,18 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
           </View>
         )}
 
+        {variant === 'browse' && isInvite && !expressed && (
+          <View style={styles.inviteBanner}>
+            <Text style={styles.inviteBannerTitle}>მოთხოვნა პირადად თქვენთვისაა</Text>
+            <Text style={styles.inviteBannerText}>
+              მომხმარებელმა ეს სამუშაო მხოლოდ თქვენ გამოგიგზავნათ. თუ ვერ შეასრულებთ, უთხარით უარი — მომხმარებელს შეეძლება სხვა ოსტატების მოძებნა.
+            </Text>
+            <Pressable testID="decline-invite-button" onPress={() => setDeclineOpen(true)} hitSlop={6}>
+              <Text style={styles.inviteDeclineLink}>უარის თქმა</Text>
+            </Pressable>
+          </View>
+        )}
+
         {variant === 'cancelled' && (
           <View style={styles.disputedBanner}>
             <View style={styles.bannerHeaderRow}>
@@ -753,6 +787,27 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         </Pressable>
       </BottomSheet>
 
+      <BottomSheet visible={declineOpen} onClose={() => setDeclineOpen(false)}>
+        <View style={styles.cancelIcon}>
+          <X size={22} color={colors.destructive} />
+        </View>
+        <Text style={styles.sheetTitle}>უარის თქმა</Text>
+        <Text style={styles.sheetSubtitle}>
+          მოთხოვნა აღარ გამოგიჩნდებათ, მომხმარებელი კი მიიღებს შეტყობინებას, რომ სხვა ოსტატი მოძებნოს.
+        </Text>
+        <Button
+          testID="decline-invite-confirm"
+          label="უარის თქმა"
+          loadingLabel="იგზავნება..."
+          variant="destructive"
+          onPress={declineInvite}
+          loading={declining}
+        />
+        <Pressable style={styles.sheetCancelLink} onPress={() => setDeclineOpen(false)}>
+          <Text style={styles.sheetCancelLinkText}>არა</Text>
+        </Pressable>
+      </BottomSheet>
+
       <ReportJobSheet
         visible={reportSheetOpen}
         jobId={job.id}
@@ -902,6 +957,30 @@ const styles = StyleSheet.create({
   disputedBannerText: {
     ...typography.small,
     color: colors.destructive,
+  },
+  inviteBanner: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  inviteBannerTitle: {
+    ...typography.captionMedium,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  inviteBannerText: {
+    ...typography.small,
+    color: colors.mutedForeground,
+  },
+  inviteDeclineLink: {
+    ...typography.captionMedium,
+    color: colors.destructive,
+    marginTop: spacing.xs,
   },
   disputeQuote: {
     marginTop: spacing.sm,

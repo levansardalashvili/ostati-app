@@ -35,6 +35,9 @@ type Props = {
   // Provider-მდე ცხადად მივიდეს "ეს კონკრეტულად თქვენთვისაა" — მხოლოდ
   // ჩატის composer-ში ივსება, არ იგზავნება.
   onReady: (jobId: string | null, draftMessage?: string) => void;
+  // "ხელახლა დაქირავება" — always create a new private job, even though a
+  // conversation with this Provider already exists.
+  forceNew?: boolean;
 };
 
 // ახალი, "ცივი" ჩატი (Provider-ის საჯარო პროფილიდან/"შენახული
@@ -63,7 +66,7 @@ type Props = {
 // სტრუქტურირებული ფასის-შეთავაზების/დასრულების/შეფასების მთელი
 // მექანიზმი (#2/#47/#92/#97-#98) ამ ნაკადზეც ავტომატურად, ცვლილების
 // გარეშე მუშაობს.
-export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
+export function StartJobChatSheet({ provider, onClose, onReady, forceNew = false }: Props) {
   const { profile } = useCustomerProfile();
   const visible = !!provider;
 
@@ -112,7 +115,7 @@ export function StartJobChatSheet({ provider, onClose, onReady }: Props) {
     setSubmitError('');
 
     const uid = authService.getCurrentUser()?.uid;
-    if (!uid) {
+    if (!uid || forceNew) {
       setChecking(false);
       return;
     }

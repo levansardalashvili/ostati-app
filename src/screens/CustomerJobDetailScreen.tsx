@@ -24,6 +24,7 @@ import { formatPickedDate, toIsoDateString } from '../components/CalendarPicker'
 import { CategoryIcon } from '../components/CategoryIcon';
 import { DatePickerField } from '../components/DatePickerField';
 import { ReportJobSheet } from '../components/ReportJobSheet';
+import { StartJobChatSheet } from '../components/StartJobChatSheet';
 import { TimePickerField } from '../components/TimePickerField';
 import { timeSlotLabel } from '../data/timeSlots';
 import { SecureStorageImage } from '../components/SecureStorageImage';
@@ -37,6 +38,7 @@ import { jobService } from '../services/jobService';
 import { notificationService } from '../services/notificationService';
 import { quoteService } from '../services/quoteService';
 import { reviewService } from '../services/reviewService';
+import { userService } from '../services/userService';
 import { useJobStatus } from '../state/JobStatusContext';
 import type { CustomerJob } from '../types/job';
 import type { Provider } from '../types/provider';
@@ -225,6 +227,38 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const canMarkCompleted =
     effectiveStatus === 'active' && !!job.providerId && (!scheduledStart || Date.now() >= scheduledStart.getTime());
   const [markCompletedOpen, setMarkCompletedOpen] = useState(false);
+
+  // 0152 — private job: turn it into a normal public one.
+  const [openingToAll, setOpeningToAll] = useState(false);
+  const openToAll = async () => {
+    if (openingToAll) return;
+    setOpeningToAll(true);
+    try {
+      await jobService.openJobToAll(job.id);
+      setJob((prev) => ({ ...prev, invitedProviderId: null }));
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'განცხადების გახსნა ვერ მოხერხდა — სცადე თავიდან.');
+    } finally {
+      setOpeningToAll(false);
+    }
+  };
+
+  // "ხელახლა დაქირავება" — new private job for the same Provider, same category.
+  const [rehireProvider, setRehireProvider] = useState<Provider | null>(null);
+  const [rehireLoading, setRehireLoading] = useState(false);
+  const startRehire = async () => {
+    if (!job.providerId || rehireLoading) return;
+    setRehireLoading(true);
+    try {
+      const p = selectedProvider?.id === job.providerId ? selectedProvider : await userService.getRealProviderById(job.providerId);
+      if (!p) throw new Error('provider not found');
+      setRehireProvider({ ...p, category: job.category });
+    } catch {
+      Alert.alert('ვერ მოხერხდა', 'ოსტატის მონაცემები ვერ ჩაიტვირთა — სცადე თავიდან.');
+    } finally {
+      setRehireLoading(false);
+    }
+  };
 
   // 0150 — change date/time of an active job (Provider gets notified).
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -727,6 +761,40 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
                 </Pressable>
               </>
             )}
+            {!!job.providerId && (
+              <Button
+                testID="rehire-button"
+                label="ხელახლა დაქირავება"
+                variant="outline"
+                onPress={startRehire}
+                loading={rehireLoading}
+                style={{ marginTop: spacing.md }}
+              />
+            )}
+          </View>
+        )}
+
+        {effectiveStatus === 'pending' && !!job.invitedProviderId && (
+          <View style={styles.completionCard}>
+            <View style={styles.completionHeaderRow}>
+              <Clock size={15} color={colors.warning} />
+              <Text style={styles.completionTitle}>
+                {job.inviteDeclinedAt ? 'ოსტატმა მოთხოვნაზე უარი თქვა' : 'განცხადება მხოლოდ ერთ ოსტატს ჩანს'}
+              </Text>
+            </View>
+            <Text style={styles.completionSubtitle}>
+              {job.inviteDeclinedAt
+                ? 'გახსენით განცხადება ყველა ოსტატისთვის — თქვენს არეალში შესაბამისი ოსტატები მიიღებენ შეტყობინებას.'
+                : 'თუ ოსტატი არ გპასუხობთ, შეგიძლიათ განცხადება ყველა ოსტატისთვის გახსნათ.'}
+            </Text>
+            <Button
+              testID="open-to-all-button"
+              label="ყველა ოსტატისთვის გახსნა"
+              loadingLabel="იხსნება..."
+              variant={job.inviteDeclinedAt ? 'primary' : 'outline'}
+              onPress={openToAll}
+              loading={openingToAll}
+            />
           </View>
         )}
 
@@ -982,6 +1050,26 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
           <Text style={styles.sheetCancelLinkText}>დახურვა</Text>
         </Pressable>
       </BottomSheet>
+
+      <StartJobChatSheet
+        provider={rehireProvider}
+        forceNew
+        onClose={() => setRehireProvider(null)}
+        onReady={(newJobId, draftMessage) => {
+          const p = rehireProvider;
+          setRehireProvider(null);
+          if (!p) return;
+          navigation.navigate('ChatConversation', {
+            chatId: p.id,
+            name: p.name,
+            initials: p.initials,
+            color: p.color,
+            role: 'customer',
+            jobId: newJobId ?? undefined,
+            draftMessage,
+          });
+        }}
+      />
 
       <BottomSheet visible={rescheduleOpen} onClose={() => setRescheduleOpen(false)}>
         <Text style={styles.sheetTitle}>დროის შეცვლა</Text>

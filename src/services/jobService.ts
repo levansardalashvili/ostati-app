@@ -54,6 +54,8 @@ type JobPostRow = {
   // src/types/job.ts-ის FeedJob/CustomerJob-ის იგივე შენიშვნა.
   preferred_date: string | null;
   time_slot: TimeSlot | null;
+  invited_provider_id?: string | null;
+  invite_declined_at?: string | null;
 };
 
 // `title` აღარ ინახება ბაზაში — ყოველთვის კატეგორიის სახელიდანაა
@@ -124,6 +126,8 @@ function fromJobPostRow(row: JobPostRow): CustomerJob {
     preferredDate: row.preferred_date,
     timeSlot: row.time_slot,
     createdAt: row.created_at,
+    invitedProviderId: row.invited_provider_id ?? null,
+    inviteDeclinedAt: row.invite_declined_at ?? null,
   };
 }
 
@@ -253,6 +257,10 @@ export interface JobService {
   customerMarkCompleted(jobId: string): Promise<void>;
   // 0150 — Customer changes date/time of an active job; Provider is notified.
   rescheduleActiveJob(jobId: string, preferredDate: string, timeSlot: string, dateLabel: string): Promise<void>;
+  // 0152 — private (invited) jobs: Provider declines / Customer opens to everyone.
+  declineInvitedJob(jobId: string): Promise<void>;
+  openJobToAll(jobId: string): Promise<void>;
+  isMyJobInvite(jobId: string): Promise<boolean>;
   // 0150 — Provider's side of a dispute (shown to admin) + the current dispute texts.
   respondToDispute(jobId: string, response: string): Promise<void>;
   getDisputeInfo(jobId: string): Promise<{ reason: string | null; providerResponse: string | null }>;
@@ -520,6 +528,19 @@ export const jobService: JobService = {
       p_date: dateLabel,
     });
     if (error) throw error;
+  },
+  async declineInvitedJob(jobId) {
+    const { error } = await supabase.rpc('decline_invited_job', { p_job_id: jobId });
+    if (error) throw error;
+  },
+  async openJobToAll(jobId) {
+    const { error } = await supabase.rpc('open_job_to_all', { p_job_id: jobId });
+    if (error) throw error;
+  },
+  async isMyJobInvite(jobId) {
+    const { data, error } = await supabase.rpc('get_my_job_invite', { p_job_id: jobId });
+    if (error) throw error;
+    return data === true;
   },
   async respondToDispute(jobId, response) {
     const { error } = await supabase.rpc('provider_respond_to_dispute', { p_job_id: jobId, p_response: response });
