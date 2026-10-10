@@ -1,15 +1,7 @@
 import { supabase } from './supabaseClient';
 import type { NotificationEntry, NotificationTarget } from '../types/notification';
 
-// `notifications` ცხრილის Postgres row shape (#70). #73-მდე შეტყობინება
-// იქმნებოდა client-side-ზე (`notificationService.create`) — ეს **მოცილებულია**:
-// `notifications`-ის INSERT RLS policy მთლიანად ჩაკეტილია (supabase/migrations/
-// 0018), რადგან ნებისმიერ ავტორიზებულ კლიენტს შეეძლო ამ open policy-ით
-// ნებისმიერი user_id-სთვის ნებისმიერი შეტყობინების ჩაწერა. ყველა რეალური
-// მოვლენა (ახალი შეტყობინება, ახალი დაინტერესება, Provider-ის არჩევა,
-// დასრულების მოთხოვნა, job-ის სტატუსის ცვლილება) ახლა SECURITY DEFINER
-// trigger-ით/RPC-ით იქმნება სერვერის მხარეს (0020-0023) — მხოლოდ წაკითხვა/
-// mark-read რჩება კლიენტისთვის ღია.
+// Only the server creates notifications (triggers/RPCs); the client reads and marks them read.
 type NotificationRow = {
   id: string;
   user_id: string;
@@ -47,28 +39,8 @@ function fromRow(row: NotificationRow): NotificationEntry {
   };
 }
 
-export interface NotificationService {
-  listMine(userId: string): Promise<NotificationEntry[]>;
-  markRead(id: string): Promise<void>;
-  markAllRead(userId: string): Promise<void>;
-  // ეკრანის გახსნისას მასთან დაკავშირებული შეტყობინებები ავტომატურად
-  // წაკითხულდება (RLS მხოლოდ საკუთარ row-ებს უშვებს).
-  markChatNotificationsRead(participantIds: string[]): Promise<void>;
-  markJobNotificationsRead(jobId: string): Promise<void>;
-  subscribeToUnreadCount(userId: string, onChange: (count: number) => void): () => void;
-
-  // Task 3 — `notification_preferences` (NotificationSettingsScreen-ის
-  // toggle-ები, მანამდე ლოკალური useState). key→enabled jsonb-ს ინახავს,
-  // owner-only RLS. `getPreferences` აბრუნებს მხოლოდ მას, რაც ბაზაშია
-  // შენახული (missing key = "მომხმარებელს ჯერ არასდროს გამორთვია", UI-ის
-  // მხარეს default true-დ ითვლება) — ასე მომავალში ახალი toggle-ის
-  // დამატება არსებული მომხმარებლისთვის "ჩუმად გამორთულს" არ გახდის.
-  getPreferences(userId: string): Promise<Record<string, boolean>>;
-  setPreference(userId: string, key: string, enabled: boolean): Promise<void>;
-}
-
-export const notificationService: NotificationService = {
-  async listMine(userId) {
+export const notificationService = {
+  async listMine(userId: string): Promise<NotificationEntry[]> {
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
@@ -77,11 +49,12 @@ export const notificationService: NotificationService = {
     if (error) throw error;
     return (data as NotificationRow[]).map(fromRow);
   },
-  async markRead(id) {
+  async markRead(id: string): Promise<void> {
     const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
     if (error) throw error;
   },
-  async markChatNotificationsRead(participantIds) {
+  // Opening a chat or job marks its notifications read.
+  async markChatNotificationsRead(participantIds: string[]): Promise<void> {
     const { error } = await supabase
       .from('notifications')
       .update({ read: true })
@@ -90,7 +63,7 @@ export const notificationService: NotificationService = {
       .in('target->>chatId', participantIds);
     if (error) throw error;
   },
-  async markJobNotificationsRead(jobId) {
+  async markJobNotificationsRead(jobId: string): Promise<void> {
     const { error } = await supabase
       .from('notifications')
       .update({ read: true })
@@ -98,11 +71,11 @@ export const notificationService: NotificationService = {
       .or(`target->>jobId.eq.${jobId},target->>id.eq.${jobId}`);
     if (error) throw error;
   },
-  async markAllRead(userId) {
+  async markAllRead(userId: string): Promise<void> {
     const { error } = await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
     if (error) throw error;
   },
-  subscribeToUnreadCount(userId, onChange) {
+  subscribeToUnreadCount(userId: string, onChange: (count: number) => void): () => void {
     const fetchCount = () => {
       supabase
         .from('notifications')
@@ -112,12 +85,7 @@ export const notificationService: NotificationService = {
         .then(({ count }) => onChange(count ?? 0));
     };
     fetchCount();
-    // შემთხვევითი suffix topic-ის სახელში — ეს მეთოდი ერთდროულად რამდენიმე
-    // ეკრანიდან იძახება იმავე userId-ით (Home-ის ბელი + Profile-ის ბეჯი,
-    // ორივე ერთდროულად mounted-ია Bottom Tab-ის ეკრანების სტანდარტული
-    // ქცევის გამო) — იდენტური topic-ის სახელით ორი ერთდროული subscribe()
-    // ერთმანეთს ეჯახება ("cannot add postgres_changes callbacks... after
-    // subscribe()").
+    // Random suffix: Home bell and Profile badge subscribe at the same time.
     const channel = supabase
       .channel(`notifications-unread-${userId}-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, fetchCount)
@@ -126,7 +94,8 @@ export const notificationService: NotificationService = {
       supabase.removeChannel(channel);
     };
   },
-  async getPreferences(userId) {
+  // Only stored keys are returned; a missing key means enabled (so new toggles start on).
+  async getPreferences(userId: string): Promise<Record<string, boolean>> {
     const { data, error } = await supabase
       .from('notification_preferences')
       .select('prefs')
@@ -135,9 +104,8 @@ export const notificationService: NotificationService = {
     if (error) throw error;
     return (data as { prefs: Record<string, boolean> } | null)?.prefs ?? {};
   },
-  async setPreference(userId, key, enabled) {
-    // read-modify-upsert — ერთი toggle-ის ცვლილება არ უნდა წაშალოს
-    // დანარჩენი, ადრე შენახული toggle-ების მნიშვნელობები.
+  async setPreference(userId: string, key: string, enabled: boolean): Promise<void> {
+    // Read-modify-upsert so other toggles are kept.
     const { data, error: readError } = await supabase
       .from('notification_preferences')
       .select('prefs')

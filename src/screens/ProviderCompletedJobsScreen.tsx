@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Award, Clock, MapPin } from 'lucide-react-native';
@@ -16,11 +16,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderCompletedJobs'>;
 
-// ProviderCompletedJobs — რეალურ `job_posts`-ზეა აგებული (#69,
-// `provider_id = me AND status = 'completed'`), `reviews`-ის (#58/#64)
-// job_id→stars mapping-ით ერთდროულად წამოღებული. მანამდე ცალკე, id-იანი
-// mock `PROVIDER_COMPLETED_JOBS` იყო (`getCompletedJobs`, უცვლელი დარჩა
-// mock consumer-ების არარსებობის შემთხვევაშიც — საბოლოო წაშლის ეტაპისთვის).
+// My completed jobs with the stars each received.
 export function ProviderCompletedJobsScreen({ navigation }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [completedJobs, setCompletedJobs] = useState<FeedJob[]>([]);

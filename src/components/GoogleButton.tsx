@@ -1,4 +1,3 @@
-import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { colors, radius, spacing, typography } from '../theme';
@@ -34,7 +33,7 @@ function GoogleLogo() {
   );
 }
 
-// Google Sign-In ღილაკი (დიზაინის რეფერენსის GoogleButton-ის მიხედვით)
+// Google sign-in button.
 export function GoogleButton({ loading, onPress, label = 'Google-ით გაგრძელება', variant = 'full' }: Props) {
   if (variant === 'circle') {
     return (

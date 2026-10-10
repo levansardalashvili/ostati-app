@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Animated,
   Pressable,
@@ -42,12 +42,8 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-// "ტოპ ოსტატები" რანჟირება — არა უბრალო ბოლო რეგისტრაცია (მომხმარებლის
-// მოთხოვნით), წონიანი/Bayesian ფორმულით (src/utils/providerRank.ts) —
-// მანიპულაციისგან დაცული (5.0/1 შეფასება ვერ გადააჭარბებს 4.9/180-ს).
 
-// C1 — Customer Home / Browse (product-spec.md; დიზაინის რეფერენსის
-// CustomerHome-ის მიხედვით)
+// Customer home: top providers in my area, featured categories, current job.
 export function CustomerHomeScreen({ navigation }: Props) {
   const { handleScroll } = useTabBarScroll();
   const { profile } = useCustomerProfile();
@@ -66,13 +62,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
       })
       .catch(() => {})
       .finally(() => {
-        // #85: ადრე `isLoading` ცალკე, ფიქსირებული 950ms `setTimeout`-ით
-        // იმართებოდა, სრულიად დაუკავშირებელი ამ რეალურ fetch-თან —
-        // ნელი ქსელისას (950ms-ზე ხანგრძლივი fetch) ეს ნიშნავდა, რომ
-        // skeleton ნაადრევად ქრებოდა და "ოსტატები ვერ მოიძებნა" ცარიელი
-        // state ერთი წამით ცდომილად გამოკრთებოდა, სანამ `providers`
-        // რეალურად ჩაიტვირთებოდა. ახლა `isLoading` პირდაპირ ამ fetch-ის
-        // დასრულებაზეა დამოკიდებული.
+        // Loading ends with the fetch itself (a fixed timer flashed the empty state on slow networks).
         if (!cancelled) setIsLoading(false);
       });
     return () => {
@@ -80,9 +70,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
     };
   }, []);
 
-  // Customer-ის საკუთარი რაიონი, დაცული მისამართიდან ამოღებული — DISTRICTS
-  // (TBILISI_AREAS)-ის ჩამონათვალის substring-შედარებით, რადგან
-  // defaultAddress თავისუფალი ტექსტია ("რაიონი, ქალაქი" ან პირიქით).
+  // My district guessed from the free-text address (substring match).
   const myDistrict = useMemo(
     () => DISTRICTS.find((d) => profile.defaultAddress.includes(d)) ?? null,
     [profile.defaultAddress],
@@ -95,12 +83,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
       return next;
     });
 
-  // მთხოვნის მიხედვით — არეალის ფილტრის UI (ჩიპები) Home-იდან მოცილებულია
-  // მთლიანად, მაგრამ "ტოპ ოსტატები შენს არეალში" კვლავ ავტომატურად
-  // ითვლის Customer-ის საკუთარ არეალში (myDistrict) — მომხმარებელს აღარ
-  // შეუძლია ამის ხელით შეცვლა/გამორთვა Home-ზე. თუ არეალი ვერ დგინდება
-  // (myDistrict === null), ფილტრი უბრალოდ არ გამოიყენება (fallback —
-  // ცარიელი/გატეხილი სექციის ნაცვლად საერთო ტოპ სია ჩანს).
+  // Ranked within my district; if it can't be guessed, the overall top list.
   const rankedInArea = useMemo(() => {
     return providers
       .filter((p) => {
@@ -115,8 +98,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
       })
       .sort(compareProviders);
   }, [providers, search, selCats, myDistrict]);
-  // Home-ზე მხოლოდ ტოპ 5 ჩანს — "ყველას ნახვა" ხსნის სრულ სიას
-  // (CustomerProviderListScreen), საკუთარი არეალის/სხვა ფილტრებით.
+  // Top 5 here; "See all" opens CustomerProviderListScreen.
   const topProviders = rankedInArea.slice(0, 5);
 
   const clearFilters = () => {
@@ -130,8 +112,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
   const handleOpenProvider = (id: string) => {
     navigation.navigate('ViewProviderProfile', { id });
   };
-  // "ცივი ჩატის → job-ის შექმნის" ხვრელის ფიქსი — StartJobChatSheet.tsx-ის
-  // თავზე სრული მიზეზი (ViewProviderProfileScreen-ის იგივე ცვლილება).
+  // "მიწერა" goes through StartJobChatSheet (a chat always belongs to a job).
   const [startChatProvider, setStartChatProvider] = useState<Provider | null>(null);
   const handleOpenChat = (provider: Provider) => setStartChatProvider(provider);
   const openChatWithJob = (jobId: string | null, draftMessage?: string) => {
@@ -155,9 +136,7 @@ export function CustomerHomeScreen({ navigation }: Props) {
     navigation.navigate('CustomerProviderList');
   };
 
-  // Task 6 (audit) — "ტოპ 3" ახლა ბექენდის `featured` დროშაზეა აგებული
-  // (`categoryService`, `categories.featured`), ადრინდელი ჰარდქოდილი
-  // `TOP_CATEGORY_IDS`-ის ნაცვლად. bg/dot ფერები კვლავ ლოკალურია.
+  // Featured categories come from the backend; colors are local.
   const [categoryList, setCategoryList] = useState(() => categoryService.getCached());
   useEffect(() => {
     let cancelled = false;
@@ -179,16 +158,9 @@ export function CustomerHomeScreen({ navigation }: Props) {
       return { id: c.id, label: c.name, bg: style?.bg ?? colors.muted, dot: style?.dot ?? colors.mutedForeground };
     });
 
-  // "მიმდინარე სამუშაო" — ჩანს მხოლოდ მაშინ, როცა Customer-მა კონკრეტულ
-  // Provider-ს აირჩია (status === 'active'). დაჭერისას იხსნება არსებული
-  // CustomerJobDetail ეკრანი — არა ცალკე duplicate დეტალის ეკრანი.
+  // "Current job" card.
   const [myJobs, setMyJobs] = useState<CustomerJob[]>([]);
-  // #83: `useFocusEffect`-ზეა (არა mount-ზე ერთხელ) — Home არასდროს
-  // unmount-დება (Bottom Tab), ამიტომ plain `useEffect`-ს ვერასდროს
-  // "შეეტყობოდა" job-ის გაუქმებაზე, თუ Customer-მა ის CustomerJobDetail-იდან
-  // გააუქმა და უკან Home-ზე დაბრუნდა — "მიმდინარე სამუშაო" ბარათი
-  // "active"-ად "გაყინული" დარჩებოდა permanently, მთელი session-ის
-  // განმავლობაში, თუნდაც job რეალურად უკვე "cancelled"-ია.
+  // On focus: tabs stay mounted, so a job cancelled on another screen must refresh here.
   useFocusEffect(
     useCallback(() => {
       const uid = authService.getCurrentUser()?.uid;
@@ -205,13 +177,10 @@ export function CustomerHomeScreen({ navigation }: Props) {
       };
     }, []),
   );
-  // active + ოსტატმა დასრულება მონიშნა და მომხმარებლის დადასტურებას ელოდება; დადასტურების (ორივე მხარე) შემდეგ ბარათი ქრება
+  // Shown while active or waiting for my confirmation.
   const currentJob = myJobs.find((j) => j.status === 'active' || j.status === 'awaiting_customer_confirmation') ?? null;
 
-  // ბელის წითელი წერტილი (#70) — mock ნაგულისხმებია, სანამ session
-  // ცოცხალი Realtime subscription-ით (`notificationService`) რეალურ
-  // count-ს არ დაადასტურებს (ან 0-ს) — `chatService.subscribeToUnreadCount`-ის
-  // (#68) იგივე პრინციპი.
+  // Live unread notification count for the bell.
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   useEffect(() => {
     const uid = authService.getCurrentUser()?.uid;

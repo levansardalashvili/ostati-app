@@ -13,8 +13,6 @@ export type ChatMsg = {
   from: 'me' | 'other';
   text?: string;
   imgColor?: string;
-  // რეალური Supabase Storage-ის URL (#68) — თუ არსებობს, რეალურ სურათს
-  // ასახავს, `imgColor`-ის (mock placeholder) ნაცვლად.
   imageUrl?: string;
   t?: string;
   state?: MsgState;
@@ -22,9 +20,7 @@ export type ChatMsg = {
   amount?: number;
   comment?: string;
   offerStatus?: OfferStatus;
-  // Second hardening pass, item 5 (supabase/migrations/0049) — job-ის
-  // id, რომელსაც ეს ფასის შეთავაზება ეხება. `undefined` ისტორიულ
-  // (job-scoping-მდელ) offer-ებზე.
+  // the job this offer is about (undefined on very old offers)
   jobId?: string;
 };
 

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Camera, Check, ChevronRight, Clock, MapPin, MessageCircle } from 'lucide-react-native';
 import { CategoryIcon } from './CategoryIcon';
@@ -15,16 +14,8 @@ type Props = {
   onChat: () => void;
 };
 
-// ProviderFeedJobCard — Job Feed-ის ერთი ბარათი (ProviderHomeScreen-ის
-// JobCard-იდან გამოტანილი, გაზიარებულია ProviderHomeScreen-სა და
-// ProviderJobFeedScreen-ს ("ყველას ნახვა") შორის).
-//
-// Task — ბარათზე პირდაპირ "დაინტ. ვარ" ღილაკი ამოღებულია — Provider-მა
-// ჯერ სამუშაოს სრული დეტალები/აღწერა/ფოტოები უნდა ნახოს ("დეტ. ნახვა"),
-// ინტერესის/ფასის გაგზავნა კი მხოლოდ Job Detail-ის ეკრანზეა შესაძლებელი
-// (ქვედა footer, "დაინტერესება" ღილაკი). `sent`-ის შემდეგ კვლავ ჩანს
-// "მიწერა" (Customer-ის ProviderCard-ის იგივე ზოლი — ცალკე, დასრულებული ინტერესის
-// შემდგომი მოქმედებაა).
+// Job feed card (Home and the full feed). The price is offered on the detail screen,
+// after seeing the description and photos; "მიწერა" appears once interest was sent.
 export function ProviderFeedJobCard({ job, sent, onDetail, onChat }: Props) {
   const category = CATEGORIES.find((c) => c.id === job.category) ?? CATEGORIES[0];
   const message = usePressScale();
@@ -78,8 +69,6 @@ export function ProviderFeedJobCard({ job, sent, onDetail, onChat }: Props) {
 
       </View>
 
-      {/* Same action row as the Customer's ProviderCard: "დეტალების ნახვა ›"
-          link + blue "მიწერა" pill (the pill only after interest was sent). */}
       <View style={styles.jobActionRow}>
         <Pressable style={styles.detailLink} onPress={onDetail} hitSlop={6}>
           <Text style={styles.detailLinkText}>დეტალების ნახვა</Text>
@@ -197,7 +186,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
   },
-  // Mirrors ProviderCard's action row (Customer side).
+  // Same action row as ProviderCard.
   jobActionRow: {
     flexDirection: 'row',
     alignItems: 'center',

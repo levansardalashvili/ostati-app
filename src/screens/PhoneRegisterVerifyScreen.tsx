@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
@@ -16,11 +16,8 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PhoneRegisterVerify'>;
 
-// #107 — OTP-ვერიფიკაციის ბოლო ნაბიჯი. `PhoneRegisterScreen`-ს უკვე
-// მთელი პროფილი ხელთ აქვს (route params) — verify-ის წარმატებაზე
-// პირდაპირ `createUserRecord`-ს იძახებს, ისე როგორც RegisterScreen-ის
-// საკუთარი submit-ი (ცალკე "პროფილის დასრულების" ეკრანი, GoogleComplete-ის
-// მსგავსი, აქ საჭირო არაა — აღარაფერია დასრულებული).
+// Last phone sign-up step: verify the code, set the password, create the users row
+// (the whole profile came as route params).
 export function PhoneRegisterVerifyScreen({ navigation, route }: Props) {
   const { role, phone, firstName, lastName, defaultAddress, entrance, apartment, doorCode, isPrivateHouse, password } =
     route.params;
@@ -39,9 +36,7 @@ export function PhoneRegisterVerifyScreen({ navigation, route }: Props) {
     setVerifying(true);
     try {
       const { uid } = await authService.verifyPhoneOtp(phone, otp);
-      // Task — login-ისთვის მომავალში საჭირო, რომ SMS-კოდი აღარ დასჭირდეს
-      // ყოველ ჯერზე (PhoneLoginScreen ამ პაროლს იყენებს). ცალკე, OTP-ის
-      // ვერიფიკაციის უშუალო წარმატების შემდეგ (სესია უკვე აქტიურია).
+      // Password lets later logins skip SMS.
       await authService.setNewPassword(password);
       try {
         await userService.createUserRecord(uid, {
@@ -57,11 +52,7 @@ export function PhoneRegisterVerifyScreen({ navigation, route }: Props) {
           isPrivateHouse,
         });
       } catch (createError) {
-        // duplicate key — ეს ტელეფონის ნომერი (uid) უკვე დარეგისტრირებულია
-        // (მომხმარებელმა შემცდომად "რეგისტრაცია" აირჩია "შესვლა"-ს
-        // ნაცვლად). `getAuthErrorMessage`-ის ჩვეულებრივი mapping-ი აქ
-        // Postgres-ის raw constraint-ტექსტს ვერ ამოიცნობს, ამიტომ ცალკე,
-        // ცხადი ქართული შეტყობინება + პირდაპირი "შესვლის" გზა.
+        // Duplicate key = this number is already registered — clear message + way to log in.
         const message = (createError as { message?: string } | null)?.message ?? '';
         if (message.includes('duplicate key')) {
           setError('ეს ნომერი უკვე დარეგისტრირებულია — სცადე "შესვლა ტელეფონით".');

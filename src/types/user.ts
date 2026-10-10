@@ -1,55 +1,35 @@
-// მომხმარებლის საერთო identity-ტიპები — Customer-ისაც და Provider-ისაც
-// (როლი თავად განასხვავებს, თუ რომელ პროფილს/სერვისს იყენებს UI).
 
 export type Role = 'customer' | 'provider';
 
-// Customer-ის საკუთარი პროფილის მონაცემები (რეგისტრაციისას/Google-ით
-// შევსებული) — CustomerProfileContext-ის state-ის ფორმა.
+// CustomerProfileContext state.
 export type CustomerProfile = {
   firstName: string;
   lastName: string;
   email: string;
   defaultAddress: string;
-  // #107 — ტელეფონის OTP-ით რეგისტრირებულ ანგარიშებს არ აქვთ email —
-  // ცარიელი სტრიქონი ორივე ველისთვის (`email`-ის იგივე default-ი,
-  // #2-ის migration 0002-დანვე).
+  // '' when not registered that way (same for email)
   phone: string;
-  // მისამართის დამატებითი დეტალები (შესასვლელი/ბინა/კარის კოდი) —
-  // `defaultAddress`-ის იგივე "მხოლოდ წინასწარ ივსება, არასდროს
-  // ავტომატურად არ იცვლება" პრინციპით. `entrance` სავალდებულოა, გარდა
-  // `isPrivateHouse`-ისა (კერძო სახლს შესასვლელი/ბინა არ გააჩნია).
+  // address details; entrance is required unless isPrivateHouse
   entrance: string;
   apartment: string;
   doorCode: string;
   isPrivateHouse: boolean;
 };
 
-// Supabase-ის `users` ცხრილის row-ის ფორმა — ანგარიშის საბაზისო
-// identity + role, საერთო ორივე როლისთვის (#51/#52). Register/GoogleComplete
-// წერს ამას რეგისტრაციისას, Login/RootNavigator-ის session-restore
-// კითხულობს (რომ იცოდეს, სად გადაიყვანოს მომხმარებელი — CustomerHome თუ
-// ProviderHome). Provider-ისთვის `defaultAddress` ცარიელია (Provider-ს
-// საცხოვრებელი მისამართი არ სჭირდება, #46) — მისი დანარჩენი, უფრო
-// დეტალური პროფილი (specialty/areas/about...) ცალკე `provider_profiles`
-// ცხრილშია (#53, `src/types/provider.ts`-ის `ProviderProfile`).
+// `users` row: identity + role. Providers have no address; their profile is in provider_profiles.
 export type UserRecord = {
   role: Role;
   firstName: string;
   lastName: string;
   email: string;
   defaultAddress: string;
-  // #107 — `public.users.phone` (supabase/migrations/0083), Email-ის
-  // იგივე "ცარიელი, თუ ეს მეთოდით არ დარეგისტრირებულა" პრინციპით.
   phone: string;
-  // `public.users.entrance`/`apartment`/`door_code`/`is_private_house` —
-  // Customer-ის მისამართის დამატებითი დეტალები, ყველა Provider-ისთვის
-  // ცარიელი/false (მისამართივით, #46).
+  // customers only (empty for providers)
   entrance: string;
   apartment: string;
   doorCode: string;
   isPrivateHouse: boolean;
-  // ადმინის მიერ ანგარიშის შეჩერება (supabase/migrations/0106) — client არასდროს წერს,
-  // მხოლოდ კითხულობს login/session-restore-ზე (#139).
+  // set by the admin; checked on login and session restore
   suspended: boolean;
   suspensionReason: string | null;
 };

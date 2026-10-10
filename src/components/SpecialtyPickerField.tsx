@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Briefcase, Check, ChevronRight, X } from 'lucide-react-native';
 import { BottomSheet } from './BottomSheet';
@@ -24,7 +24,7 @@ const CUSTOM_PREFIX = 'custom:';
 // ძველი custom:* ჩანაწერები მხოლოდ წასაშლელად ჩანს.
 export function SpecialtyPickerField({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
-  // ადმინ-პანელიდან მართული კატეგორიები (`categories`, is_active) — სპეციალობა = კატეგორია (#116)
+  // Professions = active categories from the admin panel.
   const [categoryList, setCategoryList] = useState(() => categoryService.getCached());
   useEffect(() => {
     categoryService.listCategories().then(setCategoryList);

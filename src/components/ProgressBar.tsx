@@ -1,4 +1,3 @@
-import React from 'react';
 import { View } from 'react-native';
 import { colors } from '../theme';
 
@@ -7,7 +6,7 @@ type Props = {
   total: number;
 };
 
-// Onboarding-ის პროგრესის ინდიკატორი (დიზაინის რეფერენსის ProgressBar-ის მიხედვით)
+// Onboarding step dots.
 export function ProgressBar({ step, total }: Props) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

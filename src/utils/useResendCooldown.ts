@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 
-// #107 — არცერთ ეკრანზე ადრე countdown/cooldown-ის პატერნი არ არსებობდა
-// (გადამოწმებულია grep-ით) — მინიმალური, ახალი hook OTP-ის "ხელახლა
-// გაგზავნის" ღილაკისთვის (`PhoneRegisterVerifyScreen`).
+// Countdown for the "resend code" button.
 export function useResendCooldown(seconds: number) {
   const [secondsLeft, setSecondsLeft] = useState(seconds);
 

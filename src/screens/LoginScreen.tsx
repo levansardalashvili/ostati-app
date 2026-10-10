@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -13,7 +13,7 @@ import { SocialAuthRow } from '../components/SocialAuthRow';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
-import { userService } from '../services/userService';
+import { loadSignedInUser } from '../utils/signInSession';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
@@ -22,7 +22,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
-// A3 — შესვლის ეკრანი (product-spec.md, create-account-form.md)
+// Login: email + password, Google, Apple (phone when enabled).
 export function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -59,37 +59,9 @@ export function LoginScreen({ navigation }: Props) {
       setCredError('ავტორიზაცია ვერ დასრულდა — სცადე თავიდან.');
       return;
     }
-    const record = await userService.getUserRecord(user.uid);
-    if (!record) {
-      await authService.signOut();
-      setCredError('ეს ანგარიში ჯერ არ არის დარეგისტრირებული — ჯერ დარეგისტრირდი.');
-      return;
-    }
-    if (record.suspended) {
-      await authService.signOut();
-      setCredError(`თქვენი ანგარიში შეჩერებულია: ${record.suspensionReason ?? 'წესების დარღვევის გამო'}`);
-      return;
-    }
-    if (record.role === 'provider') {
-      setProviderProfile({ firstName: record.firstName, lastName: record.lastName });
-      const providerProfile = await userService.getProviderProfileRecord(user.uid);
-      if (providerProfile) setProviderProfile(providerProfile);
-      // პროფილის row არ არსებობს = setup არ დასრულებულა, ვაბრუნებთ setup-ზე
-      navigation.reset({ index: 0, routes: [{ name: providerProfile ? 'ProviderHome' : 'ProviderSetup' }] });
-    } else {
-      setProfile({
-        firstName: record.firstName,
-        lastName: record.lastName,
-        email: record.email,
-        defaultAddress: record.defaultAddress,
-        phone: record.phone,
-        entrance: record.entrance,
-        apartment: record.apartment,
-        doorCode: record.doorCode,
-        isPrivateHouse: record.isPrivateHouse,
-      });
-      navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
-    }
+    const result = await loadSignedInUser(user.uid, setProfile, setProviderProfile);
+    if ('error' in result) setCredError(result.error);
+    else navigation.reset({ index: 0, routes: [{ name: result.route }] });
   };
 
   const handleLogin = async () => {

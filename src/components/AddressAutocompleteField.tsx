@@ -7,10 +7,7 @@ import { useScrollIntoViewOnFocus } from './KeyboardAwareForm';
 
 type Suggestion = { id: string; label: string };
 
-// Nominatim's structured address breakdown (`addressdetails=1`) — only the
-// pieces this component actually reads; the real response has many more
-// (state/county/postcode/country/...), all ignored here on purpose (task:
-// "avoid unnecessary repeated district / city / postal code / country").
+// Only the Nominatim address parts we read.
 type NominatimAddress = {
   house_number?: string;
   road?: string;
@@ -29,18 +26,8 @@ type NominatimResult = {
   address?: NominatimAddress;
 };
 
-// Address-fix pass, task 1 — Nominatim's raw `display_name` includes every
-// administrative layer it has (house number, street, neighbourhood,
-// district-with-"რაიონი" suffix, city, postcode, country — CLAUDE.md's own
-// example: "12, ალიო მირცხულავას ქუჩა, დიდუბე, დიდუბის რაიონი, თბილისი,
-// 0119, საქართველო"). Using `addressdetails=1`'s STRUCTURED fields (not
-// truncating the raw string by length/comma-count) to keep exactly:
-// house number + street + neighbourhood/local area — "12, ალიო
-// მირცხულავას ქუჩა, დიდუბე". The area/neighbourhood piece is always
-// preserved deliberately — CustomerHomeScreen's own district filter
-// (CLAUDE.md #20) substring-matches district names against whatever text
-// ends up in this field, so dropping it here would silently break that
-// unrelated feature.
+// Short label from structured fields: house number + street + area.
+// The area stays on purpose — district guessing matches against this text.
 function shortAddressLabel(result: NominatimResult): string {
   const a = result.address;
   if (!a) return result.display_name;
@@ -53,18 +40,11 @@ function shortAddressLabel(result: NominatimResult): string {
 
   if (parts.length > 0) return parts.join(', ');
 
-  // No street-level match at all (e.g. the query matched a whole
-  // neighbourhood/city, not a specific address) — fall back to whatever
-  // coarse place name is available, never literally nothing, and never
-  // the full raw string with postcode/country still attached.
+  // No street match → the coarsest place name, never the raw string with postcode/country.
   return area || a.city || a.town || a.village || result.display_name;
 }
 
-// Address-fix pass, task 2 — normalize before comparing, not a positional
-// "drop every other item": lowercasing is a no-op for Georgian script (no
-// case distinction), but this also collapses incidental whitespace
-// differences between two results that would otherwise render as visibly
-// identical rows.
+// Collapse whitespace so visually identical rows dedupe (no case in Georgian).
 function normalizeForDedup(label: string): string {
   return label.trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -77,9 +57,7 @@ type Props = {
   onBlur?: () => void;
   placeholder?: string;
   error?: string;
-  // TextField.tsx-ის იგივე პრინციპი — წითელი "*" ლეიბლის გვერდით.
   required?: boolean;
-  // TextField.tsx-ის იგივე "შემდეგი"-ით ჯაჭვის პრინციპი.
   onSubmitEditing?: () => void;
 };
 
@@ -87,18 +65,9 @@ const MIN_QUERY_LEN = 3;
 const DEBOUNCE_MS = 500;
 const BLUR_HIDE_DELAY_MS = 200;
 
-// მისამართის ველი რუკის შედეგების სიით (OpenStreetMap Nominatim, უფასო,
-// API key არ სჭირდება — მომხმარებლის მოთხოვნით). მომხმარებელი წერს
-// მისამართს (მაგ. "ჭავჭავაძის 48"), 500ms დებაუნსით მოდის რამდენიმე
-// შესატყვისი შედეგი ჩამონათვალის სახით ველის ქვემოთ, არჩევისას ველი
-// ივსება არჩეული ვარიანტით. თუ API-მ ვერაფერი იპოვა ან ხელმისაწვდომი
-// არაა — თავისუფალი ტექსტის ჩაწერაც კვლავ მუშაობს (ვალიდაცია
-// value.trim()-ზეა, არა არჩევაზე). გამოიყენება RegisterScreen-სა და
-// GoogleCompleteScreen-ში (customer-ისთვისაც და provider-ისთვისაც — ორივე
-// ამ ორ ეკრანზე შედის, ცალკე მისამართის ველი Provider-ს არსად აქვს).
-// შენიშვნა: Nominatim-ის უფასო public API-ს აქვს rate-limit (~1 req/sec) —
-// მასშტაბის ზრდისას განსახილველია საკუთარი Nominatim instance ან ფასიანი
-// providers (Google Places).
+// Address field with Nominatim suggestions (free, no key; 500ms debounce).
+// Free text still works — validation is just non-empty.
+// ponytail: public Nominatim is ~1 req/s; self-host or a paid geocoder if traffic grows.
 export const AddressAutocompleteField = React.forwardRef<TextInput, Props>(function AddressAutocompleteField(
   { label, value, onChangeText, onSelect, onBlur, placeholder, error, required, onSubmitEditing },
   forwardedRef,
@@ -132,24 +101,13 @@ export const AddressAutocompleteField = React.forwardRef<TextInput, Props>(funct
       const seq = ++requestSeq.current;
       setLoading(true);
       try {
-        // `addressdetails=1` — structured fields, needed for both the
-        // shortened display format (task 1) and a meaningful dedup key
-        // (task 2); without it we'd only ever have the long raw string.
         const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=ge&accept-language=ka&q=${encodeURIComponent(query)}`;
         const res = await fetch(url, { headers: { 'User-Agent': 'ostato-app (Georgia local services marketplace)' } });
         const data = await res.json();
         if (seq !== requestSeq.current) return;
 
         const results = Array.isArray(data) ? (data as NominatimResult[]) : [];
-        // Dedup by the NORMALIZED SHORT label, not by index/position and
-        // not by raw display_name — two Nominatim results can be
-        // different OSM features (different place_id, different exact
-        // display_name — e.g. differing only in postcode or a minor
-        // district-name variant) that collapse to the exact same
-        // house-number+street+area once shortened; showing both would
-        // just be two visually identical rows. Results that genuinely
-        // differ in house number, street, or area keep distinct short
-        // labels and are never merged.
+        // Dedup by the normalized short label — different OSM results can shorten to the same row.
         const seen = new Set<string>();
         const deduped: Suggestion[] = [];
         results.forEach((item, idx) => {
@@ -195,10 +153,7 @@ export const AddressAutocompleteField = React.forwardRef<TextInput, Props>(funct
 
   const onFieldLayout = (e: LayoutChangeEvent) => setFieldHeight(e.nativeEvent.layout.height);
 
-  // "ჩემი მდებარეობის გამოყენება" — მომხმარებლის მოთხოვნა, Bolt Food-ის
-  // მსგავსი ნაკადით: ნებართვის მოთხოვნა → GPS-კოორდინატი →
-  // Nominatim-ის reverse-geocoding (იგივე `shortAddressLabel()`, რასაც
-  // ტექსტური ძებნაც იყენებს — ერთი ფორმატი ორივე გზისთვის).
+  // GPS → Nominatim reverse geocoding → same short label format.
   const handleUseLocation = async () => {
     if (locating) return;
     setLocationError('');

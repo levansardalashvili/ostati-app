@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -39,8 +39,7 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-// E1 — Provider-ის პროფილის ეკრანი (product-spec.md; დიზაინის რეფერენსის
-// ProviderProfile-ის მიხედვით)
+// Provider's own profile tab.
 export function ProviderProfileScreen({ navigation }: Props) {
   const { handleScroll } = useTabBarScroll();
   const { profile, setProfile } = useProviderProfile();
@@ -49,17 +48,9 @@ export function ProviderProfileScreen({ navigation }: Props) {
   const specialtyLabel = profile.specialty[0]?.label ?? '';
   const experienceLabel = EXPERIENCE_OPTIONS.find((e) => e.id === profile.experience)?.label ?? '';
 
-  // რეალური rating/reviews/jobs (#71) — ადრე ჰარდქოდილი "4.9★/127 შეფ./312
-  // სამ." იყო, ანგარიშის რეალურ მდგომარეობასთან დაუკავშირებელი.
   const uid = authService.getCurrentUser()?.uid ?? null;
-  // `null` სანამ არ ჩაიტვირთება (არა `{rating:0,...}` საწყისიდანვე) — თუ
-  // 0-ზე დაწყებულს გვექნებოდა, `isNewProvider`-ის ternary ქვემოთ ჯერ ერთ
-  // ფრაგმენტს (⭐-ის გარეშე) დახატავდა, მერე fetch-ის დასრულებისთანავე
-  // მთლიანად სხვა ფრაგმენტზე (⭐+რიცხვები) გადავიდოდა — ეს ტიპის ცვლილება
-  // ერთსა და იმავე position-ზე Fabric-ის ცნობილი Android crash-ია
-  // ("addViewAt... child already has a parent", #71-ის loading-guard-ების
-  // იგივე ოჯახის ბაგი). `null`-ის დროს საერთოდ არაფერი არ ვრენდერავთ იმ
-  // ადგილას — ცარიელიდან შევსებულზე გადასვლა კი უსაფრთხოა.
+  // null until loaded — rendering nothing, then the stats, is safe; switching between two
+  // different fragments in the same spot crashes Fabric on Android.
   const [stats, setStats] = useState<{ rating: number; reviews: number; jobs: number } | null>(null);
   useEffect(() => {
     if (!uid) return;

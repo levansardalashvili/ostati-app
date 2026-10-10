@@ -1,34 +1,9 @@
-// ორმხრივი (two-sided) დასრულების state machine (#72-ის მიხედვით
-// გამკვრივებული — რეალურ Postgres RPC-ებზეა აგებული, არა თავისუფალ
-// client-side UPDATE-ზე, იხ. supabase/migrations/0014_job_workflow_rpcs.sql):
-// pending (Provider ჯერ არ არჩეულა)
-//   → active (select_provider() RPC — Customer-მა Provider აირჩია;
-//     ატომურად ინიშნება provider_id + agreed_price, ამ ბოლოს პირდაპირ
-//     Provider-ის job_responses.offered_price-დან, RPC-ის შიგნით)
-//   → awaiting_customer_confirmation (provider_request_completion() RPC —
-//     Provider-ს პირდაპირ დასრულება არ შეუძლია, მხოლოდ ამ შუალედურ
-//     state-ში გადასვლა)
-//   → confirmed_awaiting_rating (customer_confirm_completion() RPC —
-//     Customer ეთანხმება, მაგრამ job ჯერ არ არის "completed")
-//   → completed (მხოლოდ reviews-ის INSERT trigger-ის (0015) გვერდითი
-//     ეფექტით, მას შემდეგ რაც სავალდებულო RatingScreen ვარსკვლავს
-//     გააგზავნის — არცერთი RPC პირდაპირ არ აყენებს "completed"-ს)
-//   ან → disputed (customer_report_problem() RPC, მიზეზის ტექსტით —
-//     job არასდროს ხდება completed ამ short-circuit-ით)
-// "cancelled" ამ ციკლის მიღმაა (გამონაკლისი/terminal state, კვლავ
-// მხოლოდ ლოკალური UI-ს დონეზე, არასდროს Supabase-ში ჩაწერილი — #47-ის
-// ცნობილი შეზღუდვა).
-//
-// შენიშვნა: StatusPill.tsx ამ ტიპს რეექსპორტავს (`export type { JobStatus }`),
-// რომ არსებული `import { StatusPill, type JobStatus } from '../components/StatusPill'`
-// import-ები ხელუხლებელი დარჩეს.
-// 'draft' — third hardening pass, priority 2 (supabase/migrations/0053):
-// create_job() creates a row in this status; it is invisible to every
-// Provider read and every workflow RPC, readable only by the owning
-// Customer (used to resume a failed publish attempt — see
-// PostJobScreen.tsx). It is never expected to reach StatusPill in normal
-// use (jobService.listMyJobPosts() excludes it), but is part of the type
-// because a direct getJobPostById() read can legitimately return one.
+// Job status, changed only by RPCs/triggers:
+// draft → pending → active (provider selected, price fixed)
+// → awaiting_customer_confirmation (provider marked done)
+// → confirmed_awaiting_rating → completed (only via the review insert trigger).
+// Side branches: disputed (customer reported a problem), cancelled.
+// 'draft' is visible only to its owner (an unfinished publish).
 export type JobStatus =
   | 'draft'
   | 'active'
@@ -39,27 +14,14 @@ export type JobStatus =
   | 'completed'
   | 'cancelled';
 
-// job_posts.time_slot-ის ფიქსირებული მნიშვნელობები (supabase/migrations/
-// 0041, `job_posts_time_slot_check`-ის ზუსტი ანარეკლი) — PostJobScreen-ის
-// "სასურველი დრო" BottomSheet-ის თითოეული ვარიანტი. `job_scheduled_start()`
-// SQL ფუნქცია (იქვე) განსაზღვრავს, რომელი დროიდან ითვლება job-ის
-// "დაწყებული" — 'flexible'/`undefined`-ისთვის უბრალოდ თარიღის დასაწყისი
-// (00:00, Asia/Tbilisi).
-// 'HH-HH' (საქართველოს დრო, მაგ. '09-10' = 09:00–10:00; ძველი განცხადებებისთვის '09-12' და ა.შ.) ან 'flexible' — იხ. data/timeSlots.ts
+// 'HH-HH' in Georgian time (e.g. '09-10'; old jobs '09-12') or 'flexible' — see data/timeSlots.ts.
 export type TimeSlot = string;
 
-// Provider-ის მხრიდან ხილული job-ის ჩანაწერი (Job Feed) — რეალურად
-// Supabase-ის `job_posts` ცხრილზეა აგებული (#55 "ეტაპი B", jobService.ts-ის
-// `getOpenProviderFeedPosts`/`listMyAssignedJobs`).
+// A job as the provider sees it (feed, assigned jobs).
 export type FeedJob = {
   id: string;
   category: string;
-  // job_posts-ს აღარ აქვს `title` სვეტი (#72 — ლეგასი, user-entered
-  // title წაშლილია canonical მოდელიდან, იხ.
-  // supabase/migrations/0011_job_posts_workflow_columns.sql). ეს ველი
-  // UI-ს გამო რჩება (ეკრანების ცვლილება არ დასჭირდა), მაგრამ
-  // jobService.ts-ში კატეგორიიდან გამოითვლება (`deriveJobTitle`), არა
-  // ბაზიდან წაკითხული.
+  // derived from the category
   title: string;
   customer: string;
   location: string;
@@ -67,97 +29,48 @@ export type FeedJob = {
   ago: string;
   urgent: boolean;
   hasPhoto: boolean;
-  // Task — `hasPhoto` მხოლოდ badge-ისთვის საკმარისი იყო ("ფოტოა" tag),
-  // მაგრამ თავად ფოტოს URL-ები არასდროს არ მოდიოდა Provider-ის მხარეს —
-  // ProviderJobDetailScreen-ს ფოტოს ჩვენება ფიზიკურად არ შეეძლო.
-  // `get_open_provider_feed()`/`get_feed_job_by_id()` RPC-ები (0048/0052)
-  // ისედაც აბრუნებდნენ `job_posts.photos`-ს — mapping-ში აკლდა.
   photos?: string[];
   desc: string;
-  // Customer-ის მიერ არჩეული Provider-ის id, თუ job უკვე გადაწყვეტილია.
-  // CURRENT_PROVIDER_ID-ს დამთხვევისას job Feed-იდან ქრება და "მიმდინარე
-  // სამუშაო" ხდება Provider Home-ზე; ნებისმიერი სხვა id-ით — უბრალოდ ქრება
-  // Feed-იდან (job სხვა Provider-ისთვის დაიხურა). undefined/null — job
-  // ჯერ კიდევ ღიაა ინტერესის გამოსახატად.
+  // the selected provider; set = the job is no longer open
   assignedProviderId?: string | null;
-  // თუ ეს Feed-job ზუსტად შეესაბამება CUSTOMER_JOBS-ის რომელიმე ჩანაწერს
-  // (იგივე "namdvili" job ორივე მხრიდან), მისი id აქ — ორმხრივი დასრულების
-  // state machine (JobStatusContext.tsx) ამ id-ით კითხულობს/წერს გაზიარებულ
-  // სტატუსს ProviderJobDetailScreen-ზე. undefined — ეს Feed-job მხოლოდ
-  // Provider-მხრიდანაა მოდელირებული, Customer-ის მხარეს შესატყვისი ჩანაწერი
-  // არ არსებობს.
+  // same as id; key for JobStatusContext
   customerJobId?: string;
-  // რეალური job_posts.status (#69) — შევსებულია მხოლოდ `listMyAssignedJobs`-ის
-  // შედეგზე ("ჩემი სამუშაოები"/"მიმდინარე სამუშაო" ბარათებისთვის),
-  // undefined Job Feed-ის ღია (ყოველთვის 'pending') ჩანაწერებზე.
+  // set only on assigned jobs (open feed jobs are always 'pending')
   status?: JobStatus;
-  // job_posts.customer_id (#70) — Provider-ის "დაინტერესებისას"/"სამუშაო
-  // დავასრულე"-ს დროს საჭიროა, რომ ვიცოდეთ Customer-ს (job-ის owner-ს)
-  // ვის შევუთხოვოთ შეტყობინება. undefined mock demo ჩანაწერებზე.
   customerId?: string;
-  // job_posts.agreed_price (#72) — select_provider() RPC-ის მიერ
-  // ატომურად კოპირებული არჩეული Provider-ის job_responses.offered_price-დან.
-  // undefined/null სანამ Provider ჯერ არ არჩეულა.
+  // copied from the chosen response's offered_price on selection
   agreedPrice?: number | null;
-  // job_posts.cancellation_actor (supabase/migrations/0036) — ვინ
-  // გააუქმა (`cancel_job`/`provider_cancel_job` RPC-ებში სერვერზეა
-  // derived, არასდროს client-ის claim). `undefined`/`null` — job
-  // არასდროს გაუქმებულა, ან ძველი, migration-მდელი ჩანაწერია.
-  // `ProviderJobDetailScreen`-ის 'cancelled' variant-ის ტექსტს იყენებს,
-  // რომ არასწორად "მომხმარებელმა გააუქმა" არ დაწეროს, როცა სინამდვილეში
-  // Provider-მა თავად გააუქმა საკუთარი job.
+  // who cancelled — set by the server
   cancellationActor?: 'customer' | 'provider' | 'admin' | null;
-  // job_posts.preferred_date/time_slot (supabase/migrations/0041) —
-  // კანონიკური (structured) დანართი არსებული თავისუფალ-ტექსტური
-  // `date`-ის გვერდით, რომელიც ჩვენებისთვის უცვლელად რჩება. `undefined`
-  // ძველ, migration-მდელ job-ებზე (განრიგის შეზღუდვის გარეშე, ისევე
-  // როგორც აქამდე). `provider_request_completion()` RPC (0041) სწორედ
-  // ამ ორ ველზეა აგებული, არა თავისუფალ `date`-ზე.
+  // canonical schedule (null on old jobs); `date` is display text
   preferredDate?: string | null;
   timeSlot?: TimeSlot | null;
 };
 
-// Customer-ის მხრიდან ხილული job-ის ჩანაწერი — რეალურად Supabase-ის
-// `job_posts` ცხრილზეა აგებული (#54 "ეტაპი A", jobService.ts-ის
-// `createCustomerJob`/`listMyJobPosts`/`getJobPostById`).
+// A job as its customer sees it.
 export type CustomerJob = {
   id: string;
-  // 0094/0152 — private job sent to one Provider ("მიწერა"/rehire), and
-  // whether that Provider declined it.
+  // private job ("მიწერა"/rehire) and whether that provider declined
   invitedProviderId?: string | null;
   inviteDeclinedAt?: string | null;
-  // job_posts-ს აღარ აქვს `title` სვეტი (#72) — იხ. FeedJob.title-ის
-  // იგივე შენიშვნა ზემოთ.
+  // derived from the category
   title: string;
   category: string;
-  // სრული JobStatus union-ია (#67) — ადრე ვიწრო '`active`|`pending`|
-  // `completed`|`cancelled`' იყო, `JobStatusContext`-ის რეალურად უფრო
-  // ფართო მდგომარეობებთან (`awaiting_customer_confirmation`/`disputed`)
-  // შეუსაბამოდ.
   status: JobStatus;
   provider: string | null;
-  // job_posts.provider_id (#71) — Provider-ის რეალურ id-ზე დაფუძნებული
-  // ჩატის გახსნა (CustomerJobsScreen-ის "ჩატი" ღილაკი), `provider`
-  // (სახელი) ცალკეა ისტორიულად, ჩვენებისთვის საკმარისი იყო.
   providerId?: string;
   date: string;
   address: string;
-  // 0109 — სტრუქტურირებული რაიონი/ქალაქი; ძველ განცხადებებზე undefined
+  // structured district/city (undefined on old jobs)
   district?: string;
   desc: string;
-  // Supabase Storage-ის საჯარო URL-ები (#63) — `undefined` ძველ mock
-  // demo-ჩანაწერებზე (j1/j2/j3, #61-ის წინა), ცარიელი მასივი რეალურ
-  // job-ზე ფოტოს გარეშე, შევსებული მასივი — რეალურ ატვირთულ ფოტოებზე.
   photos?: string[];
-  // job_posts.agreed_price (#72) — იხ. FeedJob-ის იგივე ველი ზემოთ.
   agreedPrice?: number | null;
-  // ვინ გააუქმა (0036) — Customer-ს "ხელახლა გახსნა" მხოლოდ ოსტატის გაუქმებაზე ეძლევა (0097)
+  // reopen is offered only when the provider cancelled
   cancellationActor?: 'customer' | 'provider' | 'admin' | null;
   createdAt?: string;
-  // job_posts.dispute_reason (#72) — customer_report_problem() RPC-ის
-  // მიერ შენახული თავისუფალი ტექსტი, მხოლოდ 'disputed' სტატუსზე.
+  // set while 'disputed'
   disputeReason?: string | null;
-  // იხ. FeedJob-ის იგივე ველების შენიშვნა ზემოთ (supabase/migrations/0041).
   preferredDate?: string | null;
   timeSlot?: TimeSlot | null;
 };

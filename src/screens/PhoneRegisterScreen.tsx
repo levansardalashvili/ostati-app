@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -20,12 +20,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PhoneRegister'>;
 
 const PHONE_RE = /^5\d{8}$/;
 
-// #107 — ტელეფონის ნომრით რეგისტრაცია, RegisterScreen.tsx-ის იგივე
-// structure (email/password-ის ნაცვლად — ტელეფონის ველი). განზრახ
-// განსხვავდება Google/AppleComplete-ის "ჯერ auth, მერე პროფილის
-// დასრულების" ნიმუშისგან — აქ ყველა ველი **წინასწარ** იკრიბება, OTP
-// მხოლოდ ვერიფიკაციის ბოლო ნაბიჯია (იხ. PhoneRegisterVerifyScreen-ის
-// თავზე სრული მიზეზი).
+// Phone sign-up: all fields are collected first; the SMS code is the last step
+// (fewer paid SMS wasted on abandoned forms).
 export function PhoneRegisterScreen({ navigation, route }: Props) {
   const { role } = route.params;
   const isProvider = role === 'provider';
@@ -40,18 +36,12 @@ export function PhoneRegisterScreen({ navigation, route }: Props) {
     isPrivateHouse: false,
   });
   const [phoneDigits, setPhoneDigits] = useState('');
-  // Task — ეს პაროლი ინახება Supabase-ის ანგარიშზე OTP-ვერიფიკაციის
-  // წარმატების შემდეგ (PhoneRegisterVerifyScreen-ის `setNewPassword`)
-  // — რომ login-ისას (PhoneLoginScreen) ყოველ ჯერზე ახალი SMS-კოდი აღარ
-  // დასჭირდეს, RegisterScreen-ის (email) იგივე პაროლის პრინციპით.
+  // Saved after the code is verified, so later logins need no SMS.
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  // Keyboard "შემდეგი"-ის ჯაჭვი — RegisterScreen.tsx-ის იგივე ფიქსი
-  // (ველი, რომელიც ტაპის მომენტში კლავიატურის მიღმაა, ხელით ვეღარ
-  // დაიტაპება).
   const lastNameRef = useRef<TextInput>(null);
   const addressRef = useRef<TextInput>(null);
   const phoneRef = useRef<TextInput>(null);

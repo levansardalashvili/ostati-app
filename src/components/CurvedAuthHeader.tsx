@@ -1,4 +1,3 @@
-import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native';
@@ -9,30 +8,18 @@ import { colors, radius, spacing, typography } from '../theme';
 import { motion } from '../utils/motion';
 import { useKeyboardVisible } from '../utils/useKeyboardVisible';
 
-// ბორბლისებრი curved-header (ვიდეო-რეფერენსის ფორმა), აპის ერთი ლურჯი
-// აქცენტით (#2563EB→#1D4ED8, decision #5) — გაზიარებული Login/Register-ს შორის.
-// სიმაღლე *არ* არის ფიქსირებული რიცხვი — headerWrap თავად შეიცვლის ზომას
-// შიგთავსის მიხედვით (subtitle-იან Login-ზე გრძელი, subtitle-ის გარეშე
-// Register-ზე მოკლე) — Svg (absoluteFill) ავტომატურად „იჭიმება“ რაც არ
-// უნდა სიმაღლე გამოვიდეს, JS-გაზომვის გარეშე.
+// Curved auth header. Height follows the content; the SVG stretches to fit.
 const BLOB_PATH = 'M0,0 L100,0 L100,58 C78,58 70,92 45,88 C25,85 15,65 0,68 Z';
-// ტალღას სჭირდება ცარიელი სივრცე ტექსტის ქვემოთ — თორემ curve ტექსტს „მოსჭრის“
+// Room under the text so the curve doesn't cut it.
 const CURVE_BOTTOM_PADDING = spacing.xxl * 3;
 
 type Props = {
-  // Login-ის "კეთილი იყოს..." ტიპის ტექსტი brand-ის ქვემოთ — არასავალდებულო
-  // (Register-ს აღარ სჭირდება, #167-ის მოთხოვნით)
   subtitle?: string;
-  // არასავალდებულო — თუ არ არის მოცემული, უკან-ისარი საერთოდ არ ჩანს
-  // (Login-ს აღარ სჭირდება, #170: Welcome ახლა `replace`-ავს Login-ზე,
-  // stack-ში წინა ეკრანი აღარ რჩება)
+  // no back arrow when omitted
   onBack?: () => void;
-  // default "ოსტატო" (აპის ბრენდი, Login-ზე); Register-ს შეუძლია აქ
-  // არჩეული როლის ლეიბლი გადასცეს ("მომხმარებელი"/"ოსტატი") — ეს როლის
-  // სახელია, არა ბრენდი, ამიტომ "ოსტატი" ფორმით რჩება უცვლელი.
+  // brand, or the role label on Register
   brand?: string;
-  // მოცემულია, თუ Register-ს RoleSelectScreen-ის იგივე emoji-ს (🏠/🔧) სჭირდება
-  // ბრენდის ნიშნის ნაცვლად — default undefined ინარჩუნებს Login-ის ბრენდის ნიშანს
+  // role emoji instead of the brand mark
   emoji?: string;
 };
 

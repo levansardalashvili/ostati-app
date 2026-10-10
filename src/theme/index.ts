@@ -19,20 +19,9 @@ export const spacing = {
   xxl: 32,
 };
 
-// Task — "ღილაკები და ფორმები სხვადასხვა ზომის ტელეფონის ეკრანებზე ჩანს
-// დამახინჯებულად" — ტიპოგრაფია მთელ აპში აქედან ერთი წყაროდან მოდის
-// (`typography.*`-ს ყველა ეკრანი/კომპონენტი spread-ავს), ამიტომ ერთი,
-// ცენტრალიზებული, ეკრანის სიგანეზე დაფუძნებული "moderate scale" აქ
-// ავტომატურად ვრცელდება ყველგან — ცალკეული ეკრანების touch-ის გარეშე.
-// Baseline 375dp (გავრცელებული საშუალო დიზაინის სიგანე). `MODERATE_FACTOR`
-// (0.35) აბალანსებს ეფექტს — ვიწრო ეკრანზე ტექსტი ოდნავ პატარავდება (არა
-// პროპორციულად, რაც წაუკითხავად ხდიდა პატარა ტექსტს), დიდ ეკრანზე ოდნავ
-// იზრდება. [0.85, 1.15]-ში შეზღუდვა იცავს ორივე უკიდურესობისგან. Portrait-
-// only აპია (app.json) — static `Dimensions.get('window')` მოდულის
-// ჩატვირთვისას საკმარისია, dynamic re-render (`useWindowDimensions`) არ
-// სჭირდება. ეს არ ცვლის RN-ის საკუთარ, OS-ის accessibility font-scale
-// პატივისცემას (`allowFontScaling`) — მხოლოდ ბაზისურ `fontSize`-ს ცვლის,
-// რომელზეც OS-ის სკალირება ისედაც ცალკე გადაიდება.
+// Font sizes scale moderately with screen width (base 375dp, factor 0.35,
+// clamped to 0.85–1.15). Portrait only, so read the width once.
+// OS accessibility font scaling still applies on top.
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BASELINE_WIDTH = 375;
 const MODERATE_FACTOR = 0.35;

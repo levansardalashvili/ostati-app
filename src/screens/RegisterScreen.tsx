@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -26,14 +26,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
 const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
-// A3 — რეგისტრაცია (product-spec.md, create-account-form.md).
-// მისამართის ველი customer-ისთვისაც ემატება — დიზაინის რეფერენსის
-// მიხედვით, პრიორიტეტის წესის თანახმად (ზიპი კონფლიქტში იმარჯვებს).
-// Provider-ისთვის მისამართი საერთოდ არ ჩანს/არ სავალდებულოა (მომხმარებლის
-// მოთხოვნით) — Provider-ის სამუშაო არეალს მოგვიანებით, ProviderSetup-ზე
-// ირჩევს (RegionAreaPicker), საცხოვრებელი მისამართი მას საერთოდ არ სჭირდება.
-// "სახელი და გვარი" ორივე როლისთვის გაყოფილია ცალკე ველებად
-// (მომხმარებლის მოთხოვნით override-ავს ზიპის ერთიან ველს).
+// Email registration. Address only for customers (providers pick a work area in setup).
 export function RegisterScreen({ navigation, route }: Props) {
   const { role } = route.params;
   const isProvider = role === 'provider';
@@ -52,9 +45,7 @@ export function RegisterScreen({ navigation, route }: Props) {
   });
   const [pass, setPass] = useState('');
   const [confirm, setConfirm] = useState('');
-  // Keyboard "შემდეგი"-ით ჯაჭვი — ამის გარეშე ველი, რომელიც კლავიატურის
-  // გახსნის შემდეგ ეკრანის ბოლოში აღმოჩნდება (მაგ. მისამართი, ელ.ფოსტის
-  // მერე), ფიზიკურად ვერ ტაპდება (ნაპოვნი რეალური ბაგი).
+  // "Next" key chains the fields.
   const lastNameRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
   const addressRef = useRef<TextInput>(null);
@@ -127,15 +118,8 @@ export function RegisterScreen({ navigation, route }: Props) {
     if (!allValid || loading) return;
     setLoading(true);
     try {
-      // Task — ელფოსტის რეგისტრაცია ახლა სავალდებულო OTP-დადასტურებას
-      // საჭიროებს (Supabase-ის "Confirm email" ჩართული) — `signUp()`
-      // მხოლოდ დაუდასტურებელ ანგარიშს ქმნის და ავტომატურად აგზავნის
-      // პირველ კოდს; `users`-ის row ("profile") ახლა მხოლოდ
-      // RegisterVerifyEmailScreen-ზე, verify-ის წარმატების შემდეგ იწერება
-      // (ზუსტად PhoneRegisterVerifyScreen-ის იგივე არქიტექტურით) —
-      // პაროლი კი, ტელეფონისგან განსხვავებით, უკვე ანგარიშის
-      // შექმნისთანავე დაყენებულია, ცალკე route param-ად გადატანა არ
-      // სჭირდება.
+      // signUp created an unconfirmed account and sent the code; the users row is
+      // written after verification (RegisterVerifyEmailScreen).
       const goToVerify = () => {
         setLoading(false);
         navigation.navigate('RegisterVerifyEmail', {
@@ -152,8 +136,6 @@ export function RegisterScreen({ navigation, route }: Props) {
       };
 
       const completeWithUid = async (uid: string) => {
-        // Supabase-ის `users` ცხრილის row — Login-ს დასჭირდება role-ის
-        // წასაკითხად (რომელ Home-ზე გადაიყვანოს ავტორიზაციის შემდეგ).
         const record = {
           role,
           firstName: firstName.trim(),
@@ -169,25 +151,15 @@ export function RegisterScreen({ navigation, route }: Props) {
         try {
           await userService.createUserRecord(uid, record);
         } catch {
-          // ერთი ხელახალი ცდა მოკლე ქსელური შეფერხების გადასატანად
+          // One retry for a brief network drop.
           await new Promise((resolve) => setTimeout(resolve, 800));
           await userService.createUserRecord(uid, record);
         }
-        // Task — უკან-ისრით ამ ეკრანზე დაბრუნებისას ღილაკი "რეგისტრაცია..."-ზე
-        // ჩარჩენილი აღარ დარჩეს (`navigate`-ის, არა `replace`-ის შემდეგ ეს
-        // ეკრანი აღარ იშლება, `loading`-ის reset კი მანამდე მხოლოდ catch-ში
-        // ხდებოდა — წარმატებაზე screen უბრალოდ ქრებოდა, state-ს არავინ
-        // კითხულობდა).
+        // This screen stays in the stack (navigate) — reset loading for when the user comes back.
         setLoading(false);
         if (role === 'provider') {
           setProviderProfile({ firstName: firstName.trim(), lastName: lastName.trim() });
-          // `navigate` (არა `replace`), რომ ეს ეკრანი სტეკში დარჩეს:
-          // ProviderSetup-ის ახალი უკან-ისარი (`navigation.goBack()`) ამ
-          // ზუსტად ამ ეკრანზე დაბრუნდეს, ზუსტად ისე, როგორც
-          // Google/Apple/Phone-ის რეგისტრაციის გზებზეც უკვე მუშაობდა
-          // (იქ `navigation.navigate('GoogleComplete'|...)`-ით მისული
-          // შუალედური ეკრანი `replace`-ავს საკუთარ თავს ProviderSetup-ით,
-          // Register კი სტეკში ხელუხლებელი რჩება).
+          // navigate, not replace, so ProviderSetup's back arrow returns here.
           navigation.navigate('ProviderSetup');
         } else {
           setProfile({
@@ -213,8 +185,7 @@ export function RegisterScreen({ navigation, route }: Props) {
         if (needsEmailVerification) {
           goToVerify();
         } else {
-          // Dashboard-ის "Confirm email" ჯერ გამორთულია — ძველებური,
-          // დაუყოვნებელი დასრულება (verify-ის გარეშე).
+          // "Confirm email" is off — finish right away.
           await completeWithUid(uid);
         }
         return;
@@ -222,14 +193,8 @@ export function RegisterScreen({ navigation, route }: Props) {
         if ((registerError as { message?: string } | null)?.message !== 'User already registered') {
           throw registerError;
         }
-        // ნახევრად დასრულებული წინა მცდელობა: ან ჯერ არ დადასტურებულა
-        // ელფოსტა (Supabase-ის `Email not confirmed` — ანგარიში
-        // არსებობს, პაროლიც ემთხვევა, უბრალოდ verify ჯერ არ
-        // დასრულებულა → ვაგრძელებთ იმავე verify-ეკრანზე, ახალი კოდით),
-        // ან უკვე დადასტურებულია, მაგრამ `users`-ის row ვერ შეიქმნა
-        // (ქსელის გაწყვეტა createUserRecord-ამდე) → ვასრულებთ პირდაპირ,
-        // verify-ის გარეშე. ნებისმიერ სხვა შემთხვევაში (სხვისი ანგარიში,
-        // არასწორი პაროლი) — ჩვეულებრივი "უკვე დარეგისტრირებულია" შეცდომა.
+        // A half-finished earlier attempt: email not confirmed yet → continue to verify;
+        // confirmed but no users row → finish now. Anything else → "already registered".
         let existingUid: string;
         try {
           existingUid = (await authService.signInWithEmail({ email: email.trim(), password: pass })).uid;
@@ -258,7 +223,7 @@ export function RegisterScreen({ navigation, route }: Props) {
     setGLoading(true);
     try {
       await authService.signInWithGoogle();
-      navigation.navigate('GoogleComplete', { role });
+      navigation.navigate('SocialComplete', { role, provider: 'google' });
     } catch (error) {
       setSubmitError(getAuthErrorMessage(error));
     } finally {
@@ -271,7 +236,7 @@ export function RegisterScreen({ navigation, route }: Props) {
     setALoading(true);
     try {
       const { appleFullName } = await authService.signInWithApple();
-      navigation.navigate('AppleComplete', { role, appleFullName });
+      navigation.navigate('SocialComplete', { role, provider: 'apple', appleFullName });
     } catch (error) {
       setSubmitError(getAuthErrorMessage(error));
     } finally {

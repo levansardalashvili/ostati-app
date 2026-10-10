@@ -21,22 +21,8 @@ type Props = ScrollViewProps & {
   avoidKeyboard?: boolean;
 };
 
-// ჩანაცვლებს `react-native-keyboard-aware-scroll-view`-ს (მანამდე
-// გამოყენებული ყველა auth/ფორმის ეკრანზე) — ის React Native-ის New
-// Architecture-ზე (Fabric, Expo SDK 57-ის default) რეალურად დაშლილია:
-// `_updateKeyboardSpace`-ში ეყრდნობა ძველ `UIManager.measureInWindow`/
-// `UIManager.viewIsDescendantOf` static API-ებს, რომლებიც Fabric-ზე
-// აღარ მუშაობს — ჩუმად, ყოველგვარი შეცდომის/warning-ის გარეშე, ამიტომ
-// მანამდე ვერცერთმა ეკრანმა ვერ დაინახა, რომ საერთოდ არ ხდებოდა
-// ავტო-სქროლვა ფოკუსირებულ ველამდე (Login-ზე მხოლოდ იმიტომ "მუშაობდა",
-// რომ მისი content ისედაც საკმარისად მოკლეა კლავიატურის გარეშეც
-// მოსატევად).
-//
-// ამის ნაცვლად აქ პირდაპირ გამოიყენება React Native-ის საკუთარი,
-// Fabric-ზეც სწორად მუშა `ScrollView.scrollResponderScrollNativeHandleToKeyboard`
-// (TextInput-ის ref-ის `.measureLayout()` instance-მეთოდს იძახებს, არა
-// deprecated static UIManager-ს) — ზუსტად ის მექანიზმი, რასაც გატეხილი
-// ბიბლიოთეკა თავად ცდილობდა გაეხვია.
+// ScrollView that keeps the focused field above the keyboard (see scrollToInput).
+// react-native-keyboard-aware-scroll-view silently doesn't work on Fabric.
 export function KeyboardAwareForm({
   children,
   contentContainerStyle,

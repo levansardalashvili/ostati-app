@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Briefcase, Camera, CircleHelp, Heart, LogOut, MapPin, Pencil, Settings } from 'lucide-react-native';
@@ -24,8 +24,7 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-// E2 — Customer-ის პროფილის ეკრანი (product-spec.md; დიზაინის რეფერენსის
-// CustomerProfile-ის მიხედვით)
+// Customer profile tab.
 export function CustomerProfileScreen({ navigation }: Props) {
   const { handleScroll } = useTabBarScroll();
   const { profile } = useCustomerProfile();
@@ -225,10 +224,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.mutedForeground,
   },
-  // Task 3 — same values as ProviderProfileScreen.tsx's statsRow/statBox/
-  // statValue/statLabel (that file is unchanged; these are duplicated
-  // here rather than shared, per the chosen "leave Provider Profile
-  // untouched" approach).
+  // Same values as ProviderProfileScreen's stats styles.
   statsRow: {
     flexDirection: 'row',
     gap: spacing.sm,

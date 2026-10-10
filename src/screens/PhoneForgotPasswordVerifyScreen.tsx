@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
@@ -14,12 +14,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PhoneForgotPasswordVerify'>;
 
-// პაროლის აღდგენის ეზარდის 2/3 (ტელეფონი) — მხოლოდ OTP-კოდი
-// (ForgotPasswordVerifyScreen.tsx-ის, email-ის, ზუსტი სარკე). წარმატებაზე
-// სესია უკვე დამყარებულია (verifyPhoneOtp) — ბოლო ნაბიჯი გაზიარებული
-// ResetPasswordScreen-ია, აქამდე ეს ეკრანი თავად ამთავრებდა login-საც
-// (completeSignIn) — ახლა, #170-ის ვიდეო-რეფერენსის მიხედვით, ყოველთვის
-// ახალი პაროლის დაყენების შემდეგ გასვლა+ხელახალი-შესვლის მოთხოვნაა.
+// Phone password reset 2/3: the code. Verifying creates the session; next is ResetPassword.
 export function PhoneForgotPasswordVerifyScreen({ navigation, route }: Props) {
   const { phone } = route.params;
   const { secondsLeft, canResend, restart } = useResendCooldown(60);

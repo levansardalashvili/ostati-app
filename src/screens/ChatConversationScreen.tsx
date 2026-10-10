@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -49,37 +49,17 @@ import { useJobStatus } from '../state/JobStatusContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChatConversation'>;
 
-// D2 — საუბრის ეკრანი (product-spec.md; დიზაინის რეფერენსის
-// ChatConversation-ის მიხედვით). D3 — ფასის შეთანხმების სტრუქტურირებული
-// ბარათი (product-spec.md-ის დაფიქსირებული წესი #2) — ზიპში რეფერენსი არ
-// არსებობდა, აქედან გამომდინარე დიზაინი თავიდან შემუშავდა. Provider
-// აგზავნის შეთავაზებას ცალკე ბარათის სახით (არა თავისუფალი ტექსტით),
-// Customer ეთანხმება/უარყოფს პირდაპირ ბარათიდან — ორივე მოქმედება რეალურად
-// Supabase-ის `messages` ცხრილშია (#66/#73). "დათანხმებაზე" `respond_to_chat_offer()`
-// RPC ატომურად ასრულებს Provider-ის არჩევასაც (`job_posts.provider_id`/
-// `agreed_price`/`status='active'`) — იგივე `assign_job_provider()` ლოგიკა,
-// რასაც `select_provider()` იძახებს Job Detail-ის ეკრანზე — Customer-ს
-// აღარ სჭირდება იქ დაბრუნება იმავე Provider-ის ხელახლა ასარჩევად. ჯერ-ის
-// ბანერზე "სამუშაოს დეტალების ნახვა" (jobId-ის არსებობისას) იხსნის
-// შესაბამის Job Detail ეკრანს პირდაპირ ჩატიდან.
+// Chat between a customer and a provider. A price offer is a structured card;
+// accepting it (respond_to_chat_offer) also selects the provider for the job.
 export function ChatConversationScreen({ navigation, route }: Props) {
   const { chatId, name, initials, color, role, jobId, draftMessage } = route.params;
-  // ყველა navigation call site (#71) რეალურ Supabase UUID-ს გადასცემს
-  // chatId-ად (მეორე მხარის auth.users.id) — mock chat-ის კუნძული
-  // მთლიანად წაშლილია, ეს ეკრანი აღარ საჭიროებს mock/real branching-ს.
   const myUid = authService.getCurrentUser()?.uid ?? null;
   const customerId = role === 'customer' ? myUid : chatId;
   const providerId = role === 'provider' ? myUid : chatId;
   const { getStatus, setStatus } = useJobStatus();
 
-  // Task — `jobId` route param-ად მოდის მხოლოდ job-კონკრეტული შესვლის
-  // წერტილებიდან (Job Detail/Feed ეკრანები). `ChatsListScreen`-იდან
-  // გახსნისას საერთოდ არ არსებობს (conversations job-თან არ არის
-  // დაკავშირებული, #57) — ეს `useEffect` best-effort ავსებს ამ ხარვეზს
-  // `findLatestSharedJobId()`-ით, მხოლოდ header-ის "დეტ. ნახვა" ბმულისთვის
-  // (composer-ის Wallet-ღილაკის `jobId && jobStatus==='pending'` პირობას
-  // არ ეხება — ეს კვლავ მხოლოდ ცალსახა, route param-ად გადმოცემულ
-  // jobId/jobStatus-ზეა, არა ამ auto-resolved მნიშვნელობაზე).
+  // jobId comes as a route param only from job screens; from the chat list it is
+  // guessed with findLatestSharedJobId().
   const [autoJobId, setAutoJobId] = useState<string | null>(null);
   useEffect(() => {
     if (jobId || !customerId || !providerId) return;
@@ -105,39 +85,11 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     }
   };
 
-  // Task — job-ის დასრულების ნაკადი (Provider-ის "სამუშაო დავასრულე",
-  // Customer-ის "დადასტურება"/"პრობლემა მაქვს") ახლა ჩატშივეა
-  // ხელმისაწვდომი, "დეტ. ნახვა"-ზე გავლის გარეშე. `route.params.jobStatus`
-  // (მხოლოდ composer-ის Wallet-ღილაკისთვის, route-ის მომენტის snapshot-ია)
-  // ამ ბარათისთვის არასაკმარისია — ეს ერთხელ fetch-დება mount-ზე, ხოლო
-  // ამ ჩატშივე შესრულებული მოქმედებებისთვის (offer-ის დათანხმება,
-  // "სამუშაო დავასრულე") `JobStatusContext`-ის ლოკალური cache-ი (`getStatus`)
-  // მყისიერად override-ავს — ზუსტად იმ პრინციპით, რასაც Job Detail
-  // ეკრანებიც იყენებენ (`getStatus(id) ?? job.status`).
+  // Live job status for the in-chat status card; JobStatusContext overrides it
+  // immediately after actions taken here (same rule as the job detail screens).
   const [fetchedJobStatus, setFetchedJobStatus] = useState<JobStatus | null>(null);
-  // task: job-ის რეზიუმე ჩატშივე, სტრუქტურირებული ბარათის სახით (იგივე
-  // "ჩატი-ს დასაწყისში, ისტორიის ნაწილად" პრინციპი, რასაც ფასის
-  // შეთავაზების ბარათი უკვე იყენებს) — რომ Provider-მაც და Customer-მაც
-  // job-ის კონტექსტი ჩატის დასაწყისშივე დაინახონ, "დეტ. ნახვა"-ზე
-  // გადასვლის/ისტორიაში ზემოთ ატსქროლვის გარეშე.
-  //
-  // Audit fix (მეორე რაუნდი) — `location` პირველად სულ ამოვიღე, მაგრამ
-  // ეს არასწორი მიდგომა იყო: მოთხოვნა არასდროს ყოფილა "location არავის
-  // ეჩვენოს", არამედ **იგივე დამტკიცებული მასკირების წესის** დაცვა
-  // (#47/#97), რომელიც ეს ველი უკვე ჰქონდა. ის აქ ბრუნდება, მაგრამ
-  // **წყაროც უცვლელია** — `role==='provider'`-ისთვის `FeedJob.location`,
-  // რომელსაც `get_feed_job_by_id()` RPC (0052) **სერვერზევე** მასკირებს
-  // area_label-ზე, სანამ `jp.provider_id <> auth.uid()` (ანუ ეს
-  // კონკრეტული Provider ჯერ არ არჩეულა): `case when v_uid=jp.customer_id
-  // or v_uid=jp.provider_id then jp.address else area_label end`. ეს
-  // "არჩევა" ატომურადვე ხდება ფასის დადასტურებასთან ერთად
-  // (`select_provider()`/`respond_to_chat_offer()` ერთსა და იმავე
-  // ტრანზაქციაში წერს provider_id-საც და agreed_price-საც) — ანუ "ფასზე
-  // დადასტურებამდე მისამართი არ ჩანდეს" ზუსტად ის წესია, რასაც ეს RPC
-  // უკვე უზრუნველყოფს, client-ს არაფრის დამატება არ სჭირდება. Customer-ის
-  // მხარეს (`getJobPostById`/`CustomerJob.address`) კი ეს **საკუთარი**
-  // მისამართია (RLS owner-only) — ყოველთვის ნამდვილი, ჩვეულებრივი, ისევე
-  // როგორც PostJob/Job Detail ეკრანებზეც უცვლელად ჩანს.
+  // Job summary card at the top of the chat. The provider's location comes
+  // already masked by get_feed_job_by_id (exact address only once selected).
   const [jobSummary, setJobSummary] = useState<{ title: string; desc: string; location: string; category: string } | null>(
     null,
   );
@@ -205,8 +157,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     }
   })();
 
-  // Provider — "სამუშაო დავასრულე", ProviderJobDetailScreen-ის `markWorkDone`-ის
-  // იგივე RPC/error-handling (`SCHEDULED_TIME_NOT_REACHED`, #91).
+  // Provider "სამუშაო დავასრულე" — same RPC and errors as ProviderJobDetailScreen.
   const [markingWorkDone, setMarkingWorkDone] = useState(false);
   const markWorkDoneFromChat = async () => {
     if (!linkJobId || markingWorkDone) return;
@@ -226,10 +177,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     }
   };
 
-  // Customer — "დადასტურება" პირდაპირ RatingScreen-ზე გადადის (შეფასება
-  // სავალდებულოა, #6/#47/#18-ის დაფიქსირებული წესი — ჩატში მისი სრული
-  // ჩაშენება scope-ს სცდება). `name`/`initials`/`color` route param-ები
-  // Customer-ის ჩატში უკვე Provider-ის საკუთარი ინფოა (`chatId===providerId`).
+  // Customer "დადასტურება" goes straight to RatingScreen (rating is mandatory).
   const goToRatingFromChat = () => {
     if (!linkJobId) return;
     navigation.navigate('RatingScreen', {
@@ -240,8 +188,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     });
   };
 
-  // Customer — "პრობლემა მაქვს", CustomerJobDetailScreen-ის problem-sheet-ის
-  // ზუსტი ანარეკლი (იგივე PROBLEM_OPTIONS/RPC), ჩატში ჩაშენებული.
+  // Customer "პრობლემა მაქვს" — same options and RPC as CustomerJobDetailScreen.
   const PROBLEM_OPTIONS = ['ოსტატი ჯერ არ მოსულა', 'სამუშაო ჯერ არ დასრულებულა', 'სამუშაოს ხარისხი დაბალია', 'სხვა'];
   const [problemSheetOpen, setProblemSheetOpen] = useState(false);
   const [problemOption, setProblemOption] = useState<string | null>(null);
@@ -264,15 +211,10 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     }
   };
 
-  // #73: sendReal*-ს აღარ სჭირდება participants — `messages`-ის INSERT
-  // trigger (on_message_insert_notify) მონაწილეთა სახელებს/ინიციალებს
-  // პირდაპირ `users`/`provider_profiles`-იდან კითხულობს, სერვერის მხარეს.
 
   const [messages, setMessages] = useState<ChatMsg[]>([]);
 
-  // ერთ წყვილს რამდენიმე job რომ აქვს, მესიჯები ერთ ჩატში ერევა — როცა
-  // ჩატში 2+ განსხვავებული job_id ჩანს, job-ის შეცვლისას გამყოფი ჩნდება
-  // (არსებული 'date' ტიპის ხაზი, ახალი ტიპი არ დაგვჭირდა).
+  // One chat per customer/provider pair: when it spans 2+ jobs, a divider marks each job change.
   const [jobLabels, setJobLabels] = useState<Record<string, string>>({});
   const jobIdsKey = [...new Set(messages.map((m) => m.jobId).filter((x): x is string => !!x))].join(',');
   useEffect(() => {
@@ -321,8 +263,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     };
   }, [customerId, providerId, myUid, role]);
 
-  // Realtime (#59) — მეორე მხარის ახალი შეტყობინება მაშინვე ემატება, ეკრანის
-  // ხელახლა გახსნის გარეშე.
+  // Realtime: the other side's messages appear without reopening.
   useEffect(() => {
     if (!customerId || !providerId || !myUid) return;
     return chatService.subscribeToMessages(customerId, providerId, myUid, (msg) => {
@@ -337,40 +278,22 @@ export function ChatConversationScreen({ navigation, route }: Props) {
         next[idx] = msg;
         return next;
       });
-      // Chat-fix pass, task 3 — the mount-time markConversationRead()
-      // below only covers messages that already existed when the screen
-      // opened. If the OTHER participant sends something new while this
-      // screen is still open (realtime), the server-side trigger still
-      // increments this user's own unread counter (they weren't the
-      // sender) even though it's on screen right now — re-clear it here
-      // too. `subscribeToMessages` already filters out the caller's own
-      // new INSERTs (chatService.ts), so `msg` here is always something
-      // genuinely incoming, never an outgoing message being echoed back;
-      // `isNewIncoming` additionally excludes UPDATE events (e.g. an
-      // offer's accepted/declined status changing) from triggering this,
-      // since those aren't "new unread messages".
+      // A message arriving while the chat is open still bumps my unread counter
+      // server-side — clear it again (only for new incoming INSERTs, not offer updates).
       if (isNewIncoming) {
         chatService.markConversationRead(customerId, providerId).catch(() => {});
       }
     });
   }, [customerId, providerId, myUid]);
 
-  // StartJobChatSheet.tsx-ის draftMessage — fallback მხოლოდ იმ
-  // შემთხვევისთვის, თუ პირველი შეტყობინების ავტომატური გაგზავნა
-  // ჩავარდა (ქსელი) — ჩვეულებრივ ცარიელია, რადგან სასურველ შემთხვევაში
-  // შეტყობინება ჩატის გახსნამდეც უკვე გაგზავნილია.
+  // draftMessage: the first message from StartJobChatSheet, only if sending it failed.
   const [msgText, setMsgText] = useState(draftMessage ?? '');
 
-  // მომხმარებლის მოთხოვნა — Customer-ისთვის ცხადი გამაფრთხილებელი
-  // ნიშანი, რომ ახალი, job-ზე-დამყარებული მოთხოვნა ჯერ ერთმხრივია:
-  // საუბრის ნორმალურად გასაგრძელებლად Provider-მა ჯერ უნდა ნახოს/
-  // უპასუხოს. Job კვლავ 'pending'-ია (ჯერ არავინ არჩეულა) და Provider-ს
-  // ჯერ არცერთი შეტყობინება არ გაუგზავნია ამ საუბარში — წმინდა
-  // client-side derived flag-ია, ახალი RPC/სვეტი არ დასჭირდა.
+  // A new request is one-sided until the provider answers: the customer can't send more until then.
   const awaitingProviderResponse =
     role === 'customer' && !!linkJobId && liveJobStatus === 'pending' && !messages.some((m) => m.from === 'other');
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
-  // დაბლოკვა/დარეპორტება (0095). blockedByMe ბლოკავს კომპოზერს, იმავე გზით რაც composerLocked.
+  // Block / report. Being blocked locks the composer like composerLocked.
   const [menuOpen, setMenuOpen] = useState(false);
   const [blockedByMe, setBlockedByMe] = useState(false);
   const [blockBusy, setBlockBusy] = useState(false);
@@ -423,18 +346,10 @@ export function ChatConversationScreen({ navigation, route }: Props) {
   const [offerAmount, setOfferAmount] = useState('');
   const [offerComment, setOfferComment] = useState('');
   const scrollRef = useRef<ScrollView>(null);
-  // Chat-fix pass, task 1 — real bottom safe-area inset (home indicator/
-  // gesture bar), not a fixed guess (`SafeAreaView` above only reserves
-  // `top`, deliberately — see the composer style comment below for why).
+  // Real bottom inset; SafeAreaView reserves only `top` (see the composer).
   const insets = useSafeAreaInsets();
 
-  // "message list adjusts correctly" — when the keyboard opens, the
-  // ScrollView's own height shrinks (KeyboardAvoidingView's `padding`
-  // behavior on iOS, native `windowSoftInputMode="resize"` on Android,
-  // app.json), which can leave the latest message hidden behind the
-  // now-taller composer/keyboard until the user manually scrolls. Re-run
-  // the same scrollToEnd() used for new messages whenever the keyboard
-  // shows, on both platforms.
+  // Keep the latest message visible when the keyboard opens.
   useEffect(() => {
     const sub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => {
       scrollRef.current?.scrollToEnd({ animated: true });
@@ -442,10 +357,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
     return () => sub.remove();
   }, []);
 
-  // ჩატის ზედა ბანერზე ფასის სტატუსი ბოლო 'offer' შეტყობინებიდან
-  // გამოითვლება დინამიურად (არა სტატიკური mock ველი) — "მომლოდინე"
-  // (offerStatus==='pending'), "თქვენი შეთავაზება"/"შეთავაზებული ფასი"
-  // (ვინ გაგზავნა), ან "ფასი შეთანხმებულია"/"ფასი უარყოფილია".
+  // Price status banner — from the latest offer message.
   const latestOffer = [...messages].reverse().find((m) => m.type === 'offer');
   const offerStatusText = !latestOffer
     ? null
@@ -503,11 +415,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
 
   const sendOffer = () => {
     const amount = parseInt(offerAmount, 10);
-    // Cold-DM reply fix — `linkJobId` (resolved: route param OR
-    // `findLatestSharedJobId()`), არა raw route.params.jobId, რომელიც
-    // Chats-ის სიიდან/შეტყობინებიდან შესვლისას (StartJobChatSheet-ის
-    // ახალი ჩატის ჩათვლით) ყოველთვის undefined იყო — იხ. offer-ის
-    // კომპოზერი ღილაკის იგივე ფიქსი ზემოთ.
+    // linkJobId (route param or guessed), not route.params.jobId — that is missing when opened from the chat list.
     if (!amount || amount <= 0 || !linkJobId) return;
     const id = `offer-${Date.now()}`;
     const comment = offerComment.trim() || undefined;
@@ -539,13 +447,8 @@ export function ChatConversationScreen({ navigation, route }: Props) {
       });
   };
 
-  // Task 2 — Retry ახლა რეალურად ხელახლა უგზავნის შეტყობინებას შესაბამის
-  // chatService-ის მეთოდს (ვიზუალურ state-ს ცვლის, real send-ის გარეშე
-  // აღარ ვმუშაობთ). `retryingRef` — სინქრონული (არა useState) guard,
-  // რომ სწრაფი ორმაგი დაჭერა ერთსა და იმავე render-ში ორივემ ვერ
-  // "დაინახოს" ჯერ კიდევ 'failed' state (React-ის state batching-ის
-  // გამო `messages`-ის ცვლილება ერთ event handler-ში სინქრონულად ვერ
-  // აისახება), ვერც ორმაგი re-send მოხდეს.
+  // Retry re-sends for real. retryingRef is a synchronous guard: two fast taps
+  // in one render both still see 'failed' in state.
   const retryingRef = useRef<Set<string>>(new Set());
   const retryMsg = async (id: string) => {
     if (retryingRef.current.has(id) || !customerId || !providerId || !myUid) return;
@@ -561,10 +464,7 @@ export function ChatConversationScreen({ navigation, route }: Props) {
         if (!msg.jobId) throw new Error('Offer message is missing jobId');
         real = await chatService.sendRealOffer(customerId, providerId, myUid, msg.amount ?? 0, msg.comment, msg.jobId);
       } else if (msg.type === 'image') {
-        // თუ ატვირთვა უკვე მოხერხდა და მხოლოდ insert ჩავარდა, `imageUrl`
-        // უკვე რეალური http(s) URL-ია — ხელახლა აღარ ვტვირთავთ (image
-        // payload-ის შენარჩუნება). თუ ლოკალური file URI-ღაა, ატვირთვაც
-        // ხელახლა სჭირდება.
+        // If the upload succeeded and only the insert failed, imageUrl is already remote — don't upload again.
        let uploadedUrl = msg.imageUrl ?? '';
 
 if (
@@ -601,24 +501,13 @@ if (
     chatService
       .respondToRealOffer(id, offerStatus)
       .then(() => {
-        // Provider selection is now automatic on acceptance
-        // (supabase/migrations/0052, respond_to_chat_offer() ->
-        // assign_job_provider()) — the Customer no longer has to go back
-        // to the job-detail screen and pick the same Provider again.
-        // Sync the local cache so screens reading JobStatusContext (not
-        // yet re-fetched from Supabase) reflect this immediately too.
+        // Accepting selects the provider server-side; sync JobStatusContext right away.
         if (offerStatus === 'accepted' && msgJobId) {
           setStatus(msgJobId, 'active');
         }
       })
       .catch((e) => {
-        // Audit fix — `respond_to_chat_offer()` (0049/0066) legitimately
-        // rejects this (e.g. the job stopped being 'pending' between the
-        // offer being sent and this tap — the Customer selected a Provider
-        // through the normal "select" flow in the meantime). The optimistic
-        // update above must be rolled back here, or the UI permanently
-        // shows "accepted"/"declined" while the database still has
-        // 'pending' — until an unrelated refetch corrects it.
+        // The RPC can reject (e.g. the job was assigned meanwhile) — roll back the optimistic update.
         setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, offerStatus: previous } : m)));
         const expired = ((e as { message?: string } | null)?.message ?? '').includes('OFFER_EXPIRED');
         Alert.alert(
@@ -641,13 +530,7 @@ if (
           <Text style={styles.headerName} numberOfLines={1}>
             {name}
           </Text>
-          {/* Task — "დეტ. ნახვა" ლინკი ყოველთვის ჩანს, როცა ჩატს
-              job-კონტექსტი აქვს (`linkJobId` — route param-იდან, ან
-              best-effort ავტომატურად ამოხსნილი, იხ. ზემოთ), ფასის
-              სტატუსის დამოუკიდებლად — ცალკე, სტაბილური შესასვლელია
-              job-დეტალებზე (feed-ბარათის "დეტ. ნახვა" ღილაკის იგივე
-              ტერმინი, #98-შემდგომი). ქვედა ფასის-ბანერი (offerStatusText)
-              ამის დამოუკიდებლად, უცვლელად რჩება — მხოლოდ საინფორმაციო. */}
+          {/* Link to the job whenever the chat has a job context. */}
           {linkJobId && (
             <Pressable style={styles.headerJobLink} onPress={handleOpenJobDetail} hitSlop={6}>
               <Text style={styles.headerJobLinkText} numberOfLines={1}>
@@ -689,8 +572,7 @@ if (
         </View>
       )}
 
-      {/* Task — job-ის lifecycle-სტატუსი (offer-ის ფასის სტატუსისგან
-          დამოუკიდებელი) + შესაბამისი მოქმედება, პირდაპირ ჩატში. */}
+      {/* Job status card with the next action, right in the chat. */}
       {statusCardTitle && (
         <View style={styles.statusCard}>
           <View style={styles.statusCardHeaderRow}>
@@ -723,15 +605,7 @@ if (
         </View>
       )}
 
-      {/* `behavior: undefined` on Android used to rely entirely on the
-          native window resize (`android.softwareKeyboardLayoutMode:
-          "resize"`, app.json) to push the composer up when the keyboard
-          opens — but Android's edge-to-edge rendering (on by default since
-          Expo SDK 52+) makes that native resize silently no-op, so the
-          composer (and whatever the user is typing) ended up completely
-          hidden behind the keyboard instead of just covered. `'height'`
-          shrinks this view by the keyboard's height directly in JS,
-          independent of that broken native behavior. */}
+      {/* 'height' on Android: edge-to-edge makes the native window resize a no-op. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           ref={scrollRef}
@@ -739,13 +613,7 @@ if (
           contentContainerStyle={styles.messagesContent}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
-          {/* task — job-ის რეზიუმე ისტორიის ნაწილად, ბარათის სახით (ფასის
-              შეთავაზების ბარათის იგივე პრინციპი) — ჩანს **ორივე** მხარეს,
-              ერთხელ, ისტორიის თავში (ქრონოლოგიურად პირველი) — საუბრის
-              გაზრდისას ისტორიაში ზემოთ "იწევს" ჩვეულებრივი შეტყობინების
-              მსგავსად, header-ის "დეტ. ნახვა" ბმული კი (უცვლელი) მუდამ
-              ხელმისაწვდომია სწრაფი წვდომისთვის, ისტორიის სქროლვის
-              გარეშე. */}
+          {/* Job summary as the first item of the history, for both sides. */}
           {jobSummary && (
             <View style={styles.jobSummaryCard}>
               <View style={styles.jobSummaryHeaderRow}>
@@ -856,12 +724,7 @@ if (
                           {m.offerStatus === 'accepted' && <Check size={12} color={colors.success} strokeWidth={2.5} />}
                           {m.offerStatus === 'declined' && <X size={12} color={colors.destructive} strokeWidth={2.5} />}
                           {m.offerStatus === 'pending' && <Clock size={12} color={colors.mutedForeground} />}
-                          {/* supabase migration — ახალი offer ავტომატურად
-                              "superseded"-ად ნიშნავს იმავე job-ზე იმავე
-                              Provider-ის ძველ, ჯერ-კიდევ-pending
-                              შეთავაზებებს (DB trigger) — აქ უბრალოდ
-                              ვასახავთ, აქცია აღარ სჭირდება (canRespond
-                              ისედაც false-ია). */}
+                          {/* A newer offer marks older pending ones 'superseded' (DB trigger) — display only. */}
                           {m.offerStatus === 'superseded' && <Clock size={12} color={colors.mutedForeground} />}
                           <Text
                             style={[
@@ -881,10 +744,6 @@ if (
                     <View style={[styles.msgFooter, isMe ? styles.msgFooterMe : styles.msgFooterOther]}>
                       <Text style={styles.msgTime}>{m.t}</Text>
                       <MessageStateIcon state={m.state} isMine={isMe} />
-                      {/* Audit fix — retryMsg() already handled type==='offer'
-                          (msg.jobId re-send), but no bubble ever rendered this
-                          link for a failed offer — the send-failure dead-ended
-                          with no way to recover except reopening the sheet. */}
                       {m.state === 'failed' && (
                         <Pressable onPress={() => retryMsg(m.id)}>
                           <Text style={styles.retryText}>ხელახლა</Text>
@@ -912,9 +771,6 @@ if (
                     <View style={[styles.msgFooter, isMe ? styles.msgFooterMe : styles.msgFooterOther]}>
                       <Text style={styles.msgTime}>{m.t}</Text>
                       <MessageStateIcon state={m.state} isMine={isMe} />
-                      {/* Audit fix — same gap as the offer bubble above: image
-                          retry was already implemented in retryMsg() but the
-                          bubble itself never surfaced a way to trigger it. */}
                       {m.state === 'failed' && (
                         <Pressable onPress={() => retryMsg(m.id)}>
                           <Text style={styles.retryText}>ხელახლა</Text>
@@ -947,15 +803,8 @@ if (
           })}
         </ScrollView>
 
-        {/* Chat-fix pass, task 1 — root cause: `paddingBottom: spacing.lg`
-            was a fixed guess, not tied to the device's real safe-area
-            inset (`edges={['top']}` on the SafeAreaView above deliberately
-            does NOT reserve `bottom` itself — if it did, that fixed inset
-            padding would stack with KeyboardAvoidingView's own dynamic
-            keyboard-height padding once the keyboard opens, leaving an
-            extra empty gap above it). `insets.bottom` is 0 on devices with
-            no home-indicator/gesture-bar (older phones), where a small
-            fixed floor is still wanted for visual breathing room. */}
+        {/* Bottom padding = safe-area inset (top-only SafeAreaView avoids doubling it
+           with the keyboard padding); a small floor on phones without a gesture bar. */}
         <View style={[styles.composer, { paddingBottom: insets.bottom > 0 ? insets.bottom + spacing.xs : spacing.sm + 2 }]}>
           <Pressable
             testID="chat-attach-button"
@@ -965,15 +814,7 @@ if (
           >
             <Camera size={17} color={colors.mutedForeground} />
           </Pressable>
-          {/* Cold-DM reply fix (0077-შემდეგ) — ეს ღილაკი მანამდე მხოლოდ
-              route.params-ად პირდაპირ გადმოცემულ jobId/jobStatus-ს
-              ენდობოდა, რომელიც მხოლოდ Job Detail/Feed-დან შესვლისას
-              არსებობს — Chats-ის სიიდან ან შეტყობინებიდან შესვლისას
-              (StartJobChatSheet-ის ახალი "ცივი" ჩატის ჩათვლით) ეს ორივე
-              param ყოველთვის undefined იყო, ღილაკი კი საერთოდ არასდროს
-              ჩანდა, თუნდაც job რეალურად არსებობდეს და pending იყოს.
-              ახლა resolved `linkJobId`/`liveJobStatus`-ს იყენებს — იგივე
-              მნიშვნელობებს, რასაც header-ის "დეტ. ნახვა" ბმულიც. */}
+          {/* Offer button uses the resolved linkJobId/liveJobStatus, so it works when opened from the chat list too. */}
           {role === 'provider' && linkJobId && liveJobStatus === 'pending' && (
             <Pressable
               testID="chat-offer-open"
@@ -984,17 +825,8 @@ if (
             </Pressable>
           )}
           <View style={styles.textInputWrap}>
-            {/* Task (მეორე რაუნდი) — `editable={false}`-ის TextInput-ზე
-                გადართვა Android-ზე ცნობილად ტოვებდა native EditText-ს
-                ფოკუსის-მიღების უუნაროდ, `key`-ის ხელახალი-mount-ითაც კი
-                (ეს ცდა არ დაეხმარა) — ველი ისე რჩებოდა, თითქოს
-                კლავიატურა "აღარ ჩანდა". ახლა ველი **ყოველთვის
-                editable/focusable-ია** (native focus-ის ბაგი ფიზიკურად
-                აღარ არსებობს, რადგან `editable` აღარასდროს იცვლება) —
-                "სანამ ოსტატი არ უპასუხებს, ვერ გააგზავნი" კი დაცულია
-                ორმაგად: (1) გაგზავნის ღილაკი disabled-ია, (2) `sendMsg`
-                თავადაც no-op-ია ამ მდგომარეობაში (Enter-კლავიშითაც ვერ
-                გვერდის აუვლი). */}
+            {/* Never toggle `editable` (Android loses focus for good). Sending is blocked
+               by the disabled button and an early return in sendMsg instead. */}
             <TextInput
               testID="chat-message-input"
               value={msgText}
@@ -1110,10 +942,6 @@ if (
       >
         <Text style={styles.sheetTitle}>ფასის შეთავაზება</Text>
         <Text style={styles.sheetSubtitle}>შემკვეთმა უნდა დაადასტუროს, სანამ ფასი ძალაში შევა.</Text>
-        {/* Chat-fix pass, task 2 — clearer label + a real bordered field
-            (was a borderless, centered "hero number" with a vague
-            "მიუთითეთ ფასი" placeholder) — same state/validation/RPC call
-            underneath, only the wording and input styling changed. */}
         <Text style={styles.offerAmountLabel}>შეთავაზებული ფასი</Text>
         <View style={styles.offerAmountInputWrap}>
           <TextInput
@@ -1542,10 +1370,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   offerCardWrap: {
-    // `minWidth` wins over `maxWidth` in RN's layout when they conflict —
-    // kept comfortably below `maxWidth: '85%'`'s narrowest realistic value
-    // (85% of a 320pt-wide screen, minus this screen's own horizontal
-    // padding) so the 85% cap always actually applies, on any device.
+    // minWidth must stay below 85% of the narrowest screen, or it overrides maxWidth.
     maxWidth: '85%',
     minWidth: 200,
   },
@@ -1662,8 +1487,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
-  // Chat-fix pass, task 2 — a real bordered field ("[ ჩაწერეთ თანხა   ₾ ]"),
-  // not the previous borderless, centered large-number display.
   offerAmountLabel: {
     ...typography.small,
     color: colors.mutedForeground,
@@ -1712,8 +1535,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingHorizontal: spacing.sm + 4,
     paddingTop: spacing.sm + 2,
-    // paddingBottom is applied inline (safe-area-aware, see call site) —
-    // not a fixed value here.
+    // paddingBottom is set inline (safe-area aware).
   },
   attachButton: {
     width: 36,

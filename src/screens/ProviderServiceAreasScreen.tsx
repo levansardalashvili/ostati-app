@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -14,20 +14,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderServiceAreas'>;
 
-// ProviderServiceAreas — "სამუშაო არეალი" პროფილის მენიუდან. იგივე
-// მხარეების/რაიონების accordion, რაც რეგისტრაციის RegionAreaPicker-ში
-// (RegionAreaAccordion კომპონენტი გაზიარებულია ორივეს შორის).
-//
-// #85: მანამდე ეს ეკრანი მთლიანად ლოკალური/fake იყო — `selected`-ის
-// საწყისი მნიშვნელობა ყოველთვის ჰარდქოდილი ['ვაკე','საბურთალო','ვერა']-ს
-// უდრიდა (Provider-ის რეალურ, უკვე შენახულ areas-ს არასდროს კითხულობდა),
-// და `handleSave` არაფერს არ წერდა Supabase-ში — მხოლოდ fake "შენახულია!"
-// ტექსტს აჩვენებდა 700ms-ით და უკან ბრუნდებოდა, ცვლილება სამუდამოდ
-// იკარგებოდა. ეს იყო ცნობილი, დოკუმენტირებული ხარვეზი (#31-ის შენიშვნა
-// "ორივე ლოკალური state-ია") — ახლა `ProviderProfileContext`-იდან
-// იტვირთება (ის უკვე რეალურია, #53/#60) და `userService.upsertProviderProfileRecord`-ით
-// რეალურად ინახება, ზუსტად `ProviderEditProfileScreen`-ის areas-ველის
-// იგივე save-გზით.
+// Edit work areas from the profile menu; saved like ProviderEditProfile.
 export function ProviderServiceAreasScreen({ navigation }: Props) {
   const { profile, setProfile } = useProviderProfile();
   const regions = useRegions();
@@ -113,8 +100,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     lineHeight: 20,
   },
-  // Task — იგივე absolute-footer ხარვეზი (იხ. ProviderEditProfileScreen).
-  // ჩვეულებრივი flex sibling.
+  // Plain flex footer, not absolute.
   footer: {
     backgroundColor: colors.card,
     borderTopWidth: 1,

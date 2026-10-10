@@ -1,5 +1,4 @@
-// მიღებულია დიზაინის რეფერენსიდან (docs/design-reference/theme-reference.css).
-// ერთი აქცენტის ფერი მთელ აპში + სემანტიკური ფერები სტატუსებისთვის.
+// One accent color + semantic status colors.
 
 export const colors = {
   background: '#F8FAFC',

@@ -1,28 +1,12 @@
 import type { Provider } from './provider';
 
-// ფასის შეთავაზების სტატუსი — ორივე გამოვლინებისთვის საერთო (იხ. ქვემოთ).
-// src/types/chat.ts-ის `OfferStatus` ამის ალიასია (ChatMsg-ის 'offer' ტიპის
-// შეტყობინების status ველისთვის, `messages.offer_status`-ის ანარეკლი).
-// 'superseded' — ახალი migration: Provider-ის ახალი შეთავაზება ავტომატურად
-// (DB trigger) ამ სტატუსზე გადაჰყავს იმავე job-ზე მისივე ძველ, ჯერ-კიდევ-
-// pending შეთავაზებას, რომ ჩატის ისტორიაში "პასუხგაუცემელი" offer-card
-// სამუდამოდ არ დარჩეს ჩამორჩენილი.
+// 'superseded': a newer offer from the same provider on the same job replaced it (DB trigger).
 export type QuoteStatus = 'pending' | 'accepted' | 'declined' | 'superseded';
 
-// Provider-ის მიერ კონკრეტულ job-ზე გამოთქმული ინტერესი + სავალდებულო,
-// კონკრეტული რიცხვითი ფასი ("დაინტერესებისას", ProviderJobDetailScreen-ის
-// დაინტერესების sheet-იდან) — job_responses-ის ჩანაწერის ფორმა. #72-ის
-// მიხედვით Provider ყოველთვის კონკრეტულ რიცხვს წარადგენს (არა
-// თავისუფალი ტექსტი/optional) — "ფასი სამუშაოს ნახვის შემდეგ
-// განისაზღვრება" აღარ არსებობს, როგორც ცნება.
-// "quote"-ის მეორე გამოვლინებაა ჩატის სტრუქტურირებული ფასის შეთავაზების
-// ბარათი (ChatMsg-ის type:'offer', src/types/chat.ts) — ეს ორი ცალკე
-// ცხოვრობს (ერთი job-ის დონეზეა, მეორე კონკრეტულ საუბარშია), მაგრამ ერთი
-// კონცეფციის ორი გამოვლინებაა.
+// A provider's interest in a job, with a concrete price (job_responses).
+// Chat offer cards (ChatMsg type 'offer') are the other form of a quote.
 export type JobQuote = {
   provider: Provider;
-  // undefined მხოლოდ ისტორიულ (migration-მდელ) response-ებზეა შესაძლებელი,
-  // რომლებსაც არასდროს ჰქონდათ ვალიდური ფასი — ასეთი response ვერასდროს
-  // აირჩევა (select_provider() RPC-ი უარყოფს), მაგრამ სიაში კვლავ ჩანს.
+  // undefined only on very old responses (they can't be selected)
   offeredPrice?: number;
 };

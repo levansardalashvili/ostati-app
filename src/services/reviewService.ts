@@ -1,10 +1,7 @@
 import { supabase } from './supabaseClient';
 import type { RatingData, Review } from '../types/review';
 
-// `reviews` ცხრილის Postgres row shape. `customer_name` დენორმალიზებულია
-// (job_posts.customer_name-ის, job_responses.provider_name-ის იგივე მიზეზით,
-// #55/#56) — Review.name-ს Customer-ის სახელი სჭირდება, `users`-ის RLS კი
-// მხოლოდ owner-ს კითხულობს.
+// Full row — read only for the job itself. Public listings go through get_provider_reviews (anonymous).
 type ReviewRow = {
   id: string;
   job_id: string;
@@ -13,15 +10,11 @@ type ReviewRow = {
   stars: number;
   review_text: string;
   chips: string[];
-  photos: {
-    id: number;
-    bg: string;
-    uri?: string;
-  }[] | null;
+  photos: { id: number; uri?: string }[] | null;
   created_at: string;
 };
 
-// get_provider_reviews() RPC-ის ფორმა — მხოლოდ stars/text/date (0085)
+// get_provider_reviews(): no author, hidden reviews excluded
 type PublicReviewRow = {
   id: string;
   stars: number;
@@ -40,28 +33,9 @@ function fromReviewRow(row: PublicReviewRow): Review {
   };
 }
 
-export interface ReviewService {
-  // Supabase-ის `reviews` ცხრილი (#58) — job-ის დასრულებისას Customer-ის
-  // მიერ გაგზავნილი შეფასების რეალური ჩაწერა/წაკითხვა.
-  submitReview(
-    jobId: string,
-    customerId: string,
-    providerId: string,
-    data: RatingData,
-  ): Promise<void>;
-  listRealReviewsForProvider(providerId: string): Promise<Review[]>;
-  // ოსტატის ერთჯერადი პასუხი შეფასებაზე (0100)
-  replyToReview(reviewId: string, reply: string): Promise<void>;
-
-  // ერთი job-ის სრული შეფასება (#71) — CustomerJobDetailScreen-ს ("შენი
-  // შეფასება" სექცია) და ProviderJobDetailScreen-ს ("completed" mode-ის
-  // მიღებული შეფასების ბანერი) ორივეს სჭირდება იმავე job_id-ზე მიბმული
-  // ერთი `reviews`-row.
-  getReviewByJobId(jobId: string): Promise<RatingData | null>;
-}
-
-export const reviewService: ReviewService = {
-  async submitReview(jobId, customerId, providerId, data) {
+export const reviewService = {
+  // The insert completes the job (trigger).
+  async submitReview(jobId: string, customerId: string, providerId: string, data: RatingData): Promise<void> {
     const { error } = await supabase.from('reviews').insert({
       job_id: jobId,
       customer_id: customerId,
@@ -71,19 +45,21 @@ export const reviewService: ReviewService = {
       chips: data.chips,
       photos: data.photos ?? null,
     });
-    // 23505 = ეს job უკვე შეფასებულია (წინა ცდის პასუხი დაიკარგა) — წარმატებად ითვლება
+    // 23505 = already rated (an earlier attempt's response was lost) → success
     if (error && error.code !== '23505') throw error;
   },
-  async replyToReview(reviewId, reply) {
+  // Provider's one-time reply.
+  async replyToReview(reviewId: string, reply: string): Promise<void> {
     const { error } = await supabase.rpc('reply_to_review', { p_review_id: reviewId, p_reply: reply });
     if (error) throw error;
   },
-  async listRealReviewsForProvider(providerId) {
+  async listRealReviewsForProvider(providerId: string): Promise<Review[]> {
     const { data, error } = await supabase.rpc('get_provider_reviews', { p_provider_id: providerId });
     if (error) throw error;
     return (data as PublicReviewRow[]).map(fromReviewRow);
   },
-  async getReviewByJobId(jobId) {
+  // The review for one job (both job detail screens).
+  async getReviewByJobId(jobId: string): Promise<RatingData | null> {
     const { data, error } = await supabase.from('reviews').select('*').eq('job_id', jobId).maybeSingle();
     if (error) throw error;
     if (!data) return null;

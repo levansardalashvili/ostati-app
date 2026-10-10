@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Briefcase, Clock, MapPin, User } from 'lucide-react-native';
@@ -39,23 +39,13 @@ const EMPTY_TEXT: Record<Tab, string> = {
   done: 'დასრულებული ან გაუქმებული სამუშაოები არ გაქვს',
 };
 
-// ProviderMyJobs — "ჩემი სამუშაოები" ტაბი, რეალურ `job_posts`-ზე აგებული
-// (#69, `job_posts.provider_id = me`) — მანამდე ცალკე, id-ის გარეშე
-// `MyJobRow` mock-კუნძული იყო (#30-ის შენიშვნა), ჩატის/StatusPill-ის/
-// JobStatusContext-ის კავშირის გარეშე. ახლა CustomerJobsScreen-ის იგივე
-// pattern-ს იზიარებს (`useFocusEffect`, სტატუსით navigate ProviderJobDetail-ზე).
+// "My jobs" tab for providers.
 export function ProviderMyJobsScreen({ navigation }: Props) {
   const { handleScroll } = useTabBarScroll();
   const [tab, setTab] = useState<Tab>('pending');
   const [isLoading, setIsLoading] = useState(true);
   const [jobs, setJobs] = useState<FeedJob[]>([]);
-  // "მომლოდინე" — job-ები, სადაც ამ Provider-ს უკვე აქვს job_response
-  // (დაინტერესება/ფასი), მაგრამ Customer-ს ჯერ არავინ არჩეული (job კვლავ
-  // status='pending'-ია). არა ღია Job Feed-ის სრული სია — მხოლოდ ის
-  // job-ები, სადაც ამ Provider-ს რეალურად აქვს პასუხი. არსებული
-  // getOpenProviderFeedPosts()/listMyResponseJobIds() სერვისების
-  // კომბინაციაა (ორივე უკვე გამოიყენება Job Feed/Home ეკრანებზე, "უკვე
-  // დაინტერესებული ხარ" state-ისთვის) — ახალი RPC/სტატუსი არ დამატებულა.
+  // "Pending": open jobs this provider already offered a price on.
   const [pendingJobs, setPendingJobs] = useState<FeedJob[]>([]);
   const { getStatus } = useJobStatus();
 
@@ -90,11 +80,7 @@ export function ProviderMyJobsScreen({ navigation }: Props) {
     }, []),
   );
 
-  // "awaiting_customer_confirmation"/"confirmed_awaiting_rating"/"disputed" —
-  // job ჯერ კიდევ აქტიურ მუშაობშია ან დასრულების დადასტურების პროცესშია
-  // (არ არის საბოლოოდ "completed"), ამიტომ "დადასტურებული" ტაბში რჩება
-  // (ორმხრივი დასრულების flow, JobStatusContext.tsx — CustomerJobsScreen-ის
-  // იგივე პრინციპი).
+  // Everything between selection and the rating stays in the "confirmed" tab.
   const items =
     tab === 'pending'
       ? pendingJobs
@@ -113,15 +99,7 @@ export function ProviderMyJobsScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Nav-fix pass, task 1 — MyJobsTab is a bottom tab, not a pushed
-          stack screen, so it never had a Back button at all. Bottom Tab
-          Navigator's default `backBehavior: 'history'` (ProviderTabs.tsx,
-          unchanged) already means `navigation.goBack()` correctly returns
-          to whichever tab was focused right before this one — Profile, in
-          the "Profile → ჩემი სამუშაოები" flow this task describes, without
-          hardcoding that destination (if this tab was reached some other
-          way, goBack() correctly returns there instead). Android hardware
-          back resolves through the exact same mechanism. */}
+      {/* goBack returns to the previous tab (backBehavior 'history'). */}
       <BackHeader title="ჩემი სამუშაოები" onBack={() => navigation.goBack()} />
       <View style={styles.tabsRow}>
         {TABS.map((t) => (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
@@ -14,10 +14,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PhoneForgotPassword'>;
 
 const PHONE_RE = /^5\d{8}$/;
 
-// ForgotPasswordScreen.tsx-ის (email) ანალოგიური, ტელეფონის ანგარიშისთვის
-// — 3-ნაბიჯიანი ეზარდის 1/3 (#170). `sendPhoneOtpForReset` (არა
-// `sendPhoneOtp`) — `shouldCreateUser: false`, არარსებულ ნომერზე ახალ
-// ცარიელ ანგარიშს არასდროს ქმნის.
+// Phone password reset 1/3. sendPhoneOtpForReset never creates an account.
 export function PhoneForgotPasswordScreen({ navigation }: Props) {
   const [phoneDigits, setPhoneDigits] = useState('');
   const [touched, setTouched] = useState(false);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
 import { Award, Camera, ChevronRight, Image as ImageIcon, MapPin } from 'lucide-react-native';
@@ -25,18 +25,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderEditProfile'>;
 
-// ProviderEditProfile — ზუსტად ზიპის App.tsx-ის ProviderEditProfile-ის
-// მიხედვით. საწყისი მნიშვნელობები ProviderProfileContext-იდან იტვირთება
-// (ProviderSetupScreen-ის მიერ დაწერილი) — CustomerEditProfileScreen-ის
-// იგივე "edit ფორმა, კონტექსტიდან seed-ილი" პატერნით.
-//
-// Profile-fix pass — root-cause fix: ეს ეკრანი ადრე შეგნებულად აგდებდა
-// პირველ "შენახვას" (`attemptRef.current === 0` → ყოველთვის setSaveError(true),
-// Supabase-ისკენ საერთოდ არ მიდიოდა), მხოლოდ დემონსტრაციული/საცდელი
-// error-state-ის საჩვენებლად ადრეულ ეტაპზე დარჩენილი scaffold — არა
-// რეალური ბაგი async sequencing-ში/state-ში/Supabase-ში. მოცილებულია
-// მთლიანად — handleSave ახლა რეალურ Supabase-ის ოპერაციას პირველივე
-// დაჭერისას იძახებს, ხელოვნური setTimeout/attemptRef-ის გარეშე.
+// Edit the provider profile; seeded from ProviderProfileContext.
 export function ProviderEditProfileScreen({ navigation }: Props) {
   const { profile, setProfile } = useProviderProfile();
   const [firstName, setFirstName] = useState(profile.firstName);
@@ -45,8 +34,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
   const [areas, setAreas] = useState<string[]>(profile.areas);
   const [experience, setExperience] = useState<string | null>(profile.experience);
   const [about, setAbout] = useState(profile.about);
-  // ლოკალური ან უკვე შენახული (http) URI (#65) — certificates/portfolio-ს
-  // იგივე "ატვირთვა შენახვისას" პრინციპი.
+  // Local or already uploaded URI; uploaded on save.
   const [photoUri, setPhotoUri] = useState<string | null>(profile.photoUrl ?? null);
   const [certificates, setCertificates] = useState<MediaItem[]>(profile.certificates);
   const [portfolio, setPortfolio] = useState<MediaItem[]>(profile.portfolio);
@@ -55,11 +43,6 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
   const [sqmPrices, setSqmPrices] = useState<Record<string, string>>(profile.sqmPrices);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  // Task — badge-ზე დაჭერისას აღარ იხსნება პირდაპირ კამერა, ჯერ ჩნდება
-  // არჩევანის sheet ("გალერიიდან არჩევა"/"ფოტოს გადაღება") — ProviderSetupScreen-ის
-  // (რეგისტრაცია) ორ ცალკე, მუდმივად ხილულ ღილაკს არ ვიმეორებთ აქ, რადგან
-  // ეს ეკრანი უკვე გადატვირთულია ველებით — ერთი, ჩამალული sheet ვიზუალურად
-  // უფრო სუფთაა.
   const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
 
   const sqmSpecialties = specialty.filter((s) => categoryService.isSqmPriced(s.id));
@@ -75,20 +58,14 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
     });
   };
 
-  // რეალური კამერა/გალერეის picker (#62) — ProviderSetupScreen-ის იგივე
-  // პატერნით: ლოკალური URI მაშინვე ემატება preview-სთვის, ატვირთვა
-  // Storage-ში კი "ცვლილებების შენახვა"-ზეა.
+  // Picked photos show immediately; upload happens on save.
   const pickMedia = async (source: 'camera' | 'gallery', setItems: React.Dispatch<React.SetStateAction<MediaItem[]>>) => {
     const perm =
       source === 'camera'
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      // Profile-fix pass, task 2 — previously silent (`return` with no
-      // feedback at all), which could look like "the add button just
-      // stopped working" to a Provider who denied (or previously denied)
-      // this permission — especially confusing right after a DIFFERENT
-      // grid's picker (e.g. certificates) just worked normally.
+      // Tell the user — silently doing nothing looked like a broken button.
       Alert.alert(
         'წვდომა არ არის დაშვებული',
         source === 'camera' ? 'კამერაზე წვდომა საჭიროა ფოტოს გადასაღებად.' : 'გალერეაზე წვდომა საჭიროა ფოტოს ასარჩევად.',
@@ -100,12 +77,11 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
         ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
         : await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
     if (!result.canceled && result.assets[0]) {
-      setItems((prev) => [...prev, { ...nextMediaItem(prev), uri: result.assets[0].uri }]);
+      setItems((prev) => [...prev, { ...nextMediaItem(), uri: result.assets[0].uri }]);
     }
   };
 
-  // უკვე შენახულ (http) URL-ებს არ ატვირთავს ხელახლა — მხოლოდ ახლად
-  // არჩეულ (ლოკალურ) ფოტოებს.
+  // Upload only new local photos, not already saved URLs.
   const uploadPendingMedia = async (uid: string, items: MediaItem[], kind: UserMediaKind): Promise<MediaItem[]> =>
     Promise.all(
       items.map(async (item) => {
@@ -166,9 +142,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
           sqmPrices,
         });
       } catch {
-        // ლოკალურ Context-ში ცვლილება უკვე ასახულია — Supabase-ის
-        // ჩავარდნისას UI-ს არ ვბლოკავთ, CustomerEditProfileScreen-ის
-        // იგივე პრინციპით.
+        // The Context is already updated; a failed save doesn't block the UI.
       }
     }
     setProfile({
@@ -183,7 +157,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
       portfolio: uploadedPortfolio,
       sqmPrices,
     });
-    // 0155 — the save may have moved a verified profile back to `pending`
+    // Saving a new photo/name sends a verified profile back to review — refresh the status.
     const uidAfter = authService.getCurrentUser()?.uid;
     if (uidAfter) {
       const fresh = await userService.getProviderProfileRecord(uidAfter).catch(() => null);
@@ -196,10 +170,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader title="პროფილის რედაქტირება" onBack={() => navigation.goBack()} />
-      {/* Android's native window-resize silently no-ops under edge-to-edge
-          rendering (Expo SDK 52+ default) — without this, the "ჩემ
-          შესახებ" textarea + save footer below it would be hidden behind
-          the keyboard, same bug as ChatConversationScreen's composer. */}
+      {/* 'height' on Android: edge-to-edge makes the native resize a no-op. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <KeyboardAwareForm
         avoidKeyboard={false}
@@ -207,7 +178,6 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
           contentContainerStyle={styles.bodyContent}
         >
         {profile.verificationStatus === 'verified' && (
-          // 0155 — photo/name changes on a verified profile send it back to review
           <InlineBanner
             type="warning"
             msg="ფოტოს ან სახელის შეცვლის შემდეგ ვერიფიკაციას ადმინისტრაცია ხელახლა გადაამოწმებს — მანამდე ფასს ვერ შესთავაზებ."
@@ -415,16 +385,7 @@ const styles = StyleSheet.create({
     minHeight: 96,
     textAlignVertical: 'top',
   },
-  // Task — ადრე `position: 'absolute', bottom: 0` იყო, ანუ ScrollView
-  // ამ ღილაკისთვის სივრცეს არ იტოვებდა — footer უბრალოდ TOP-ზე "ეფინებოდა"
-  // სქროლვადი კონტენტის ბოლო ნაწილს (ნამუშევრების ფოტოების ბადეს),
-  // მიუხედავად სქროლვისა (მაქსიმალურ scroll-ზეც კონტენტი ამ ღილაკის
-  // მიღმა/ქვემოთ დარჩენილი იყო, ვერასდროს ჩანდა). ასევე Android-ზე
-  // KeyboardAvoidingView-ის ScrollView-ის ავტომატური "focused input
-  // keyboard-ის ზემოთ აწიე" ეს absolute overlay-ის გამო არასწორად
-  // ითვლიდა — "ჩემ შესახებ" ველი კლავიატურის უკან იმალებოდა. ჩვეულებრივი
-  // flex sibling (ProviderSetupScreen/PostJobScreen/CustomerSetupScreen-ის
-  // იგივე footer-პატერნი) ორივეს აგვარებს ერთდროულად.
+  // Plain flex footer, not absolute — absolute covered the last content and broke keyboard avoidance.
   footer: {
     backgroundColor: colors.card,
     borderTopWidth: 1,

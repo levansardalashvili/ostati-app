@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleProp, Text, TextStyle } from 'react-native';
 import { motion, useReduceMotion } from '../utils/motion';
 

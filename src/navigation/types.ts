@@ -1,23 +1,15 @@
-// Root stack-ის route-ების სია. ეტაპობრივად დაემატება ყველა ეკრანი
-// product-spec.md-ის "ეკრანების სრული სია" მიხედვით.
 import type { CustomerJob, FeedJob } from '../types/job';
 import type { RatingData } from '../types/review';
 import type { Role } from '../types/user';
 
-// Role ახლა src/types/user.ts-შია განსაზღვრული (domain models refactor) —
-// აქ რეექსპორტდება, რომ არსებული `import type { Role } from '../navigation/types'`
-// import-ები ყველგან ხელუხლებელი დარჩეს.
+// Re-exported for existing imports.
 export type { Role };
 
 export type RootStackParamList = {
   Welcome: undefined;
   RoleSelect: undefined;
   Register: { role: Role };
-  // Task — Email/Password რეგისტრაციის სავალდებულო დადასტურება (6-ციფრიანი
-  // OTP, ელფოსტაზე) — Google/Apple/ტელეფონის გარდა, რომლებიც უკვე სხვა
-  // გზით ადასტურებენ ვინაობას. `password` აქ **არ** გადაეცემა (განსხვავებით
-  // PhoneRegisterVerify-სგან) — `signUp()` პაროლს ანგარიშის შექმნისთანავე
-  // აყენებს, OTP მხოლოდ ელფოსტის მფლობელობას ადასტურებს.
+  // No password here: signUp already set it; the code only confirms the email.
   RegisterVerifyEmail: {
     role: Role;
     email: string;
@@ -31,16 +23,16 @@ export type RootStackParamList = {
   };
   Login: undefined;
   ForgotPassword: undefined;
-  // 3-ნაბიჯიანი აღდგენის ეზარდი (email OTP, ბმულის ნაცვლად — #170) — 1/3
-  // ცნობილია email-ის ეკრანზევე, 2/3 (ეს) მხოლოდ კოდს ითხოვს.
+  // Password reset step 2 (code).
   ForgotPasswordVerify: { email: string };
-  GoogleComplete: { role: Role };
-  // #107 — Apple Sign-In + ტელეფონის OTP, email-ის/Google-ის გვერდით.
-  AppleComplete: { role: Role; appleFullName?: { givenName: string | null; familyName: string | null } | null };
+  // Google/Apple sign-in → finish profile. Apple's name only arrives on first sign-in, hence the param.
+  SocialComplete: {
+    role: Role;
+    provider: 'google' | 'apple';
+    appleFullName?: { givenName: string | null; familyName: string | null } | null;
+  };
   PhoneRegister: { role: Role };
-  // Task — login-ისთვის აღარ სჭირდება ცალკე OTP-ვერიფიკაციის ეკრანი
-  // (PhoneLoginVerify მოცილებულია) — უკვე დარეგისტრირებული ტელეფონის
-  // ანგარიში პირდაპირ ტელეფონი+პაროლით შედის, ისევე, როგორც Email/Password.
+  // Phone + password login (no SMS).
   PhoneLogin: undefined;
   PhoneRegisterVerify: {
     role: Role;
@@ -52,59 +44,29 @@ export type RootStackParamList = {
     apartment: string;
     doorCode: string;
     isPrivateHouse: boolean;
-    // OTP-ვერიფიკაციის წარმატების შემდეგ ახალ ანგარიშზე ეყენება
-    // (authService.setNewPassword) — მანამდე ამ ანგარიშს
-    // საერთოდ არ ჰქონდა პაროლის ცნება.
+    // set on the new account after the code is verified
     password: string;
   };
-  // 3-ნაბიჯიანი აღდგენის ეზარდი, ტელეფონისთვის — 1/3 (ეს ეკრანი), 2/3
-  // (PhoneForgotPasswordVerify, მხოლოდ OTP-კოდი), 3/3 (გაზიარებული
-  // ResetPassword, email-თან ერთად).
+  // Phone password reset: this → PhoneForgotPasswordVerify → ResetPassword.
   PhoneForgotPassword: undefined;
   PhoneForgotPasswordVerify: { phone: string };
-  // ორივე აღდგენის ეზარდის საერთო ბოლო ნაბიჯი — param არ სჭირდება,
-  // მუშაობს უკვე ავტორიზებულ სესიაზე (email OTP-იც, ტელეფონის OTP-იც
-  // ვერიფიკაციის წარმატებაზე თავად ქმნის სესიას).
+  // Last reset step for both; runs on the session created by the OTP.
   ResetPassword: undefined;
   CustomerSetup: { userName: string };
   ProviderSetup: undefined;
-  // რეგისტრაციის ეზარდის ბოლო, ავტომატურად-გამძვინვარებადი "ფანჯარა"
-  // (Welcome-ის ბრენდის ვიზუალით) — ორივე Setup-screen ამაზე reset-ავს
-  // Home-ის ნაცვლად, ეს კი თავად აგრძელებს სწორ Home-ზე.
+  // Shown after setup, then continues to the right Home.
   RegistrationSuccess: { role: Role };
   CustomerHome: undefined;
   ProviderHome: undefined;
-  // `job` — არასავალდებულო, უკვე წამოღებული FeedJob (real Supabase-ის
-  // job_posts-იდან, #54 "ეტაპი B"). თუ არ არის გადაცემული, ეკრანი თავად
-  // წამოიღებს (jobService.getFeedJobPostById, #71).
+  // job: pass it when already loaded; otherwise the screen fetches by id.
   ProviderJobDetail: { id: string; mode?: 'browse' | 'selected' | 'completed'; job?: FeedJob };
   ProviderJobFeed: undefined;
-  // `editJob` — მომლოდინე (pending) განცხადების რედაქტირების რეჟიმი: ფორმა
-  // წინასწარ ივსება, "შენახვა" update_pending_job() RPC-ს იძახებს.
+  // editJob: edit a pending job (update_pending_job).
   PostJob: { editJob?: CustomerJob } | undefined;
-  // `job` — არასავალდებულო, უკვე წამოღებული CustomerJob ობიექტი (real
-  // Supabase-ის job_posts-იდან, #53), როცა გამომძახებელს (CustomerJobsScreen,
-  // PostJobScreen) ეს უკვე ხელთ აქვს — ხელახალი fetch-ის თავიდან ასაცილებლად.
-  // თუ არ არის გადაცემული, ეკრანი თავად წამოიღებს (jobService.getJobPostById,
-  // #71) — notification deep-link-ებისთვის, სადაც მხოლოდ jobId ცნობილია.
+  // job: pass it when already loaded; otherwise fetched by jobId (deep links).
   CustomerJobDetail: { jobId: string; job?: CustomerJob };
-  // `jobId` — second hardening pass, item 5 (supabase/migrations/0049):
-  // ჩატის სტრუქტურირებული ფასის შეთავაზება ახლა job-ზეა მიბმული
-  // (`messages.job_id`), აღარ არის (customer_id, provider_id)-დან
-  // inferred. Optional — Provider-ის ყველა შესვლის წერტილს (Job Feed/
-  // job detail/Home) ეს ხელთ აქვს job-კონტექსტიდან; Customer-ის
-  // დირექტორია-დაფუძნებული ჩატის (SavedProviders/ViewProviderProfile)
-  // ან notification-deep-link-ის შესვლისას `undefined`-ია — ამ
-  // შემთხვევებში (Provider-ის მხრიდან) ფასის შეთავაზების ღილაკი
-  // უბრალოდ არ ჩანს (ChatConversationScreen).
-  // `jobStatus` — Audit fix: the chat price-offer composer must only be
-  // offered while the linked job is still negotiable (`status='pending'`,
-  // before a Provider is selected) — `respond_to_chat_offer`'s own RLS/RPC
-  // guard (supabase/migrations/0049/0066) already rejects any offer once
-  // the job goes 'active', but the client previously kept showing the
-  // Wallet button regardless, so the send would silently fail. Optional —
-  // when the caller doesn't have it handy, the composer button is hidden
-  // rather than risk showing a broken affordance.
+  // jobId: offers are tied to a job (missing when opened from a directory or a link
+  // — then the provider's offer button is hidden). jobStatus: offers only while 'pending'.
   ChatConversation: {
     chatId: string;
     name: string;
@@ -113,12 +75,7 @@ export type RootStackParamList = {
     role: Role;
     jobId?: string;
     jobStatus?: string;
-    // StartJobChatSheet.tsx-ის "ცივი ჩატის → job-ის შექმნის" ფიქსი — ახალი
-    // job-ის შექმნისას წინასწარ ამზადებს პირველი შეტყობინების ტექსტს
-    // (Customer-ის საკუთარი აღწერიდან), რომ Provider-მდე ეს job "ცხადად"
-    // მივიდეს ("ეს მომხმარებელი კონკრეტულად თქვენ გთხოვთ") — ტექსტი
-    // მხოლოდ წინასწარ ივსება ჩატის composer-ში, არ იგზავნება
-    // ავტომატურად (Customer თავად ხედავს/ასწორებს გაგზავნამდე).
+    // first message from StartJobChatSheet, prefilled only if sending it failed
     draftMessage?: string;
   };
   Notifications: { role: Role };
@@ -133,9 +90,7 @@ export type RootStackParamList = {
   SavedProviders: undefined;
   CustomerCategories: undefined;
   CustomerCategory: { id: string };
-  // CustomerHomeScreen-ის "ტოპ ოსტატები შენს არეალში" სექციის "ყველას
-  // ნახვა" — ყველა Provider + კატეგორია/არეალის ფილტრები (Home-იდან
-  // მოცილებული UI აქ ცოცხლდება).
+  // "See all" providers, with category/area filters.
   CustomerProviderList: undefined;
   RegionAreaPicker: { selected: string[]; onSave: (areas: string[]) => void };
   RatingScreen: {
@@ -143,21 +98,14 @@ export type RootStackParamList = {
     providerName: string;
     providerInitials: string;
     providerColor: string;
-    // onRate-ის გარეშე (აპის გახსნისას გაუგზავნელ შეფასებაზე დაბრუნება)
-    // RatingScreen თავად წერს შეფასებას ამ id-ით
+    // without onRate (reopened unrated job) RatingScreen submits itself with this id
     providerId?: string;
-    // უნდა დაარეჯექთოს, თუ შეფასება ვერ ჩაიწერა — RatingScreen მაშინ შეცდომას აჩვენებს
+    // must reject if saving failed — RatingScreen then shows the error
     onRate?: (data: RatingData) => void | Promise<void>;
   };
 };
 
-// Bottom Tab-ების route-ები — თითო tab navigator როლის მიხედვით, RootStack-ის
-// "CustomerHome"/"ProviderHome" route-ების ქვეშ ჩალაგებული. ორივე როლს 4
-// ჩანართი აქვს (product-spec.md-ის საწყისი "3 ჩანართის" წესზე override,
-// მომხმარებლის მოთხოვნით) — "MyJobsTab" ორივე მხარეს ყოფილი root-stack
-// ეკრანია (Customer-ისთვის "CustomerJobs", Provider-ისთვის "ProviderMyJobs"),
-// ახლა ტაბის სახით, არა push-ით პროფილიდან/Home-იდან (იხ. CustomerJobsScreen.tsx
-// და ProviderMyJobsScreen.tsx).
+// Tab routes, nested under CustomerHome/ProviderHome.
 export type CustomerTabParamList = {
   Home: undefined;
   MyJobsTab: undefined;

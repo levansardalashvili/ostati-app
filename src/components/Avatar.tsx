@@ -1,4 +1,3 @@
-import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { colors, radius } from '../theme';
 import { VerifiedBadge } from './VerifiedBadge';
@@ -8,19 +7,13 @@ type Props = {
   color?: string;
   size?: number;
   online?: boolean;
-  // რეალური პროფილის ფოტოს URL (#65) — თუ არსებობს, ინიციალების ნაცვლად
-  // რენდერდება.
+  // photo URL; initials when missing
   uri?: string;
-  // Task — ვერიფიცირებული ოსტატის ავატარზე ბეჯი (`VerifiedBadge`-ის იგივე
-  // აიქონი/ფერი, უბრალოდ ავატარზე overlay-დ). `online`-ის საპირისპირო
-  // კუთხეშია (ზედა-მარჯვნივ), რომ ორივე ერთდროულად true-ზეც (რეალური,
-  // ცოცხალი `is_available` + `verified`, #114-ის შენიშვნის მიხედვით) არ
-  // გადაფარონ ერთმანეთი.
+  // verified badge, top-right (the online dot is bottom-right — both can show)
   verified?: boolean;
 };
 
-// მრგვალი ავატარი ინიციალებით (დიზაინის რეფერენსის Avi კომპონენტის მიხედვით) —
-// გამოიყენება პროფილში, ჩატში, Google-ის ანგარიშის ბარათში და ა.შ.
+// Round avatar with initials or a photo.
 export function Avatar({ initials, color = colors.primary, size = 44, online = false, uri, verified = false }: Props) {
   return (
     <View style={{ width: size, height: size }}>

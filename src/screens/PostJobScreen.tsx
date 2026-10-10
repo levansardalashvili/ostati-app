@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -50,29 +49,22 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PostJob'>;
 
-// პროდუქტული წესი (product-spec.md) — job post-ში მაქს. 3 ფოტო,
-// არა 5, როგორც დიზაინის რეფერენსშია
 const MAX_PHOTOS = 3;
 const DESCRIPTION_MAX = 500;
 const DESCRIPTION_MIN = 20;
 
-// C2 — Post a Job ფორმა (product-spec.md; დიზაინის რეფერენსის PostJob-ის
-// მიხედვით, ფოტოს ლიმიტის override-ით 5-დან 3-მდე)
+// Create or edit (pending) a job post.
 export function PostJobScreen({ navigation, route }: Props) {
   const { profile } = useCustomerProfile();
   const editJob = route.params?.editJob;
   const [category, setCategory] = useState(editJob?.category ?? '');
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const [description, setDescription] = useState(editJob?.desc ?? '');
-  // ლოკალური ფაილის URI-ები (expo-image-picker-იდან) — რეალური thumbnail-ები,
-  // ფერადი mock კვადრატების ნაცვლად. Supabase Storage-ში იტვირთება
-  // "გამოქვეყნება"-ზე დაჭერისას (#61).
+  // Local URIs; uploaded on publish.
   const [photos, setPhotos] = useState<string[]>([]);
   const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
   const [photoError, setPhotoError] = useState('');
-  // მისამართი წინასწარ ივსება პროფილის default address-ით, მაგრამ აქ
-  // ცვლილება არასდროს არ სცვლის თავად default address-ს (მხოლოდ ამ
-  // კონკრეტული job post-ის მისამართია) — მომხმარებლის მოთხოვნით.
+  // Prefilled from the profile; editing it here never changes the profile.
   const [address, setAddress] = useState(editJob?.address ?? profile.defaultAddress);
   const [district, setDistrict] = useState(editJob?.district ?? guessDistrict(editJob?.address ?? profile.defaultAddress, regionService.getCached()));
   const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
@@ -85,28 +77,13 @@ export function PostJobScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(false);
   const [published, setPublished] = useState(false);
   const [submitTouched, setSubmitTouched] = useState(false);
-  // Audit fix — was `boolean`: the banner always showed the exact same
-  // generic text no matter what actually failed (network drop vs. a
-  // permanent server-side validation rejection, e.g. the chosen category
-  // was deactivated mid-flow) — retrying a permanent failure with the
-  // same input just fails again, with no indication of what to change.
+  // Specific text for permanent errors (see getPublishErrorMessage).
   const [publishError, setPublishError] = useState('');
   const [createdJob, setCreatedJob] = useState<CustomerJob | null>(null);
-  // Third hardening pass, priority 2 — the created draft job, kept across
-  // a failed retry. create_job() now creates a status='draft' row (never
-  // visible to any Provider) instead of an immediately-published one, so
-  // a retry after a photo-upload/finalize failure resumes THIS SAME job
-  // instead of calling createCustomerJob() again — a network failure can
-  // no longer produce two published jobs for one "გამოქვეყნება" tap.
+  // The draft from a failed attempt — a retry resumes it, so one tap never makes two jobs.
   const [draftJob, setDraftJob] = useState<CustomerJob | null>(null);
 
-  // Task 6 (audit) — კატეგორიების სია ახლა ბექენდიდანაა (`categories`
-  // ცხრილი, supabase/migrations/0043): სახელი/რიგითობა/აქტიურობა
-  // სანდოა backend-დან, `is_active=false` კატეგორია ამ სიაშივე აღარ
-  // ჩანს (task: "inactive categories cannot be selected for new jobs").
-  // საწყისი მნიშვნელობა `categoryService.getCached()`-ია (სტატიკური
-  // fallback, სანამ backend-fetch არ დასრულდება/ჩავარდნისას) — ეკრანი
-  // არასდროს ცარიელი/loading-ბლოკირებული არ დგება.
+  // Active categories from the backend; cached/static list until loaded.
   const [categoryList, setCategoryList] = useState<CategoryRecord[]>(() => categoryService.getCached());
   useEffect(() => {
     let cancelled = false;
@@ -121,9 +98,7 @@ export function PostJobScreen({ navigation, route }: Props) {
     };
   }, []);
   const activeCategories = [...categoryList].filter((c) => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder);
-  // bg/dot ფერები კვლავ ლოკალურია (`src/data/categories.ts`) — ეს
-  // ვიზუალური/დიზაინის ტოკენებია, არა backend-მონაცემი (0043-ის სქემას
-  // მათთვის სვეტი განზრახ არ აქვს).
+  // Colors are local design tokens, not backend data.
   const selectedStyle = CATEGORIES.find((c) => c.id === category);
 
   const categoryError = submitTouched && !category ? 'აირჩიეთ კატეგორია' : '';
@@ -133,10 +108,6 @@ export function PostJobScreen({ navigation, route }: Props) {
       : submitTouched && !description.trim()
         ? 'ეს ველი სავალდებულოა'
         : '';
-  // Second hardening pass, item 7 — მისამართი სავალდებულო ხდება (ადრე
-  // საერთოდ არ მოწმდებოდა), და თარიღის არჩევისას დრო/'ნებისმიერ დროსაც'
-  // სავალდებულოა (თარიღის გარეშე დროც არ მოწმდება — ორივე ერთად
-  // ივსება/არცერთი, DatePickerField-ის arსებული UX-ის მიხედვით).
   const addressError = submitTouched && !address.trim() ? 'მისამართი სავალდებულოა' : '';
   const districtError = submitTouched && !district;
   // თარიღი და დრო სავალდებულოა (ოსტატს უნდა ჰქონდეს კონკრეტული დაგეგმილი დრო; „ნებისმიერ დროს“ ცალკე არჩევანია)
@@ -168,17 +139,8 @@ export function PostJobScreen({ navigation, route }: Props) {
         navigation.popTo('CustomerJobDetail', { jobId: updated.id, job: { ...updated, district } });
         return;
       }
-      // Third hardening pass, priority 2 — idempotent publish. The job
-      // row is created ONCE, as a draft (invisible to every Provider
-      // read) — a retry after a later step fails resumes that SAME
-      // draft (`draftJob`) instead of calling createCustomerJob() again,
-      // so a network failure/retry can never create a duplicate
-      // published job. Photos upload to `private-media/job/{jobId}/...`
-      // (needs the job's id, which doesn't exist until the row does),
-      // then finalizeJobPublish() flips draft -> pending — the only step
-      // that actually makes the job visible to Providers. From the
-      // user's side, "გამოქვეყნება" is still one action; a failed
-      // mid-flow retry silently continues from wherever it left off.
+      // Idempotent publish: create the draft once → upload photos (path needs the job id)
+      // → set_job_photos → finalize (draft → pending). A retry continues from the same draft.
       const currentInput = {
         category,
         description: description.trim(),
@@ -189,16 +151,10 @@ export function PostJobScreen({ navigation, route }: Props) {
       };
       let job = draftJob;
       if (!job) {
-        job = await jobService.createCustomerJob(uid, currentInput);
+        job = await jobService.createCustomerJob(currentInput);
         setDraftJob(job);
       } else {
-        // Resuming after a previous attempt failed client-side — but
-        // finalizeJobPublish() may have actually SUCCEEDED server-side
-        // before the response reached us (lost network response, app
-        // backgrounded, etc.). Re-check the real state before doing
-        // anything else: a draft can only have photos set once
-        // (set_job_photos requires status='draft'), so blindly retrying
-        // an already-finished publish would fail forever otherwise.
+        // The previous attempt may have published server-side even though we saw a failure — check first.
         const current = await jobService.getJobPostById(job.id);
         if (current && current.status !== 'draft') {
           setCreatedJob(current);
@@ -206,48 +162,19 @@ export function PostJobScreen({ navigation, route }: Props) {
           setLoading(false);
           return;
         }
-        // Final pre-beta audit, item 1 — the Customer may have edited the
-        // form (category/description/address/date/time) since the draft
-        // was first created (a failed attempt, then changes, then retry).
-        // Sync those current values into the draft server-side before
-        // continuing, so the published job always matches what the form
-        // shows right now — never a stale snapshot from the first attempt.
+        // Sync any edits made since the draft was created.
         job = await jobService.updateJobDraft(job.id, currentInput);
         setDraftJob(job);
       }
-      // Latest hardening pass, item 3 — documented, not changed: this
-      // `Promise.all` is all-or-nothing. If e.g. photo A and B upload
-      // successfully but C fails, the whole call rejects, setJobPhotos()
-      // is never reached, and A/B's already-uploaded private-media
-      // objects are never attached to (or referenced by) this job. A
-      // retry re-runs `photos.map(...)` from scratch — the local `photos`
-      // state still holds all three original URIs, so A and B are
-      // uploaded AGAIN as new objects; the first attempt's A/B objects
-      // become orphaned (same class of "abandoned draft" byproduct
-      // 0053/0060 already documented for a fully-abandoned draft — this
-      // is the partial-upload-within-one-draft variant of it). No fix
-      // applied here: switching to per-photo tracking so a retry only
-      // re-uploads the ones that actually failed would be a reasonable
-      // future improvement, but is a real behavior change beyond this
-      // pass's scope, not a "simple" one — see 0060's
-      // list_stale_draft_jobs() for the read-only cleanup building block
-      // a future admin script could use for both cases.
-      // Latest hardening pass, item 2 — CONFIRMED bug fix. setJobPhotos()
-      // must always run, even with zero current photos: if a prior failed
-      // attempt already attached refs to this draft (job.photos from an
-      // earlier upload) and the Customer then removed all photos before
-      // retrying, skipping this call (the old `if (photos.length > 0)`
-      // guard) would leave those stale refs on the draft and publish them
-      // — the UI's current photo list must always become the canonical
-      // one, including "now zero".
+      // All-or-nothing upload: a retry re-uploads every photo, earlier copies stay orphaned
+      // (ponytail: re-upload all; track per photo if storage cost matters).
+      // set_job_photos always runs — even with zero photos — so removed photos don't get published.
       const photoRefs =
         photos.length > 0
           ? await Promise.all(photos.map((uri) => storageService.uploadPrivateJobPhoto(job.id, uid, uri)))
           : [];
       await jobService.setJobDistrict(job.id, district);
       await jobService.setJobPhotos(job.id, photoRefs);
-      // finalize_job_publish() returns the up-to-date row (including any
-      // photos just attached above) — no need to re-derive it client-side.
       const publishedJob = await jobService.finalizeJobPublish(job.id);
       setCreatedJob(publishedJob);
       setPublished(true);
@@ -322,19 +249,11 @@ export function PostJobScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Audit fix — publish (create/update draft → upload photos →
-          finalize) is a multi-step async chain with no cancellation; navigating
-          away mid-flight let the chain keep running against an unmounted
-          screen and could leave a job published with the user never
-          seeing the success screen. Back is inert (not hidden — a full
-          hide/show flicker for a few seconds would be worse) while `loading`. */}
+      {/* Back is disabled while publishing — leaving mid-chain could publish a job
+         the user never sees confirmed. */}
       <BackHeader title={editJob ? 'განცხადების რედაქტირება' : 'მოთხოვნის გამოქვეყნება'} onBack={() => !loading && navigation.goBack()} />
 
-      {/* Android's native window-resize silently no-ops under edge-to-edge
-          rendering (Expo SDK 52+ default) — without this, the description/
-          address fields + publish footer below them would be hidden
-          behind the keyboard, same bug as ChatConversationScreen's
-          composer. */}
+      {/* 'height' on Android: edge-to-edge makes the native resize a no-op. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <KeyboardAwareForm
         avoidKeyboard={false}

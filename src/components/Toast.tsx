@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text } from 'react-native';
 import { CheckCircle2 } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';

@@ -1,15 +1,11 @@
 import type { Provider } from '../types/provider';
 
-// ახალი ოსტატის ზღვარი — 0 შეფასება. ასეთ შემთხვევაში "0.0 ★"-ის ნაცვლად
-// "ახალი ოსტატი" ბეჯი უნდა ჩანდეს ყველგან, სადაც რეიტინგი ჩნდება
-// (CustomerHomeScreen-ის ბარათი, ViewProviderProfileScreen, SavedProviders,
-// CustomerJobDetailScreen-ის დაინტერესებული ოსტატის ბარათი).
+// No reviews yet → show "ახალი ოსტატი" instead of "0.0 ★".
 export function isNewProvider(p: Pick<Provider, 'reviews'>): boolean {
   return p.reviews === 0;
 }
 
-// პარამეტრები ადმინიდან იცვლება (app_settings, 0125) და აპის გაშვებისას ჩაიტვირთება (rankingConfigService);
-// ნაგულისხმევი მნიშვნელობები = ძველი ჰარდქოდი, ქსელის გარეშეც იგივე ქცევაა.
+// Set from the admin panel (app_settings), loaded at startup; defaults apply offline.
 const rankingConfig = {
   priorCount: 15, // "ვირტუალური" ხმების რაოდენობა baseline-ის წონისთვის
   priorMean: 4.3, // baseline საშუალო რეიტინგი, სანამ საკმარისი შეფასება დაგროვდება
@@ -22,31 +18,22 @@ export function setRankingConfig(c: { priorCount?: number; priorMean?: number; j
   if (typeof c.jobsWeight === 'number' && c.jobsWeight > 0) rankingConfig.jobsWeight = c.jobsWeight;
 }
 
-// Bayesian/წონიანი საშუალო რეიტინგი (IMDB-ის რანჟირების პრინციპი) —
-// მცირე რაოდენობის შეფასებას (მაგ. ერთი 5-ვარსკვლავიანი) არ შეუძლია
-// მანიპულაციით გადააჭარბოს ასობით კარგ შეფასებას. რაც მეტი შეფასებაა,
-// მით მეტად ენდობა ალგორითმი პროვაიდერის რეალურ საშუალოს baseline-ის
-// ნაცვლად. გამოიყენება ყველგან, სადაც რეიტინგით დალაგება/რანჟირება
-// ხდება — არასდროს პირდაპირ `p.rating`-ით (CustomerHomeScreen-ის ტოპ
-// ოსტატები, CustomerJobDetailScreen-ის "რეიტინგით" sort chip).
+// Bayesian average: a few 5★ reviews can't beat hundreds of good ones.
+// Always sort by this, never by raw rating.
 export function weightedRating(p: Pick<Provider, 'rating' | 'reviews'>): number {
   const { priorCount, priorMean } = rankingConfig;
   if (p.reviews === 0) return priorMean;
   return (p.reviews / (p.reviews + priorCount)) * p.rating + (priorCount / (p.reviews + priorCount)) * priorMean;
 }
 
-// სრული რანჟირების ქულა ("ტოპ ოსტატები") — წონიან რეიტინგს ემატება
-// მცირე log-სკალირებული წონა დასრულებულ სამუშაოებზე (p.jobs) და
-// მინიმალური tie-breaker ბოლო აქტივობაზე (`online`-ს ვიყენებთ პროქსად,
-// mock მონაცემებს "ბოლო აქტივობის დრო" არ აქვს).
+// Top-providers score: weighted rating + small log weight for completed jobs + availability tie-breaker.
 export function providerRankScore(p: Pick<Provider, 'rating' | 'reviews' | 'jobs' | 'online'>): number {
   const completedJobsBoost = Math.log10(p.jobs + 1) * rankingConfig.jobsWeight;
   const recentActivityBoost = p.online ? 0.05 : 0;
   return weightedRating(p) + completedJobsBoost + recentActivityBoost;
 }
 
-// Directory order: verified Providers always first (only they can send a
-// price offer, 0084), then by rank score. Use for every Provider list sort.
+// Verified first (only they can offer a price), then by score. Use for every provider list.
 export function compareProviders(
   a: Pick<Provider, 'rating' | 'reviews' | 'jobs' | 'online' | 'verified'>,
   b: Pick<Provider, 'rating' | 'reviews' | 'jobs' | 'online' | 'verified'>,

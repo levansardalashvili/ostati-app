@@ -2,9 +2,6 @@ import { supabase } from './supabaseClient';
 import type { CustomerProfile, UserRecord } from '../types/user';
 import type { Provider, ProviderProfile, VerificationStatus } from '../types/provider';
 
-// `users` ცხრილის Postgres-ის row shape (snake_case) — UserRecord (camelCase)
-// TS-ის მხარეს უცვლელი რჩება, კონვერტაცია ხდება ამ ფაილშივე, სერვისის
-// საზღვარზე. იხ. supabase/README.md ცხრილის SQL-ისთვის.
 type UserRow = {
   id: string;
   role: UserRecord['role'];
@@ -12,12 +9,9 @@ type UserRow = {
   last_name: string;
   email: string;
   default_address: string;
-  // #107 — supabase/migrations/0083.
   phone: string;
-  // supabase/migrations/0140.
   entrance: string;
   apartment: string;
-  // supabase/migrations/0141.
   door_code: string;
   is_private_house: boolean;
   suspended_at: string | null;
@@ -27,14 +21,7 @@ type UserRow = {
 function fromRow(row: UserRow): UserRecord {
   return {
     role: row.role,
-    // #86: `first_name`/`last_name` TS-ში `string`-ადაა ტიპირებული (0002-ის
-    // `not null default ''`-ის მიხედვით), მაგრამ თუ ცოცხალ ბაზაში ეს
-    // constraint რაიმე მიზეზით არ ემთხვევა ფაილს (ხელით გაშვებული SQL,
-    // ძველი row schema-ცვლილებამდე) — Supabase SQL NULL-ს პირდაპირ JS
-    // `null`-ად აბრუნებს, რაც `.charAt(0)`-ის მსგავს ადგილებში crash-ს
-    // იწვევს (ProviderProfileScreen-ზე დაფიქსირებული). სერვისის
-    // საზღვარზე ვიცავთ, ისევე როგორც `photo_url ?? undefined` უკვე
-    // იცავდა ქვემოთ.
+    // Null names have been seen in live rows despite the NOT NULL default — guard here (.charAt crash).
     firstName: row.first_name ?? '',
     lastName: row.last_name ?? '',
     email: row.email,
@@ -49,13 +36,7 @@ function fromRow(row: UserRow): UserRecord {
   };
 }
 
-// `provider_profiles` ცხრილის Postgres row shape. `first_name`/`last_name`
-// **დუბლირებულია** აქაც (#60-ის მიხედვით, #53-ის თავდაპირველი "მხოლოდ
-// users-ში" გადაწყვეტილების override) — საჯარო Provider დირექტორიის (#60)
-// უსაფრთხო public-read-ისთვის: `users`-ს არასდროს არ შეიძლება გაეხსნას
-// საჯარო SELECT (email/მისამართი შეიცავს Customer-ებისთვისაც), ამიტომ
-// `provider_profiles`-ს (რომელიც არაფერს მგრძნობიარეს არ შეიცავს) ეს ორი
-// ველი დაემატა, რომ დირექტორია `users`-თან join-ის გარეშე აშენდეს.
+// Names are duplicated here because provider_profiles is public-read and users is not.
 type ProviderProfileRow = {
   id: string;
   first_name: string;
@@ -68,23 +49,12 @@ type ProviderProfileRow = {
   certificates: ProviderProfile['certificates'];
   portfolio: ProviderProfile['portfolio'];
   sqm_prices: Record<string, string>;
-  // Task 3 — supabase/migrations/0025. RLS-ით client-ისთვის ჩაკეტილია
-  // (owner-ს არასდროს არ შეუძლია საკუთარი თავი გაავერიფიციროს), ამიტომ
-  // ეს მნიშვნელობა ყოველთვის სანდოა, საიდანაც არ უნდა წამოვიდეს.
+  // Client can never write this (column grants) — safe to trust.
   verification_status: VerificationStatus;
-  // #75 — Provider Home-ის toggle-ით რეალურად ინახება, `select('*')`-ით
-  // ისედაც ყოველთვის მოდიოდა, უბრალოდ ეს ტიპი მას აქამდე არ ასახავდა და
-  // fromProviderProfileRowToPublicProvider ამის ნაცვლად `online: false`-ს
-  // წერდა უპირობოდ (Profile-fix pass, task 3 — root cause #2).
   is_available: boolean;
 };
 
-// Second hardening pass, item 8 (supabase/migrations/0051) —
-// `verification_requested_at`/`verification_rejection_reason` აღარ
-// არსებობს `provider_profiles`-ზე (ის საჯაროდ readable-ია ყველა
-// authenticated user-ისთვის, #3-დანვე — ეს ორი ველი კი მოდერაციის
-// შიდა ინფორმაციაა, საჯაროდ არასდროს არ უნდა ყოფილიყო წაკითხვადი).
-// ცალკე, owner-only ცხრილზეა გატანილი.
+// Verification request details live in a separate owner-only table (provider_profiles is public).
 type ProviderVerificationRequestRow = {
   provider_id: string;
   requested_at: string | null;
@@ -96,7 +66,6 @@ function fromProviderProfileRow(
   verificationRequest?: ProviderVerificationRequestRow | null,
 ): ProviderProfile {
   return {
-    // #86: იგივე defensive coalesce, რაც fromRow-შია — იხ. იქაური შენიშვნა.
     firstName: row.first_name ?? '',
     lastName: row.last_name ?? '',
     specialty: row.specialty,
@@ -113,29 +82,14 @@ function fromProviderProfileRow(
   };
 }
 
-// EXPERIENCE_OPTIONS-ის id (მაგ. '10plus') → წარმომადგენელი წლების
-// რიცხვი, `Provider.years`-ისთვის (დახარისხების/ჩვენების მიზნით).
+// Experience option id → representative years (for sorting/display).
 const EXPERIENCE_YEARS: Record<string, number> = { lt1: 0, '1-2': 1, '3-5': 3, '6-10': 6, '10plus': 10 };
 
-// `provider_stats` view-ის row — `reviews`-იდან დათვლილი (avg_rating/
-// review_count, #64) და `job_posts`-იდან დათვლილი (completed_jobs, #67,
-// job-ის Provider-ზე რეალური "მინიჭების"/დასრულების state machine-ის
-// Supabase-ზე დაკავშირების შემდეგ).
+// get_provider_stats() row.
 type ProviderStatsRow = { provider_id: string; avg_rating: number; review_count: number; completed_jobs: number };
 
-// `provider_profiles`-ის row → საჯარო დირექტორიის `Provider` ობიექტი
-// (#60), `stats`-ის (#64) არასავალდებულო overlay-ით. `jobs`/`online`/
-// `price`/`skills` კვლავ ნაგულისხმევებზეა; `isNewProvider`/
-// `weightedRating` (#42/#43) გამართულად ამუშავებენ `reviews === 0`-ს
-// "ახალი ოსტატი"-დ, crash-ის გარეშე. `verified`/`verificationStatus`
-// (Task 3) რეალურია — `row.verification_status`-იდან, რომელიც RLS-ით
-// client-ისთვის ჩაკეტილია (0025), ამიტომ ეს ბეჯი ყოველთვის სანდო,
-// backend-დან მომდინარე მონაცემია, არასდროს client-ის საკუთარი პრეტენზია.
+// provider_profiles row (+ stats) → public directory Provider.
 function fromProviderProfileRowToPublicProvider(row: ProviderProfileRow, stats?: ProviderStatsRow): Provider {
-  // #86: `?? ''` — იგივე defensive coalesce, რაც fromRow/fromProviderProfileRow-ში;
-  // ეს ფუნქცია ცალკეა (არა `fromProviderProfileRow`-ზე აგებული) და პირდაპირ
-  // `row.first_name`-ს იყენებდა `.charAt(0)`-ისთვის, საჯარო დირექტორიის
-  // (Customer Home/Category/SavedProviders/ViewProviderProfile) crash-ის რისკით.
   const firstName = row.first_name ?? '';
   const lastName = row.last_name ?? '';
   const name = `${firstName} ${lastName}`.trim();
@@ -157,10 +111,6 @@ function fromProviderProfileRowToPublicProvider(row: ProviderProfileRow, stats?:
     jobs: stats?.completed_jobs ?? 0,
     verified: row.verification_status === 'verified',
     verificationStatus: row.verification_status,
-    // Profile-fix pass, task 3 — root cause #2: this was hardcoded `false`
-    // regardless of the Provider's actual, real `provider_profiles.
-    // is_available` value (#75) — every public-facing Provider always
-    // showed as "დაკავებული" (busy), even a genuinely available one.
     online: row.is_available,
     initials,
     color: '#2563EB',
@@ -201,84 +151,23 @@ const DEFAULT_PROVIDER_PROFILE: ProviderProfile = {
   verificationRejectionReason: null,
 };
 
-// მარტივი module-level "in-memory db" — ერთადერთი ლოკალური მომხმარებელია
-// დღევანდელ დემოში (auth ჯერ არ არსებობს), ამიტომ საკმარისია React state-ის
-// გარეთ. CustomerProfileContext/ProviderProfileContext კვლავ თავად ინახავენ
-// რეაქტიულ ასლს (useState) და ამ სერვისის მეშვეობით კითხულობენ/წერენ —
-// განზრახ სინქრონული, რომ Context-ის setState-ის timing არ შეიცვალოს.
+// Synchronous in-memory copy behind the profile Contexts (they keep the reactive state).
 let customerProfile: CustomerProfile = { ...DEFAULT_CUSTOMER_PROFILE };
 let providerProfile: ProviderProfile = { ...DEFAULT_PROVIDER_PROFILE };
 
-export interface UserService {
-  getCustomerProfile(): CustomerProfile;
-  updateCustomerProfile(patch: Partial<CustomerProfile>): CustomerProfile;
-  getProviderProfile(): ProviderProfile;
-  updateProviderProfile(patch: Partial<ProviderProfile>): ProviderProfile;
-
-  // Supabase-ის `users` ცხრილი — ანგარიშის საბაზისო ჩანაწერი (role +
-  // identity). Register/GoogleComplete წერს, Login კითხულობს (რომ იცოდეს
-  // სად გადაიყვანოს — CustomerHome თუ ProviderHome), CustomerEditProfile
-  // ცვლილებას ინახავს. ეს არის პირველი ნამდვილი (არა mock) backend
-  // persistence ამ აპში — providerProfiles/jobPosts/... ჯერ არ არსებობს.
-  // suspended/suspensionReason ადმინის RPC-ის საქმეა, არასდროს registration-ისას (0106) — ახალ ანგარიშს DB-default (unsuspended) ეყოლება
-  createUserRecord(uid: string, record: Omit<UserRecord, 'suspended' | 'suspensionReason'>): Promise<void>;
-  getUserRecord(uid: string): Promise<UserRecord | null>;
-  updateUserRecord(uid: string, patch: Partial<UserRecord>): Promise<void>;
-
-  // Supabase-ის `provider_profiles` ცხრილი — Provider-ის საკუთარი,
-  // რედაქტირებადი პროფილის გაფართოება (`users`-ის მეტი: specialty, areas,
-  // experience, about, ფოტო/სერთიფიკატი/portfolio, sqm ფასები). #52-ის
-  // მეორე ეტაპი — `users`-ის შემდეგ. `upsert`, რადგან ProviderSetupScreen
-  // პირველად ქმნის ჩანაწერს, ProviderEditProfileScreen შემდეგ ანახლებს —
-  // ორივე იმავე მეთოდით მუშაობს.
-  getProviderProfileRecord(uid: string): Promise<ProviderProfile | null>;
-  upsertProviderProfileRecord(uid: string, record: ProviderProfile): Promise<void>;
-
-  // საჯარო Provider დირექტორია, რეალურად Supabase-ზე (#60) — `provider_profiles`-ის
-  // ყველა row-ს კითხულობს (public-read RLS, #60-ის SQL).
-  listRealProviders(): Promise<Provider[]>;
-  // ერთი Provider-ის პირდაპირი წაკითხვა id-ით (#71) — `listRealProviders()`-ის
-  // filter-ის ნაცვლად, სადაც მხოლოდ ერთი კონკრეტული Provider-ია საჭირო
-  // (ViewProviderProfileScreen-ის deep-link ან პირდაპირი id-ით გახსნა).
-  getRealProviderById(id: string): Promise<Provider | null>;
-
-  // Task 5 — რამდენიმე Provider-ის ერთდროული, batched წაკითხვა id-ების
-  // მიხედვით (`quoteService.listResponsesForJob`-ის Provider-ის
-  // გამდიდრებისთვის — N+1-ის ნაცვლად ერთი `provider_profiles.in(ids)` +
-  // ერთი `get_provider_stats()` query, `listRealProviders()`-ის იგივე
-  // batching-პრინციპით).
-  getRealProvidersByIds(ids: string[]): Promise<Provider[]>;
-
-  // Task 2 — Provider Home-ის ხელმისაწვდომობის toggle, `provider_profiles.is_available`-ზე
-  // (მანამდე ლოკალური `useState`). ცალკე, მსუბუქი მეთოდებია (არა
-  // getProviderProfileRecord/upsertProviderProfileRecord-ის ნაწილი), რომ
-  // Home-ის toggle-ის ტოგვამ სრული პროფილის re-fetch/overwrite არ გამოიწვიოს.
-  getProviderAvailability(uid: string): Promise<boolean>;
-  setProviderAvailability(uid: string, value: boolean): Promise<void>;
-
-  // Provider verification request (supabase/migrations/0035) — RPC-ს
-  // იძახებს (`request_provider_verification`, პარამეტრების გარეშე —
-  // caller-ი/target status ორივე სერვერზეა derived, `reportService.submitJobReport`-ის/
-  // `jobService.cancelJob`-ის იგივე პატერნით). client-ს არასდროს არ
-  // შეუძლია `verification_status`-ის პირდაპირი `.update()`/`.upsert()` —
-  // ეს ერთადერთი გზაა unverified/rejected → pending-ის შესაცვლელად.
-  // 0107 — RPC now requires a private-media selfie path, uploaded via
-  // storageService.uploadPrivateVerificationSelfie first.
-  requestProviderVerification(selfiePath: string): Promise<void>;
-}
-
-export const userService: UserService = {
-  getCustomerProfile: () => customerProfile,
-  updateCustomerProfile: (patch) => {
+export const userService = {
+  getCustomerProfile: (): CustomerProfile => customerProfile,
+  updateCustomerProfile: (patch: Partial<CustomerProfile>): CustomerProfile => {
     customerProfile = { ...customerProfile, ...patch };
     return customerProfile;
   },
-  getProviderProfile: () => providerProfile,
-  updateProviderProfile: (patch) => {
+  getProviderProfile: (): ProviderProfile => providerProfile,
+  updateProviderProfile: (patch: Partial<ProviderProfile>): ProviderProfile => {
     providerProfile = { ...providerProfile, ...patch };
     return providerProfile;
   },
-  async createUserRecord(uid, record) {
+  // suspended/suspensionReason are set only by the admin RPC.
+  async createUserRecord(uid: string, record: Omit<UserRecord, 'suspended' | 'suspensionReason'>): Promise<void> {
     const { error } = await supabase.from('users').insert({
       id: uid,
       role: record.role,
@@ -294,13 +183,13 @@ export const userService: UserService = {
     });
     if (error) throw error;
   },
-  async getUserRecord(uid) {
+  async getUserRecord(uid: string): Promise<UserRecord | null> {
     const { data, error } = await supabase.from('users').select('*').eq('id', uid).maybeSingle();
     if (error) throw error;
     if (!data) return null;
     return fromRow(data as UserRow);
   },
-  async updateUserRecord(uid, patch) {
+  async updateUserRecord(uid: string, patch: Partial<UserRecord>): Promise<void> {
     const row: Partial<UserRow> = {};
     if (patch.role !== undefined) row.role = patch.role;
     if (patch.firstName !== undefined) row.first_name = patch.firstName;
@@ -316,13 +205,8 @@ export const userService: UserService = {
     if (error) throw error;
   },
 
-  async getProviderProfileRecord(uid) {
-    // Second hardening pass, item 8 — verification-request metadata
-    // (requested_at/rejection_reason) ცალკე, owner-only ცხრილშია
-    // (0051) — ორივე query ერთდროულად, ეს ყოველთვის caller-ის
-    // საკუთარი პროფილისთვისაა გამოძახებული (ProviderProfileContext/
-    // RootNavigator-ის boot hydration/ProviderEditProfileScreen), ასე
-    // რომ owner-only RLS ორივეს გაუშვებს.
+  async getProviderProfileRecord(uid: string): Promise<ProviderProfile | null> {
+    // Always the caller's own profile, so owner-only RLS allows both reads.
     const [{ data, error }, verificationResult] = await Promise.all([
       supabase.from('provider_profiles').select('*').eq('id', uid).maybeSingle(),
       supabase.from('provider_verification_requests').select('*').eq('provider_id', uid).maybeSingle(),
@@ -334,21 +218,9 @@ export const userService: UserService = {
       : null;
     return fromProviderProfileRow(data as ProviderProfileRow, verificationRequest);
   },
-  async upsertProviderProfileRecord(uid, record) {
-    // Audit fix (found via Maestro E2E testing) — `.upsert()` compiles to
-    // `INSERT ... ON CONFLICT (id) DO UPDATE`, and confirmed via a direct
-    // REST test against the live project: Postgres rejects that specific
-    // form with "permission denied for table provider_profiles" under the
-    // column-scoped UPDATE grant this table has (0026) — even though a
-    // plain `.update()` on the exact same row/columns succeeds immediately
-    // before/after. `ON CONFLICT DO UPDATE`'s conflict-resolution path
-    // apparently needs broader-than-column UPDATE privilege that a plain
-    // UPDATE statement does not, so upsert can never work here without
-    // reopening the table-level grant `verification_status` is
-    // deliberately locked behind. Try UPDATE first (matches the far more
-    // common "editing an existing profile" case); INSERT only if it
-    // touched zero rows (first-time ProviderSetupScreen save) — both are
-    // plain statements, confirmed to respect the column-scoped grant.
+  async upsertProviderProfileRecord(uid: string, record: ProviderProfile): Promise<void> {
+    // Not upsert: INSERT … ON CONFLICT DO UPDATE is denied under this table's
+    // column-scoped UPDATE grant. Plain UPDATE first, INSERT if no row was touched.
     const payload = {
       first_name: record.firstName,
       last_name: record.lastName,
@@ -372,11 +244,8 @@ export const userService: UserService = {
       if (insertError) throw insertError;
     }
   },
-  async listRealProviders() {
-    // Security audit — `provider_stats` VIEW ჩანაცვლდა `get_provider_stats()`
-    // RPC-ით (Supabase-ის "Security Definer View" lint-გაფრთხილების
-    // გასწორება, supabase/migrations/0030) — ვიწროდ განსაზღვრული ფუნქცია,
-    // იგივე 4 agregირებული სვეტი, არა ღია VIEW.
+  // Public provider directory.
+  async listRealProviders(): Promise<Provider[]> {
     const [{ data, error }, statsResult] = await Promise.all([
       supabase.from('provider_profiles').select('*'),
       supabase.rpc('get_provider_stats'),
@@ -388,7 +257,7 @@ export const userService: UserService = {
     }
     return (data as ProviderProfileRow[]).map((row) => fromProviderProfileRowToPublicProvider(row, statsMap.get(row.id)));
   },
-  async getRealProviderById(id) {
+  async getRealProviderById(id: string): Promise<Provider | null> {
     const [{ data, error }, statsResult] = await Promise.all([
       supabase.from('provider_profiles').select('*').eq('id', id).maybeSingle(),
       supabase.rpc('get_provider_stats', { p_provider_id: id }),
@@ -398,7 +267,8 @@ export const userService: UserService = {
     const stats = !statsResult.error ? (statsResult.data as ProviderStatsRow[] | null)?.[0] : undefined;
     return fromProviderProfileRowToPublicProvider(data as ProviderProfileRow, stats);
   },
-  async getRealProvidersByIds(ids) {
+  // Batched by ids (one profiles query + one stats call), avoids N+1.
+  async getRealProvidersByIds(ids: string[]): Promise<Provider[]> {
     if (ids.length === 0) return [];
     const [{ data, error }, statsResult] = await Promise.all([
       supabase.from('provider_profiles').select('*').in('id', ids),
@@ -412,7 +282,8 @@ export const userService: UserService = {
     return (data as ProviderProfileRow[]).map((row) => fromProviderProfileRowToPublicProvider(row, statsMap.get(row.id)));
   },
 
-  async getProviderAvailability(uid) {
+  // Availability toggle on its own, so flipping it doesn't rewrite the whole profile.
+  async getProviderAvailability(uid: string): Promise<boolean> {
     const { data, error } = await supabase
       .from('provider_profiles')
       .select('is_available')
@@ -421,12 +292,13 @@ export const userService: UserService = {
     if (error) throw error;
     return (data as { is_available: boolean } | null)?.is_available ?? true;
   },
-  async setProviderAvailability(uid, value) {
+  async setProviderAvailability(uid: string, value: boolean): Promise<void> {
     const { error } = await supabase.from('provider_profiles').update({ is_available: value }).eq('id', uid);
     if (error) throw error;
   },
 
-  async requestProviderVerification(selfiePath) {
+  // unverified/rejected → pending. Upload the selfie first (storageService.uploadPrivateVerificationSelfie).
+  async requestProviderVerification(selfiePath: string): Promise<void> {
     const { error } = await supabase.rpc('request_provider_verification', { p_selfie_path: selfiePath });
     if (error) throw error;
   },

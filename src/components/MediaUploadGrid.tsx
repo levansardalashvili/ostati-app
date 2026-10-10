@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Camera, Image as ImageIcon, Plus, X, type LucideIcon } from 'lucide-react-native';
 import { BottomSheet } from './BottomSheet';
@@ -6,26 +6,15 @@ import { colors, radius, spacing, typography } from '../theme';
 import { SecureStorageImage } from './SecureStorageImage';
 import { usePressScale } from '../utils/usePressScale';
 
-// `uri` — არასავალდებულო, ლოკალური ან Supabase Storage-ის საჯარო URL (#62) —
-// თუ არსებობს, რეალური სურათი რენდერდება ფერადი placeholder-ის ნაცვლად.
-export type MediaItem = { id: number; bg: string; uri?: string };
+// `uri` — local file or Storage URL.
+export type MediaItem = { id: number; uri?: string };
 
-const MEDIA_BG = ['#DBEAFE', '#D1FAE5', '#FEF3C7', '#FCE7F3', '#EDE9FE'];
-
-// Profile-fix pass, task 2 — `id: Date.now() + items.length` could produce
-// the SAME id from two INDEPENDENT calls (e.g. one for `certificates`, one
-// for `portfolio`, each with its own array length) if they land within the
-// same millisecond — a real, confirmed anomaly (DEFAULT_PROVIDER_PROFILE's
-// mock seed data in userService.ts had exactly this: certificates id=1 and
-// the first portfolio id=1). A module-level, monotonically increasing
-// counter guarantees every id this function ever returns — across every
-// caller, every array, every screen using it — is unique, closing that off
-// completely regardless of timing.
+// Monotonic counter: two grids adding in the same millisecond still get unique ids.
 let mediaItemSeq = 0;
 
-export function nextMediaItem(items: MediaItem[]): MediaItem {
+export function nextMediaItem(): MediaItem {
   mediaItemSeq += 1;
-  return { id: Date.now() * 1000 + mediaItemSeq, bg: MEDIA_BG[items.length % MEDIA_BG.length] };
+  return { id: Date.now() * 1000 + mediaItemSeq };
 }
 
 type Props = {
@@ -40,10 +29,7 @@ type Props = {
   testID?: string;
 };
 
-// ერთი გაზიარებული ბადე ატვირთული ფაილებისთვის (სერთიფიკატები/ნამუშევრები/
-// RatingScreen-ის ფოტოები) — რეალური კამერა/გალერეის picker-ით (#62),
-// preview/დამატება/წაშლა PostJobScreen-ის ფოტოს ატვირთვის იგივე
-// ვიზუალური ენით.
+// Photo grid (certificates, portfolio, rating photos): preview, add, remove.
 export function MediaUploadGrid({
   items,
   onAddCamera,
@@ -120,7 +106,7 @@ function MediaThumb({
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
       <Pressable
-        style={[styles.thumb, { backgroundColor: item.bg }]}
+        style={styles.thumb}
         onPress={onPreview}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
@@ -168,6 +154,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   thumb: {
+    backgroundColor: colors.muted,
     width: 72,
     height: 72,
     borderRadius: radius.lg,

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -51,11 +51,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CustomerJobDetail'>;
 
 const PROBLEM_OPTIONS = ['ოსტატი ჯერ არ მოსულა', 'სამუშაო ჯერ არ დასრულებულა', 'სამუშაოს ხარისხი დაბალია', 'სხვა'];
 
-// route-ს job param-ის არარსებობისას (ჩატის/Home-ის/notification-ის
-// deep-link, სადაც მხოლოდ jobId ცნობილია) — placeholder, სანამ რეალური
-// fetch (jobService.getJobPostById) არ დასრულდება. ცარიელი id (`''`) არასდროს
-// ემთხვევა რეალურ job-ს, ამიტომ ქვემოთ hook-ების `[job.id]`-ზე დამოკიდებული
-// fetch-ები უსაფრთხოდ no-op-ობენ, სანამ ნამდვილი job არ ჩაიტვირთება.
+// Placeholder until the job is fetched (deep links pass only the id).
+// The empty id never matches, so the [job.id] effects are no-ops meanwhile.
 const EMPTY_JOB: CustomerJob = {
   id: '',
   title: '',
@@ -68,11 +65,8 @@ const EMPTY_JOB: CustomerJob = {
   photos: [],
 };
 
-// C3 — Job-ის დეტალი + დაინტერესებული ოსტატების სია, და C4 — ოსტატის
-// არჩევის დადასტურება (product-spec.md; დიზაინის რეფერენსში ეს ორივე ერთი
-// და იმავე CustomerJobDetail კომპონენტის ორი მდგომარეობაა — ჩვენც ასე
-// ავაშენეთ). სამუშაოს დასრულების დადასტურება/შეფასების ნაკადი (product-spec.md
-// პუნქტი #14) — ზუსტად ზიპის App.tsx-ის CustomerJobDetail-ის მიხედვით.
+// Customer's job: interested providers and selection, then completion,
+// problem and rating.
 export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const [job, setJob] = useState<CustomerJob>(() => route.params.job ?? EMPTY_JOB);
   const [jobLoading, setJobLoading] = useState(!route.params.job);
@@ -90,8 +84,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
         if (!cancelled && real) setJob(real);
       })
       .catch(() => {
-        // ჩავარდნისას EMPTY_JOB-ზე ვრჩებით — loading მაინც უნდა მოიხსნას,
-        // რომ ეკრანი დაკიდებული არ დარჩეს.
+        // On failure stay on EMPTY_JOB, but stop the loading state.
       })
       .finally(() => {
         if (!cancelled) setJobLoading(false);
@@ -125,34 +118,14 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const [cancelSheetOpen, setCancelSheetOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
-  // #84 — ზოგადი moderation-რეპორტი (job_reports/create_job_report),
-  // completion-dispute-ის ("პრობლემა მაქვს") მთლიანად ცალკე, დამოუკიდებელი
-  // მოქმედება — იხ. src/components/ReportJobSheet.tsx-ის თავსართის შენიშვნა.
+  // Moderation report (job_reports) — separate from the completion dispute.
   const [reportSheetOpen, setReportSheetOpen] = useState(false);
   const [confirmProvider, setConfirmProvider] = useState<Provider | null>(null);
-  // Profile-fix pass, task 4 — CONFIRMED root cause. This used to be a lazy
-  // `useState` INITIALIZER (`() => interestedList.find(...)`), which only
-  // ever runs once, on the very first render — at that point `interestedList`
-  // is still its initial empty array (the real list only arrives later,
-  // via the async effect above), so this always evaluated to `null` on
-  // mount. For a job that was already decided in an EARLIER session (the
-  // common case: opening Job Details on an already-active/in-progress job,
-  // not the one just-selected in this same screen instance), nothing ever
-  // re-derived it afterward — `selectedProvider` stayed `null` for the
-  // entire session, silently hiding the assigned Provider's name/photo
-  // everywhere this screen shows them (the completion banner, the chat
-  // button, and the RatingScreen navigation params below — which is why
-  // `openRating()` needed a hardcoded 'გიორგი ბერიძე'/'გბ' MOCK fallback
-  // at all: real data existed in `interestedList`/`job.provider`, this
-  // screen just never looked at it again after mount). `confirmSelection()`
-  // (below) still calls `setSelectedProvider(confirmProvider)` directly
-  // for the live-selection case — unchanged; this effect only ADDS the
-  // missing re-sync for every other case, and never clears an
-  // already-set value back to null.
+  // Re-derived whenever data arrives — a job assigned in an earlier session must
+  // still show its provider (a useState initializer ran only once, on an empty list).
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   useEffect(() => {
-    // id-ით (job_posts.provider_id) — სახელით შედარება მყიფეა და მარცხის შემთხვევაში
-    // selectedProvider null რჩებოდა, რაც შეფასების ჩუმ დაკარგვას იწვევდა.
+    // Match by provider_id — matching by name failed and silently lost ratings.
     const match =
       interestedList.find((entry) => !!job.providerId && entry.provider.id === job.providerId)?.provider ??
       interestedList.find((entry) => entry.provider.name === job.provider)?.provider;
@@ -160,10 +133,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   }, [interestedList, job.provider, job.providerId]);
   const [sortBy, setSortBy] = useState<'price' | 'rating' | 'experience' | null>(null);
 
-  // #72: Provider ყოველთვის კონკრეტულ რიცხვს წარადგენს — "ფასი სამუშაოს
-  // ნახვის შემდეგ განისაზღვრება"/inspection-ფასის ცნება აღარ არსებობს.
-  // `offeredPrice === undefined` მხოლოდ migration-მდელ ისტორიულ
-  // response-ებზეა შესაძლებელი (0012-ის backfill-შენიშვნა).
+  // offeredPrice is missing only on very old responses.
   const priceValue = (entry: (typeof interestedList)[number]) =>
     entry.offeredPrice ?? Number.POSITIVE_INFINITY;
   const priceLabel = (entry: (typeof interestedList)[number]) =>
@@ -172,24 +142,18 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     if (!sortBy) return interestedList;
     const copy = [...interestedList];
     if (sortBy === 'price') copy.sort((a, b) => priceValue(a) - priceValue(b));
-    // წონიანი რეიტინგი (src/utils/providerRank.ts) — არა უბრალო `rating`,
-    // რომ ერთმა 5-ვარსკვლავიანმა შეფასებამ ვერ გადააჭარბოს ასობით კარგ
-    // შეფასებას მანიპულაციით.
+    // Weighted rating, so one 5★ review can't beat hundreds of good ones.
     if (sortBy === 'rating') copy.sort((a, b) => weightedRating(b.provider) - weightedRating(a.provider));
     if (sortBy === 'experience') copy.sort((a, b) => b.provider.years - a.provider.years);
     return copy;
   }, [interestedList, sortBy]);
 
-  // Provider-ის არჩევის შემდეგ job სხვა ოსტატებისთვის იხურება — მხოლოდ
-  // არჩეული ოსტატი ჩანს, როგორც აქტიური კანდიდატი (მომხმარებლის მოთხოვნით).
+  // After selection only the chosen provider is shown.
   const visibleInterestedList = selectedProvider
     ? sortedInterestedList.filter((entry) => entry.provider.id === selectedProvider.id)
     : sortedInterestedList;
 
-  // დასრულების/პრობლემის/შეფასების ნაკადი — ორმხრივი state machine
-  // (JobStatusContext.tsx, StatusPill.tsx) — Customer-ს პირდაპირ "დასრულების"
-  // შესაძლებლობა აღარ აქვს, მხოლოდ Provider-ის "სამუშაო დავასრულე"-ს შემდეგ
-  // ხედავს დადასტურების ბარათს (მომხმარებლის მოთხოვნით).
+  // Completion is two-sided: the customer confirms or reports a problem after the provider marks it done.
   const [problemSheetOpen, setProblemSheetOpen] = useState(false);
   const [problemOption, setProblemOption] = useState<string | null>(null);
   const [problemOther, setProblemOther] = useState('');
@@ -209,10 +173,6 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   }, [job.id]);
 
   const sharedStatus = getStatus(job.id) ?? job.status;
-  // #79: "cancelled" ცალკე ლოკალურ boolean-ად აღარ ინახება — cancelJob()
-  // RPC-ის წარმატებაზე `setStatus(job.id,'cancelled')`-ს ვიძახებთ, იმავე
-  // გაზიარებულ JobStatusContext-ში, რასაც confirmSelection/confirmCompletion/
-  // submitProblem-იც იყენებენ — `sharedStatus` თავად უკვე ასახავს.
   const effectiveStatus: JobStatus = sharedStatus;
   const showCompletionConfirmCard = effectiveStatus === 'awaiting_customer_confirmation';
   // 0149 — Customer can mark an active job done once its scheduled start
@@ -228,7 +188,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     effectiveStatus === 'active' && !!job.providerId && (!scheduledStart || Date.now() >= scheduledStart.getTime());
   const [markCompletedOpen, setMarkCompletedOpen] = useState(false);
 
-  // 0152 — private job: turn it into a normal public one.
+  // Private job → public.
   const [openingToAll, setOpeningToAll] = useState(false);
   const openToAll = async () => {
     if (openingToAll) return;
@@ -260,7 +220,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     }
   };
 
-  // 0150 — change date/time of an active job (Provider gets notified).
+  // Change date/time of an active job (the provider is notified).
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [newDate, setNewDate] = useState<Date | null>(null);
   const [newTime, setNewTime] = useState('');
@@ -283,10 +243,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     }
   };
 
-  // supabase/migrations/0079 — opportunistic, fire-and-forget auto-expiry
-  // check (ProviderJobDetailScreen-ის იგივე ეფექტის სარკე). RPC-ივე
-  // ამოწმებს რეალურ 72სთ-იან grace period-ს სერვერზე — თუ ჯერ ადრეა ან
-  // job სხვა სტატუსშია, უბრალოდ `false`-ს აბრუნებს, შეცდომის გარეშე.
+  // Apply the auto-confirm deadline on open (cron does it too); no-op before 72h.
   useEffect(() => {
     if (effectiveStatus !== 'awaiting_customer_confirmation' || !job.id) return;
     const jobId = job.id;
@@ -299,11 +256,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveStatus, job.id]);
 
-  // supabase/migrations/0082 — იგივე lazy/opportunistic პატერნი, "job-ის
-  // აღების" მხარეს: თუ ჯერ არავინ დაინტერესებულა 48სთ-ის განმავლობაში,
-  // RPC სერვერზევე ამოწმებს (idempotent — ერთხელ, `stale_interest_reminder_sent_at`-ით
-  // დაცული) და საჭიროებისას Customer-ს ატყობინებს. Job-ის სტატუსს არ
-  // ცვლის, ამიტომ `setStatus` აქ არაფერზე არ არის საჭირო.
+  // One-time "nobody interested yet" reminder (cron does it too); doesn't change status.
   useEffect(() => {
     if (effectiveStatus !== 'pending' || !job.id) return;
     jobService.checkStaleJobInterest(job.id).catch(() => {});
@@ -328,13 +281,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const handleOpenProfile = (provider: Provider) => {
     navigation.navigate('ViewProviderProfile', { id: provider.id });
   };
-  // #72: კრიტიკული გადასვლები (Provider-ის არჩევა/დასრულების
-  // დადასტურება/პრობლემის შეტყობინება) აღარ არის "ჯერ ლოკალურად, მერე
-  // ფონურად Supabase-ში" — ჯერ RPC-ს ვიძახებთ და ველოდებით (`await`),
-  // მხოლოდ წარმატებაზე ვცვლით ლოკალურ state-ს/ვნავიგირებთ. RPC-ის
-  // ჩავარდნისას (მაგ. Provider-მა უკვე გამოითხოვა თანხმობა, ან job-ის
-  // სტატუსი შუალედში შეიცვალა) მომხმარებელს პირდაპირ ვატყობინებთ, ლოკალურ
-  // state-ს არასწორად აღარ "ვაჩვენებთ" წარმატებულად.
+  // Status changes: await the RPC, update local state only on success, show the error otherwise.
   const [selecting, setSelecting] = useState(false);
   const confirmSelection = async () => {
     if (!confirmProvider || selecting) return;
@@ -345,8 +292,6 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       setStatus(job.id, 'active');
       setJob((prev) => ({ ...prev, status: 'active', provider: confirmProvider.name, providerId: confirmProvider.id }));
       setConfirmProvider(null);
-      // #73: "შენ აგირჩიეს სამუშაოსთვის" ახლა select_provider RPC-ის მხრიდან
-      // იგზავნება, სერვერის მხარეს — იხ. supabase/migrations/0022.
     } catch (e) {
       const blocked = ((e as { message?: string } | null)?.message ?? '').includes('PROVIDER_BLOCKED');
       Alert.alert('ვერ მოხერხდა', blocked ? 'ამ ოსტატის არჩევა შეუძლებელია (დაბლოკილია).' : 'ოსტატის არჩევა ვერ დასრულდა — სცადეთ თავიდან.');
@@ -354,12 +299,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       setSelecting(false);
     }
   };
-  // #82: "active" job-ს (Provider უკვე მინიჭებული) გაუქმებისას მიზეზი
-  // ახლა UI-დანაც შეგროვდება (#79-ის RPC-ს ეს ველი ისედაც შეეძლო მიეღო,
-  // მხოლოდ sheet-ს არ ჰქონდა ველი) — "pending" job-ზე (Provider ჯერ არ
-  // მინიჭებულა) კვლავ არ მოითხოვება, ზუსტად #79-ის "pending job may be
-  // cancelled" / "active job may be cancelled with a reason" წესის მიხედვით.
-  // ოსტატმა გააუქმა → მომხმარებელს შეუძლია განცხადება დანარჩენებისთვის ხელახლა გახსნას (0097)
+  // Reopen after the chosen provider cancelled.
   const [reopening, setReopening] = useState(false);
   const canReopen = effectiveStatus === 'cancelled' && job.cancellationActor === 'provider';
   const reopenJob = async () => {
@@ -378,7 +318,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       setReopening(false);
     }
   };
-  // ვადა იწურება (30 დღე, 0096): ბოლო 3 დღეში განცხადების განახლება შეიძლება (0099)
+  // Renew in the last days before expiry.
   const [renewing, setRenewing] = useState(false);
   const canRenew =
     effectiveStatus === 'pending' &&
@@ -411,14 +351,8 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       setCancelling(false);
     }
   };
-  // Customer-ის "დადასტურება" — Provider-ის დასრულების მოთხოვნას ეთანხმება
-  // (customer_confirm_completion() RPC, awaiting_customer_confirmation →
-  // confirmed_awaiting_rating) და მხოლოდ წარმატებაზე გადადის სავალდებულო
-  // შეფასებაზე. Job "completed" ხდება მხოლოდ მას შემდეგ, რაც
-  // ვარსკვლავიანი შეფასება რეალურად გაიგზავნება და reviews-ის INSERT
-  // trigger-ი (Supabase-ის მხარეს) status-ს "completed"-ზე გადაიყვანს —
-  // არც ეს ღილაკი და არც RatingScreen-ის onRate აღარ აყენებენ
-  // "completed"-ს პირდაპირ, კლიენტიდან.
+  // Confirm → confirmed_awaiting_rating → mandatory RatingScreen. Only the review
+  // insert trigger sets 'completed'.
   const [confirming, setConfirming] = useState(false);
   const confirmCompletion = async () => {
     if (confirming) return;
@@ -454,33 +388,20 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
   const openRating = () => {
     navigation.navigate('RatingScreen', {
       jobId: job.id,
-      // `job.provider` (real, denormalized on job_posts) as the fallback —
-      // never a hardcoded mock name — for the narrow edge case where
-      // `selectedProvider` genuinely couldn't be resolved (e.g. the
-      // interestedList fetch failed); by this point in the flow the job
-      // always has a real assigned provider, so this is only a defensive
-      // floor, not the expected path.
+      // Fallback if selectedProvider couldn't be resolved.
       providerName: selectedProvider?.name ?? job.provider ?? 'ოსტატი',
       providerInitials: selectedProvider?.initials ?? (job.provider ? job.provider.charAt(0).toUpperCase() : 'O'),
       providerColor: selectedProvider?.color ?? colors.primary,
       onRate: async (data) => {
         const uid = authService.getCurrentUser()?.uid;
-        // სერვერი provider_id-ს მაინც job-იდან ადგენს (set_review_identity), ამიტომ
-        // selectedProvider-ის გარეშეც შეგვიძლია გაგზავნა — ადრე აქ ჩუმად ვბრუნდებოდით
-        // და RatingScreen "მადლობას" აჩვენებდა, შეფასება კი არ ინახებოდა.
+        // The server takes provider_id from the job (set_review_identity), so sending
+        // works even without selectedProvider.
         const ratedProviderId = selectedProvider?.id ?? job.providerId;
         if (!uid || !ratedProviderId) throw new Error('rating: missing user or provider');
-        // reviews-ის INSERT-ს job_posts.status-ს "completed"-ზე გადაჰყავს
-        // (0015_review_completion_trigger.sql) — ეს ერთადერთი გზაა
-        // completed-მდე მისასვლელად, ამიტომ ლოკალურ state-საც მხოლოდ
-        // ამ insert-ის წარმატების შემდეგ ვცვლით. შეცდომა განზრახ არ ჩაიხშობა:
-        // RatingScreen ცდის თავიდან და მომხმარებელს ეუბნება, რომ ვერ გაიგზავნა.
+        // The review insert completes the job. Errors propagate on purpose — RatingScreen shows them and retries.
         await reviewService.submitReview(job.id, uid, ratedProviderId, data);
         setRatingData(data);
         setStatus(job.id, 'completed');
-        // #73: "სამუშაო დასრულებულად დადასტურდა" reviews-ის INSERT trigger-იდან
-        // (handle_review_completion) იგზავნება იმავე transaction-ში —
-        // იხ. supabase/migrations/0023.
       },
     });
   };
@@ -494,8 +415,6 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       await jobService.customerReportProblem(job.id, reason);
       setProblemSheetOpen(false);
       setStatus(job.id, 'disputed');
-      // #73: "მომხმარებელმა პრობლემა აღნიშნა" ახლა customer_report_problem
-      // RPC-ის მხრიდან იგზავნება, სერვერის მხარეს — იხ. supabase/migrations/0022.
     } catch (e) {
       const limit = ((e as { message?: string } | null)?.message ?? '').includes('DISPUTE_LIMIT_REACHED');
       Alert.alert(
@@ -509,11 +428,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
     }
   };
 
-  // ერთი მუდმივი JSX ხე jobLoading→loaded გადასვლისას (არა ორი ცალკე
-  // `return` სხვადასხვა SafeAreaView-ით) — Fabric-ის ("addViewAt: failed
-  // to insert view" / "child already has a parent") crash-ის თავიდან
-  // ასაცილებლად, რომელიც ხდება, როცა ერთი კომპონენტის ორ render-ს შორის
-  // მთელი ზედა-დონის ხე იცვლება navigation-transition-ის დროს.
+  // One persistent JSX tree for loading→loaded (two returns crash Fabric).
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader
@@ -560,8 +475,6 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
           {job.photos && job.photos.length > 0 && (
             <View style={styles.photoRow}>
               {job.photos.map((uri) => (
-                // Task — თამბნეილს გადიდება/გახსნა ადრე არ ჰქონდა (Provider-ის
-                // მხარესაც იგივე ხარვეზი იყო, ორივეგან გასწორდა ერთდროულად).
                 <Pressable key={uri} style={styles.photoThumb} onPress={() => setPhotoPreview(uri)}>
                   <SecureStorageImage reference={uri} style={styles.photoThumbImage} />
                 </Pressable>
@@ -745,7 +658,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
                 {ratingData.photos && ratingData.photos.length > 0 && (
                   <View style={styles.ratingPhotoRow}>
                     {ratingData.photos.map((photo) => (
-                      <View key={photo.id} style={[styles.ratingPhotoThumb, { backgroundColor: photo.bg }]}>
+                      <View key={photo.id} style={styles.ratingPhotoThumb}>
                         <ImageIcon size={18} color="rgba(100,116,139,0.6)" />
                       </View>
                     ))}
@@ -913,9 +826,7 @@ export function CustomerJobDetailScreen({ navigation, route }: Props) {
       )}
 
       <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)}>
-        {/* მომლოდინე განცხადებაზე ოსტატი ჯერ არ არის არჩეული — არავისზე
-            შეიძლება საჩივარი ("ოსტატი არ გამოცხადდა" და ა.შ.); ღილაკი
-            მხოლოდ არჩევის შემდეგ ჩანს. */}
+        {/* No report while pending — there's no provider to report yet. */}
         {effectiveStatus === 'pending' && (
           <Pressable
             testID="job-edit-menu-row"
@@ -1733,6 +1644,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm + 2,
   },
   ratingPhotoThumb: {
+    backgroundColor: colors.muted,
     width: 56,
     height: 56,
     borderRadius: radius.md,

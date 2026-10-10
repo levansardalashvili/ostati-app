@@ -2,7 +2,6 @@ import { supabase } from './supabaseClient';
 import { CATEGORIES as STATIC_CATEGORIES, isSqmPriced as staticIsSqmPriced } from '../data/categories';
 import type { CategoryRecord } from '../types/category';
 
-// `categories` ცხრილის Postgres row shape (supabase/migrations/0043).
 type CategoryRow = {
   id: string;
   name: string;
@@ -25,17 +24,10 @@ function fromRow(row: CategoryRow): CategoryRecord {
   };
 }
 
-// ძველი, ჰარდქოდილი TOP_CATEGORY_IDS (CustomerHomeScreen.tsx-ის
-// წინანდელი მუდმივა) — მხოლოდ სტატიკური fallback-ის `featured`-ის
-// გამოსათვლელად, რომ ქსელის გარეშე პირველ ჩატვირთვაზეც სწორი "ტოპ 3"
-// გამოჩნდეს.
+// Featured ids for the offline fallback.
 const FALLBACK_FEATURED_IDS = new Set(['plumbing', 'electrical', 'cleaning']);
 
-// სტატიკური, build-time fallback — `src/data/categories.ts`-ის უკვე
-// არსებული მასივიდან აგებული (task: "preserve existing category IDs").
-// გამოიყენება (ა) startup-ზე, backend-ის პირველ pull-მდე, და (ბ) ქსელის/
-// Supabase-ის დროებით ჩავარდნაზე — task: "safe local fallback/cache for
-// temporary network failure".
+// Static fallback (data/categories.ts) until the first fetch or when offline.
 const STATIC_FALLBACK: CategoryRecord[] = STATIC_CATEGORIES.map((c, i) => ({
   id: c.id,
   name: c.label,
@@ -46,31 +38,12 @@ const STATIC_FALLBACK: CategoryRecord[] = STATIC_CATEGORIES.map((c, i) => ({
   pricePerSqm: staticIsSqmPriced(c.id),
 }));
 
-// მარტივი module-level cache — ბოლო წარმატებული fetch-ის შედეგი, ან,
-// მანამდე/ჩავარდნაზე, სტატიკური fallback. `deriveJobTitle` (jobService.ts)
-// და სხვა სინქრონული გამომძახებლები ამას კითხულობენ პირდაპირ, ცალკე
-// async round-trip-ის გარეშე.
+// Last good list (or the fallback) for synchronous readers.
 let cache: CategoryRecord[] = STATIC_FALLBACK;
 
-export interface CategoryService {
-  // ბექენდიდან რეალური სია (`sort_order`-ით დალაგებული) — წარმატებაზე
-  // ავსებს/ანახლებს `cache`-ს. ქსელის/query-ის ჩავარდნაზე **არ** isvris
-  // შეცდომას — ბოლო ცნობილ cache-ს (backend-დან, თუ ადრე ჩატვირთულა,
-  // თორემ სტატიკურ fallback-ს) აბრუნებს, რომ ეკრანები ცარიელი/crashed
-  // მდგომარეობის ნაცვლად მაინც სწორად აისახოს.
-  listCategories(): Promise<CategoryRecord[]>;
-  // სინქრონული — ბოლო ცნობილი სია, loading-ის გარეშე (საწყისი render-ისთვის).
-  getCached(): CategoryRecord[];
-  // ერთი კატეგორიის სახელი id-ით, სინქრონული (cache-ზეა აგებული) —
-  // jobService.ts-ის deriveJobTitle()-ის და მსგავსი call site-ების
-  // ჩანაცვლება, ადრინდელი `CATEGORIES.find(...)`-ის ნაცვლად.
-  getCategoryName(id: string): string;
-  // კვ.მ-ფასის ველი უნდა ჩანდეს ამ სპეციალობაზე? (custom:* — არასდროს)
-  isSqmPriced(id: string): boolean;
-}
-
-export const categoryService: CategoryService = {
-  async listCategories() {
+export const categoryService = {
+  // Never throws — on failure returns the last known list.
+  async listCategories(): Promise<CategoryRecord[]> {
     const { data, error } = await supabase.from('categories').select('*').order('sort_order', { ascending: true });
     if (error || !data) {
       return cache;
@@ -78,13 +51,14 @@ export const categoryService: CategoryService = {
     cache = (data as CategoryRow[]).map(fromRow);
     return cache;
   },
-  getCached() {
+  getCached(): CategoryRecord[] {
     return cache;
   },
-  getCategoryName(id) {
+  getCategoryName(id: string): string {
     return cache.find((c) => c.id === id)?.name ?? id;
   },
-  isSqmPriced(id) {
+  // Show the per-m² price field for this profession? (never for custom:*)
+  isSqmPriced(id: string): boolean {
     return cache.find((c) => c.id === id)?.pricePerSqm ?? false;
   },
 };

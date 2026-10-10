@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
@@ -15,11 +15,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ResetPassword'>;
 
-// პაროლის აღდგენის ორივე ეზარდის (email/ტელეფონი) საერთო ბოლო ნაბიჯი —
-// #170-ის ვიდეო-რეფერენსით: ახალი პაროლი + checklist, submit-ის შემდეგ
-// გასვლა (authService.signOut) და "წარმატების" ეკრანი "შესვლაზე
-// დაბრუნების" ღილაკით — ახალი პაროლით ხელახალი შესვლის მოთხოვნით,
-// ავტომატური Home-ზე გადასვლის ნაცვლად (მარტივი და უსაფრთხო).
+// Last reset step for both: new password, then sign out and log in again.
 export function ResetPasswordScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { CheckCircle } from 'lucide-react-native';
 import { BottomSheet } from './BottomSheet';
@@ -7,19 +7,8 @@ import { colors, radius, spacing, typography } from '../theme';
 import { reportService, type ReportReason } from '../services/reportService';
 import type { Role } from '../types/user';
 
-// ReportJobSheet — ზოგადი "პრობლემის შეტყობინება" (moderation report,
-// #84), **არა** completion-dispute flow-ის ("პრობლემა მაქვს",
-// CustomerJobDetailScreen-ის `submitProblem`/`customer_report_problem`,
-// #72) ჩანაცვლება ან დუბლირება — ეს ორი განზრახ, ლოგიკურად ცალკეა:
-// completion-dispute job-ის workflow/status-ის საკითხია (მხოლოდ
-// Customer-ის მხრიდან, მხოლოდ `awaiting_customer_confirmation`-ზე,
-// job-ის სტატუსს ცვლის — `disputed`), ეს კი moderation-ის საკითხია
-// (job_reports-ში ინახება, job-ის სტატუსს არასდროს არ ცვლის, #81-ის
-// `create_job_report` RPC). გაზიარებულია Customer-ისა და Provider-ის
-// ორივე Job Detail ეკრანს შორის (მოთხოვნა #9 — კოდის დუბლირების
-// თავიდან ასაცილებლად) — role-ის მიხედვით საკუთარ თავზე no-show-ის
-// ვარიანტს არ აჩვენებს (Customer-ს არ ეჩვენება "მომხმარებელი არ
-// გამოცხადდა", Provider-ს — "ოსტატი არ გამოცხადდა").
+// Moderation report (job_reports) — not the completion dispute: it never changes the job status.
+// Shared by both job detail screens; each role doesn't see the no-show option about itself.
 const CUSTOMER_REASONS: { value: ReportReason; label: string }[] = [
   { value: 'provider_no_show', label: 'ოსტატი არ გამოცხადდა' },
   { value: 'work_not_completed', label: 'სამუშაო არ დასრულდა' },
@@ -53,10 +42,7 @@ export function ReportJobSheet({ visible, jobId, role, onClose }: Props) {
   const detailsRequired = reason === 'other';
   const canSubmit = !!reason && (!detailsRequired || details.trim().length > 0);
 
-  // ყოველ ახალ გახსნაზე სუფთა state — `visible`-ზე დამოკიდებული
-  // `useEffect`-ით (არა `setTimeout`-ით close-ის შემდეგ), რომ სწრაფი
-  // "დახურვა → ისევ გახსნა" (300ms-ზე ნაკლებში) ძველ, ჯერ კიდევ
-  // მოლოდინში მდგარ reset-ს არ "წაეშალოს" მომხმარებლის ახალი არჩევანი.
+  // Reset on open (not on a timer after close — a quick reopen would wipe the new choice).
   useEffect(() => {
     if (visible) {
       setReason(null);

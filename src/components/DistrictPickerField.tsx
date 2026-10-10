@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { ChevronRight, MapPin } from 'lucide-react-native';
 import { BottomSheet } from './BottomSheet';
 import { RegionAreaAccordion } from './RegionAreaAccordion';

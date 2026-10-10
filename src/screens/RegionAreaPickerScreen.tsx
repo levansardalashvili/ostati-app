@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -72,8 +72,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: spacing.xl,
   },
-  // Task — იგივე absolute-footer ხარვეზი (იხ. ProviderEditProfileScreen).
-  // ჩვეულებრივი flex sibling.
+  // Plain flex footer, not absolute.
   footer: {
     backgroundColor: colors.card,
     borderTopWidth: 1,

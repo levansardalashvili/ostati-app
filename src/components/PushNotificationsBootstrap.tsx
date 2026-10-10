@@ -7,15 +7,8 @@ import { navigationRef } from '../navigation/navigationRef';
 import type { NotificationTarget } from '../types/notification';
 import type { Role } from '../types/user';
 
-// Foreground behavior — task section 13: "existing in-app notification
-// UI remains source of truth... optionally show system banner." We show
-// the system banner too (so a backgrounded-then-foregrounded tap still
-// works the same way, and the user isn't left wondering why nothing
-// appeared) — the in-app NotificationsScreen/bell-badge stay the actual
-// source of truth for the persisted list; this is purely the OS-level
-// presentation of the push itself, not a second parallel notification
-// system. Module-level (not inside the component below) — must be set
-// once, before any notification can arrive, not re-set per mount/render.
+// Show the system banner in the foreground too. Set once at module level,
+// before any notification can arrive.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -25,11 +18,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// გადმოსცემს push-ის `data` payload-ს (Edge Function-ის მიერ აწყობილი,
-// supabase/functions/send-push-notifications/index.ts — `{...target,
-// type, notificationId, role}`) იმავე `NotificationTarget`-ად, რასაც
-// in-app სია (`notifications.target` column) იყენებს — ერთი გაზიარებული
-// `navigateToNotificationTarget` ორივეს ემსახურება.
+// Push data has the same shape as notifications.target, so one navigate function serves both.
 function targetFromPushData(data: Record<string, unknown> | undefined): NotificationTarget | undefined {
   if (!data || typeof data.screen !== 'string') return undefined;
   switch (data.screen) {
@@ -63,15 +52,8 @@ function handleTapData(data: Record<string, unknown> | undefined) {
   navigateToNotificationTarget(navigationRef.navigate, target, role);
 }
 
-// App.tsx-ის root-ზე ერთხელ mounted, ვიზუალური გამოსახულების გარეშე —
-// მხოლოდ side-effect wiring:
-//   1. push token-ის რეგისტრაცია auth-state-ის ცვლილებაზე
-//      (FavoriteProvidersContext-ის, #78, იგივე `subscribeToAuthState` +
-//      uid-guard პატერნი — ერთი listener ფარავს cold-start
-//      session-restore-საც, login-საც; logout-ის token-deactivation
-//      ცალკეა, `authService.signOut()`-შივეა, სესიის დახურვამდე).
-//   2. push-ის tap → navigate, სამივე შემთხვევაში (foreground/background
-//      listener + killed-app cold-start-ის `getLastNotificationResponseAsync`).
+// Mounted once in App.tsx, no UI: registers the push token on sign-in
+// (deactivation is in signOut) and navigates on a push tap, including a cold start.
 export function PushNotificationsBootstrap() {
   const uidRef = useRef<string | null>(null);
 
@@ -81,7 +63,7 @@ export function PushNotificationsBootstrap() {
       if (nextUid === uidRef.current) return;
       uidRef.current = nextUid;
       if (nextUid) {
-        pushTokenService.registerForPushNotifications(nextUid).catch(() => {});
+        pushTokenService.registerForPushNotifications().catch(() => {});
       }
     });
 

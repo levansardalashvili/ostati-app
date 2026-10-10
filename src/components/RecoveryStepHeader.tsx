@@ -13,10 +13,7 @@ type Props = {
   onBack: () => void;
 };
 
-// პაროლის აღდგენის 3-ნაბიჯიანი ეზარდის (email/ტელეფონი) გაზიარებული
-// header — "უკან" + ProgressBar + წრეში ჩასმული ნაბიჯის აიქონი (#170,
-// ვიდეო-რეფერენსის სტილი). სათაური/ქვესათაური თითო ეკრანის საკუთარია,
-// აქ არაა — მხოლოდ ვიზუალურად განმეორებადი ნაწილი.
+// Password reset header: back + progress + step icon.
 export function RecoveryStepHeader({ icon: Icon, step, total, onBack }: Props) {
   return (
     <View>

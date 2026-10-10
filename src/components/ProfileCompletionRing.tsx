@@ -1,4 +1,3 @@
-import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { colors } from '../theme';
@@ -9,11 +8,7 @@ type Props = {
   strokeWidth?: number;
 };
 
-// Task — მარტივი, circular percentage indicator — ცვლის
-// VerificationRequestCard-ის ძველ, ტექსტურ "დაასრულე პროფილი
-// მოთხოვნამდე" + აკლია-ველების ჩამონათვალს (მომხმარებლის მოთხოვნით,
-// მინიმალისტური "პროცენტი" ვიზუალის სასარგებლოდ). `getVerificationEligibility`-ის
-// იმავე 4 შემოწმებაზეა აგებული (`ProviderProfileContext.tsx`).
+// Circular percentage of getVerificationEligibility's 4 checks.
 export function ProfileCompletionRing({ percent, size = 52, strokeWidth = 5 }: Props) {
   const clamped = Math.max(0, Math.min(100, Math.round(percent)));
   const radius = (size - strokeWidth) / 2;

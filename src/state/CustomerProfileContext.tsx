@@ -2,17 +2,8 @@ import React, { createContext, useContext, useState } from 'react';
 import { userService } from '../services/userService';
 import type { CustomerProfile } from '../types/user';
 
-// CustomerProfileContext — Customer-ის საკუთარი პროფილის მონაცემები
-// (რეგისტრაციისას/Google-ით შევსებული), გაზიარებული ეკრანებს შორის:
-// Register/GoogleComplete წერენ საწყის მნიშვნელობებს, CustomerHome/
-// CustomerProfile/CustomerEditProfile კითხულობენ და ცვლიან, PostJob
-// მხოლოდ კითხულობს defaultAddress-ს (საწყისი მნიშვნელობისთვის, მაგრამ
-// მასში ცვლილება default address-ს არასდროს არ სცვლის).
-//
-// რეაქტიული ასლია userService-ის (getCustomerProfile/updateCustomerProfile)
-// გარშემო — ორივე სინქრონულია, ამიტომ setState-ის timing უცვლელია
-// (raw useState-ის იდენტური ქცევა), მაგრამ ახლა ერთადერთი "წყარო
-// სიმართლისთვის" userService-შია, არა Context-ის საკუთარ constant-ში.
+// The customer's own profile, shared across screens. Reactive copy around userService.
+// PostJob only prefills from defaultAddress and never writes it back.
 export type CustomerProfileState = CustomerProfile;
 
 type CustomerProfileContextValue = {

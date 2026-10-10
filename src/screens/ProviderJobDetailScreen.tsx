@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -49,10 +49,7 @@ const EMPTY_JOB: FeedJob = {
   desc: '',
 };
 
-// Provider-ის job-გაუქმების ფიქსირებული მიზეზები (task-ის მოთხოვნა,
-// supabase/migrations/0036-ის `job_posts_cancellation_reason_code_check`-ის
-// ზუსტი ანარეკლი) — structured code + ცალკე ქართული ლეიბლი, არა
-// მხოლოდ ტექსტი (მომავალი moderation-ისთვის).
+// Must match job_posts_cancellation_reason_code_check.
 const PROVIDER_CANCEL_REASONS: { code: string; label: string }[] = [
   { code: 'provider_unavailable', label: 'აღარ ვარ ხელმისაწვდომი' },
   { code: 'schedule_conflict', label: 'დროის კონფლიქტი' },
@@ -62,11 +59,8 @@ const PROVIDER_CANCEL_REASONS: { code: string; label: string }[] = [
   { code: 'other', label: 'სხვა' },
 ];
 
-// B2 — Job-ის დეტალი + ინტერესის დადასტურება (Provider მხრიდან)
-// (product-spec.md; დიზაინის რეფერენსის ProviderJobDetail-ის browse/selected
-// mode-ების მიხედვით). "selected" mode-ის შიგნით ორმხრივი დასრულების state
-// machine მუშაობს (JobStatusContext.tsx) — Provider-ს პირდაპირ დასრულება არ
-// შეუძლია, მხოლოდ "სამუშაო დავასრულე", რაც Customer-ის დადასტურებას ელოდება.
+// Provider's view of a job: price offer while pending; once selected,
+// "სამუშაო დავასრულე" which waits for the customer's confirmation.
 export function ProviderJobDetailScreen({ navigation, route }: Props) {
   const { id, mode = 'browse', job: passedJob } = route.params;
   const [job, setJob] = useState<FeedJob>(() => passedJob ?? EMPTY_JOB);
@@ -93,25 +87,17 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     };
   }, [passedJob, id]);
 
-  // Task — Provider ვერ გამოხატავს ინტერესს job-ზე ვერიფიკაციის გავლამდე
-  // (supabase/migrations/0084) — client-side check აქ მხოლოდ UX-ისთვისაა
-  // (ცარიელი sheet-ის გახსნის თავიდან ასაცილებლად), რეალური გეითი RPC-ის
-  // შიგნითაა (`express_interest()` raise-ავს `PROVIDER_NOT_VERIFIED`-ს).
+  // Verification check here is UX only; express_interest enforces it (PROVIDER_NOT_VERIFIED).
   const { profile: providerProfile } = useProviderProfile();
   const isVerified = providerProfile.verificationStatus === 'verified';
   const [expressed, setExpressed] = useState(false);
-  // Feed-ის ბარათის "დაინტ. ვარ" ღილაკი (ProviderHomeScreen/
-  // ProviderJobFeedScreen) აღარ ხსნის ფასის sheet-ს ბარათიდანვე პირდაპირ —
-  // ნავიგირებს აქ, სრული აღწერის/ფოტოების ნახვის შემდეგ ფასის მოთხოვნისთვის
-  // (task-ის მოთხოვნა: Provider-მა ფასი უნდა შესთავაზოს მხოლოდ job-ის
-  // დეტალების ნახვის შემდეგ, არა ერთი შეხედვით feed-ის ბარათზე).
+  // autoOpenOffer: the feed sends the provider here to see the details before offering a price.
   const [offerSheetOpen, setOfferSheetOpen] = useState(false);
   const [verifySheetOpen, setVerifySheetOpen] = useState(false);
   const [offerPrice, setOfferPrice] = useState('');
   const { getStatus, setStatus } = useJobStatus();
 
-  // უკვე გაგზავნილი ინტერესის state-ის აღდგენა, თუ Provider ამ job-ის
-  // დეტალზე ხელახლა შემოვიდა (Supabase-ის job_responses, #56).
+  // Restore "already interested" from job_responses.
   useEffect(() => {
     const uid = authService.getCurrentUser()?.uid;
     if (!uid || !job.id) return;
@@ -127,18 +113,8 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     };
   }, [job.id]);
 
-  // "selected"/"completed" mode-ის რეალური ვარიანტი გაზიარებული სტატუსიდან
-  // გამოითვლება, თუ job-ს Customer-ის მხარესთან ბმული აქვს (customerJobId) —
-  // route-ის სტატიკური `mode` param მხოლოდ fallback-ია (ან საწყისი
-  // navigation-ის მინიშნებაა). Provider-ს "დასრულებული" mode-ის პირდაპირ
-  // დაყენება არასდროს არ შეუძლია — მხოლოდ სტატუსის ცვლილებით.
-  // #82: `getStatus(...)` მხოლოდ ლოკალური, ამ მოწყობილობის JobStatusContext
-  // ქეშია — Provider-ის საკუთარ device-ს არასდროს არ "შეუტყვია" job-ის
-  // გაუქმებაზე ლოკალურად (მხოლოდ Customer-ის device-ზე გამოიძახა
-  // setStatus(...,'cancelled')), ამიტომ `?? job.status` fallback აუცილებელია —
-  // `job.status` კი ყოველთვის ახლახან წამოღებული, რეალური მნიშვნელობაა
-  // (`getFeedJobPostById`/`listMyAssignedJobs`-იდან), რომ Provider-მა
-  // "cancelled" job-ს ჯერ კიდევ "active"-ად ვერასდროს დაინახოს.
+  // Local JobStatusContext first, else the freshly fetched job.status — this device
+  // never hears about the customer's actions (e.g. a cancel) locally.
   const linkedStatus = (job.customerJobId ? getStatus(job.customerJobId) : undefined) ?? job.status;
   const variant: 'browse' | 'active' | 'awaiting_confirmation' | 'disputed' | 'completed' | 'cancelled' =
     linkedStatus === 'cancelled'
@@ -148,15 +124,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         : linkedStatus === 'disputed'
           ? 'disputed'
           : // Pre-existing gap, surfaced (not introduced) by 0079's auto-expiry:
-            // once the Customer confirms completion (explicitly, or via 0079's
-            // timeout) but hasn't submitted a rating yet, the job sits in
-            // `confirmed_awaiting_rating` — this had no case here at all and
-            // fell through to 'active' (re-showing "სამუშაო დავასრულე", which
-            // the RPC would then reject since the job is no longer `active`).
-            // Reuses the 'completed' variant/banner — its title ("სამუშაო
-            // დასრულებულად დადასტურდა") is accurate either way, and the
-            // star-rating block already renders conditionally on
-            // `receivedRating` existing.
+            // confirmed_awaiting_rating uses the 'completed' variant (stars render only once a review exists).
             linkedStatus === 'completed' || linkedStatus === 'confirmed_awaiting_rating'
             ? 'completed'
             : linkedStatus === 'active'
@@ -167,7 +135,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
                   ? 'active'
                   : 'browse';
 
-  // 0152 — private job sent only to this Provider: they can decline it.
+  // Private job sent only to this provider — they can decline it.
   const [isInvite, setIsInvite] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
   const [declining, setDeclining] = useState(false);
@@ -189,8 +157,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     }
   };
 
-  // 0150 — the Customer's dispute reason + the Provider's own written side
-  // (shown to the admin who resolves the dispute).
+  // Dispute: the customer's reason and the provider's side (shown to the admin).
   const [dispute, setDispute] = useState<{ reason: string | null; providerResponse: string | null } | null>(null);
   const [disputeDraft, setDisputeDraft] = useState('');
   const [sendingDispute, setSendingDispute] = useState(false);
@@ -213,12 +180,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     }
   };
 
-  // supabase/migrations/0079 — opportunistic, fire-and-forget check: no
-  // cron exists in this project, so simply loading this screen while the
-  // job has sat in awaiting_customer_confirmation is what "self-heals" a
-  // Customer who never responded. The RPC itself enforces the real 72h
-  // grace period server-side and safely no-ops otherwise — this effect
-  // does not need its own threshold logic client-side.
+  // Apply the auto-confirm deadline on open (cron does it too); no-op before 72h.
   useEffect(() => {
     if (linkedStatus !== 'awaiting_customer_confirmation' || !job.customerJobId) return;
     const jobId = job.customerJobId;
@@ -236,27 +198,17 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
   }, [job.id]);
   const [markingWorkDone, setMarkingWorkDone] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  // Task — footer (ჩატი/"სამუშაო დავასრულე") ადრე ნულოვანი paddingBottom-ით
-  // იჯდა ეკრანის ნამდვილ ქვედა კიდეზე (SafeAreaView-ს აქ `edges={['top']}`
-  // აქვს, ბოლო არ ჯავშნავს) — Android-ის gesture-ნავიგაციის ზოლს
-  // ხვდებოდა/თითქმის ხვდებოდა. ChatConversationScreen-ის კომპოზერის იგივე
-  // პრინციპი — ოდნავ (ზუსტად safe-area inset-ის ოდენობით) მაღლა სწევს.
+  // Footer sits above the gesture bar (SafeAreaView reserves only the top).
   const insets = useSafeAreaInsets();
   const footerBottomPadding = insets.bottom > 0 ? insets.bottom + spacing.xs : spacing.md;
   const markWorkDone = async () => {
     if (!job.customerJobId || markingWorkDone) return;
     setMarkingWorkDone(true);
     try {
-      // #73: Customer-ის "სამუშაო დასრულდა?" შეტყობინება ახლა თავად RPC-ის
-      // (provider_request_completion) მხრიდან იგზავნება, სერვერის მხარეს —
-      // იხ. supabase/migrations/0022.
       await jobService.providerRequestCompletion(job.customerJobId);
       setStatus(job.customerJobId, 'awaiting_customer_confirmation');
     } catch (err) {
-      // supabase/migrations/0041 — RPC-ის სპეციფიკური, greppable
-      // შეცდომა ("SCHEDULED_TIME_NOT_REACHED"), authService.ts-ის
-      // getAuthErrorMessage-ის იგივე პატერნით — ზუსტი ტექსტის ნაცვლად
-      // მკაფიო, ცნობადი მარკერ-სტრიქონი.
+      // Marker error from the RPC when the scheduled time hasn't started yet.
       const message = (err as { message?: string } | null)?.message ?? '';
       if (message.includes('SCHEDULED_TIME_NOT_REACHED')) {
         Alert.alert('ჯერ ადრეა', 'სამუშაოს დასრულება ვერ მოინიშნება დაგეგმილ თარიღ/დრომდე ადრე.');
@@ -277,30 +229,18 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       color: '#64748B',
       role: 'provider',
       jobId: job.customerJobId,
-      // Audit fix — `linkedStatus` (not the possibly-stale `job.status`)
-      // so the chat's offer composer stays hidden once this job is no
-      // longer 'pending' (Provider already selected, price locked).
+      // linkedStatus, not the possibly stale job.status — hides the chat offer button once the job isn't pending.
       jobStatus: linkedStatus,
     });
   };
-  // #84-ის დროს "..." ღილაკს მხოლოდ ერთი მოქმედება (ზოგადი
-  // moderation-რეპორტი) ჰქონდა, ამიტომ პირდაპირ ხსნიდა ReportJobSheet-ს.
-  // ახლა job-ის გაუქმებაც ემატება (Task — Provider-initiated cancellation)
-  // — ორი მოქმედება ერთ ღილაკზე უკვე მართლაც menu-ს საჭიროებს, ზუსტად
-  // CustomerJobDetailScreen-ის იგივე "..." menu-ს პატერნით.
-  // completion-dispute flow ("პრობლემა მაქვს", markWorkDone-ის მეზობელი)
-  // ამ menu-ს არაფერში ეხება, სრულიად ცალკეა.
+  // "…" menu: report + cancel. Separate from the completion dispute.
   const [reportSheetOpen, setReportSheetOpen] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const handleMore = () => {
     setActionMenuOpen(true);
   };
 
-  // Provider-initiated job cancellation — supabase/migrations/0036-ის
-  // `provider_cancel_job` RPC. მხოლოდ `variant === 'active'`-ზეა
-  // ხელმისაწვდომი (task: "Do not show the action for jobs where
-  // Provider is only interested but not selected") — menu-ს JSX-შივეა
-  // დაცული, ცალკე დამატებითი შემოწმება აქ არ სჭირდება.
+  // Cancel is offered only on 'active' (guarded in the menu JSX).
   const [cancelSheetOpen, setCancelSheetOpen] = useState(false);
   const [cancelReasonCode, setCancelReasonCode] = useState<string | null>(null);
   const [cancelDetails, setCancelDetails] = useState('');
@@ -318,12 +258,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     try {
       await jobService.providerCancelJob(job.customerJobId, cancelReasonCode!, cancelDetails.trim() || undefined);
       setStatus(job.customerJobId, 'cancelled');
-      // Audit fix (found via Maestro E2E testing) — `job` is local state,
-      // fetched once at mount, before this cancellation happened. Without
-      // this, `job.cancellationActor` below stays at whatever it was on
-      // load (never 'provider'), so the banner always fell back to
-      // "მომხმარებელმა... გააუქმა" even when the Provider is the one who
-      // just cancelled it through this exact action.
+      // `job` was fetched before this cancel — update the actor so the banner says the provider cancelled.
       setJob((j) => ({ ...j, cancellationActor: 'provider' }));
       setCancelSheetOpen(false);
       setCancelReasonCode(null);
@@ -334,8 +269,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       setCancelling(false);
     }
   };
-  // #72: ფასი სავალდებულო, კონკრეტული რიცხვია — "დაინტ. ვარ" აღარ
-  // იგზავნება ფასის გარეშე.
+  // Interest always carries a concrete price.
   const [sendingInterest, setSendingInterest] = useState(false);
   const confirmInterest = async () => {
     const priceNum = Number(offerPrice);
@@ -347,14 +281,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
       await quoteService.expressInterest(job.id, priceNum);
       setExpressed(true);
       setOfferSheetOpen(false);
-      // Task — ინტერესის გამოხატვისას გაგზავნილი ფასი ახლა ავტომატურად
-      // ჩატშიც ჩნდება, სტრუქტურირებული offer-ბარათის სახით (არა მხოლოდ
-      // job_responses.offered_price-ში, ჩუმად) — Provider-ს აღარ სჭირდება
-      // იგივე ფასის ხელახლა, ცალკე გაგზავნა ჩატის Wallet-ღილაკიდან.
-      // Best-effort, fire-and-forget — ინტერესი უკვე წარმატებით
-      // გამოხატულია (job_responses-ის row უკვე არსებობს, რაც messages-ის
-      // INSERT policy-საც (0046) სჭირდება), ეს მხოლოდ ჩატს ამდიდრებს და
-      // ამ ჩავარდნაზე მთავარი ნაკადი არ უნდა დაბლოკოს.
+      // Also post the price as an offer card in the chat — best-effort, the interest itself already succeeded.
       if (job.customerId) {
         chatService.sendRealOffer(job.customerId, uid, uid, priceNum, undefined, job.id).catch(() => {});
       }
@@ -373,10 +300,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     }
   };
 
-  // supabase/migrations/0081 — გადაფიქრების/შეცდომით-გაგზავნილი ფასის
-  // უკან წაღება, სანამ job კვლავ `pending`-ია (RPC თავად ამოწმებს
-  // სერვერზე; client-ის `variant === 'browse'` მხოლოდ ღილაკის ჩვენებას
-  // განსაზღვრავს).
+  // Withdraw while still pending (the RPC checks).
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawSheetOpen, setWithdrawSheetOpen] = useState(false);
   const handleWithdraw = () => {
@@ -398,9 +322,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
     }
   };
 
-  // ერთი მუდმივი JSX ხე jobLoading→loaded გადასვლისას (Fabric-ის "child
-  // already has a parent" crash-ის თავიდან ასაცილებლად — CustomerJobDetailScreen-ის
-  // იგივე პრინციპი).
+  // One persistent JSX tree for loading→loaded (two returns crash Fabric).
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader
@@ -509,9 +431,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               <AlertTriangle size={16} color={colors.destructive} />
               <Text style={styles.disputedBannerTitle}>მოთხოვნა გაუქმებულია</Text>
             </View>
-            {/* supabase/migrations/0036: `cancellationActor` სერვერზეა
-                derived (RPC-ის შიგნით), არასდროს client-ის claim — ტექსტი
-                სწორად განასხვავებს, თავად Provider-მა გააუქმა თუ Customer-მა. */}
+            {/* cancellationActor is set by the server — tells who cancelled. */}
             <Text style={styles.disputedBannerText}>
               {job.cancellationActor === 'provider'
                 ? 'შენ გააუქმე ეს სამუშაო.'
@@ -548,14 +468,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
                   <MapPin size={13} color={colors.mutedForeground} />
                   <Text style={styles.metaText}>{job.location}</Text>
                 </View>
-                {/* Task — "როდის სურს მომხმარებელს რომ მივიდე" (job.date,
-                    Customer-ის PostJobScreen-ზე არჩეული სასურველი თარიღი/
-                    დრო) ამ ეკრანზე საერთოდ არ ჩანდა — მხოლოდ `job.ago`
-                    (განცხადების გამოქვეყნების, არა სამუშაოს, დროა) იყო.
-                    CustomerJobDetailScreen-ს ეს უკვე ჰქონდა (იგივე
-                    `job.date`, Clock-აიქონით) — Provider-ის მხარეს
-                    დაემატა, `Calendar`-აიქონით (Clock-ს `job.ago`-სთვის
-                    დარჩენილი, რომ ორივე ცალსახად გამოირჩეოდეს). */}
+                {/* Requested date/time (Calendar icon; Clock is used for the posting age). */}
                 <View style={styles.metaItem}>
                   <Calendar size={13} color={colors.mutedForeground} />
                   <Text style={styles.metaText}>{job.date}</Text>
@@ -572,19 +485,9 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>სამუშაოს აღწერა</Text>
           <Text style={styles.sectionText}>{job.desc}</Text>
-          {/* Task — Customer-ის ატვირთული ფოტოები (CustomerJobDetailScreen-ს
-              ეს უკვე ჰქონდა, #63) Provider-ის მხარეს არასდროს არ ჩანდა —
-              `FeedJob.photos` საერთოდ არ არსებობდა (მხოლოდ `hasPhoto`
-              badge-ისთვის), მიუხედავად იმისა, რომ ბექენდის RPC-ები
-              (`get_open_provider_feed`/`get_feed_job_by_id`) ისედაც
-              აბრუნებდნენ `photos`-ს. */}
           {job.photos && job.photos.length > 0 && (
             <View style={styles.photoRow}>
               {job.photos.map((uri) => (
-                // Task — თამბნეილი ადრე გადიდებას/გახსნას არ უჭერდა
-                // მხარს — Provider-ს ფოტოს დეტალების უკეთ დანახვა არ
-                // შეეძლო. ChatConversationScreen-ის იმავე
-                // full-screen-preview პატერნით (Pressable + overlay).
                 <Pressable key={uri} style={styles.photoThumb} onPress={() => setPhotoPreview(uri)}>
                   <SecureStorageImage reference={uri} style={styles.photoThumbImage} />
                 </Pressable>
@@ -606,23 +509,11 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
         </View>
       </ScrollView>
 
-      {/* Task — footer ისევ pinned bottom bar-ია (ScrollView-ის მიღმა,
-          content-ს არ მისდევს) — მომხმარებელმა დააზუსტა, რომ საწყისი
-          "ძაან ქვემოთაა" საჩივარი ეხებოდა ეკრანის ნამდვილ ქვედა კიდესთან
-          სიახლოვეს (Android-ის gesture-ნავიგაციის ზოლთან თითქმის
-          გადაფარვას), არა კონტენტიდან მანძილს — footer კონტენტში
-          გადატანა overshoot იყო. `paddingBottom` ახლა `insets.bottom`-ზეა
-          დაფუძნებული (ChatConversationScreen-ის კომპოზერის იგივე
-          პრინციპით) — ოდნავ მაღლა სწევს ღილაკებს ზუსტად imenad safe-area
-          inset-ის ოდენობით, gesture-ზოლთან შეხების თავიდან ასაცილებლად. */}
+      {/* Pinned footer; paddingBottom = safe-area inset (keeps clear of the gesture bar). */}
       {variant === 'browse' && (
         <View style={[styles.footer, { paddingBottom: footerBottomPadding }]}>
-          {/* supabase/migrations/0046 — Provider→Customer chat now
-              requires a real job_responses row (or assignment) server-side;
-              the "any open pending job" exception is gone. Before
-              expressing interest there is no such row yet, so the chat
-              button would fail server-side — shown only once `expressed`
-              is true, matching the new backend rule exactly. */}
+          {/* Chat only after expressing interest — the server allows provider→customer
+             messages only with a job_responses row or an assignment. */}
           {expressed && (
             <Pressable style={styles.chatButton} onPress={handleChat}>
               <MessageCircle size={17} color={colors.foreground} />
@@ -647,9 +538,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               {expressed ? (offerPrice ? `შეთავაზდა: ${offerPrice} ₾` : 'დაინტ. ხარ') : 'ფასის შეთავაზება'}
             </Text>
           </Pressable>
-          {/* supabase/migrations/0081 — გადაფიქრების გზა, job კვლავ
-              `pending`-ია სანამ ეს ღილაკი ჩანს (`variant === 'browse'`
-              მხოლოდ ამ სტატუსზეა). */}
+          {/* Withdraw interest (shown only while pending). */}
           {expressed && (
             <Pressable
               style={styles.withdrawButton}
@@ -670,11 +559,7 @@ export function ProviderJobDetailScreen({ navigation, route }: Props) {
               ჩატი
             </Text>
           </Pressable>
-          {/* Provider-ს პირდაპირ დასრულების უფლება არა აქვს — ეს ღილაკი
-              მხოლოდ "awaiting_customer_confirmation"-ზე გადადის, Customer-ის
-              დადასტურებამდე job "completed" ვერასდროს გახდება. ღილაკი მხოლოდ
-              მაშინ ჩანს, როცა ამ job-ს Customer-ის მხარესთან რეალური ბმული
-              აქვს (customerJobId) — წინააღმდეგ შემთხვევაში დასაჭერი არაფერია. */}
+          {/* Moves the job to awaiting_customer_confirmation only — never straight to completed. */}
           {job.customerJobId && (
             <Pressable
               style={[styles.completeWorkButton, markingWorkDone && styles.completeWorkButtonDisabled]}

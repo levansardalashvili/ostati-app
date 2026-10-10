@@ -19,24 +19,9 @@ type Props = {
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
-// ქვევიდან ამომხტარი ფურცელი (დიზაინის რეფერენსში გამოყენებული "sheet"
-// pattern-ის მიხედვით — ოსტატის არჩევის დადასტურება, სამუშაოს გაუქმება და
-// ა.შ.). Web-ის absolute-positioned overlay-ს ნაცვლად native Modal-ს
-// ვიყენებთ, რაც მობილურზე უფრო იდიომურია.
-//
-// KeyboardAvoidingView აქ ცენტრალურადაა — ყველა sheet, რომელსაც
-// TextInput აქვს (OfferPriceSheet, ReportJobSheet, პაროლის შეცვლის sheet
-// და ა.შ.), ერთდროულად სარგებლობს ამით, ცალ-ცალკე ცვლილების გარეშე.
-// Android-ზე `behavior: undefined`-ის ნაცვლად `'height'` — native
-// window-resize (`android.softwareKeyboardLayoutMode: "resize"`) ჩუმად
-// არ მუშაობს edge-to-edge Android-ზე (Expo SDK 52+ default), ისე რომ
-// sheet-ის შიგნით TextInput-ს კლავიატურა მთლიანად ფარავდა.
-//
-// Modal-ის ჩაშენებული `animationType="slide"` ჩანაცვლებულია საკუთარი
-// spring-ანიმაციით (backdrop fade + sheet-ის slide-up) — `visible=false`-ზე
-// Modal ავტომატურად მყისიერად unmount-დებოდა, closing-ანიმაციის გარეშე;
-// `mounted` local state Modal-ს ცოცხლად ინახავს გასვლის ანიმაციის
-// დასრულებამდე.
+// Bottom sheet on a native Modal. KeyboardAvoidingView lives here so every sheet
+// with an input gets it ('height' on Android — edge-to-edge breaks native resize).
+// Own animation: `mounted` keeps the Modal alive until the close animation ends.
 export function BottomSheet({ visible, onClose, children }: Props) {
   const [mounted, setMounted] = useState(visible);
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;

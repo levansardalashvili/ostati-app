@@ -8,57 +8,6 @@ export type UserMediaKind =
 const PRIVATE_BUCKET = 'private-media';
 const PRIVATE_PREFIX = 'private-media://';
 
-export interface StorageService {
-  // Public job photos — existing behavior.
-  uploadJobPhoto(uid: string, localUri: string): Promise<string>;
-
-  // Public Provider media.
-  uploadUserMedia(
-    uid: string,
-    localUri: string,
-    kind: UserMediaKind,
-  ): Promise<string>;
-
-  // Private chat image.
-  uploadPrivateChatImage(
-    customerId: string,
-    providerId: string,
-    uploaderId: string,
-    localUri: string,
-  ): Promise<string>;
-
-  // Private completion/rating image.
-  uploadPrivateCompletionPhoto(
-    jobId: string,
-    uploaderId: string,
-    localUri: string,
-  ): Promise<string>;
-
-  // Second hardening pass, item 4 — private job-post photo. Path
-  // `job/{jobId}/{uploaderId}/{filename}`, matching
-  // can_access_private_job_photo() (supabase/migrations/0048): the job's
-  // customer, its assigned Provider, or any Provider while the job is
-  // still pending.
-  uploadPrivateJobPhoto(
-    jobId: string,
-    uploaderId: string,
-    localUri: string,
-  ): Promise<string>;
-
-  // Manual verification selfie — path `verification/{uid}/{filename}`,
-  // owner-write / owner-or-admin-read (supabase/migrations/0107).
-  uploadPrivateVerificationSelfie(
-    uid: string,
-    localUri: string,
-  ): Promise<string>;
-
-  // Converts private-media://... into a temporary signed URL.
-  // Normal http/public URLs pass through unchanged.
-  getDisplayUrl(reference: string): Promise<string>;
-
-  isPrivateReference(reference?: string | null): boolean;
-}
-
 function extOf(localUri: string): string {
   const withoutQuery = localUri.split('?')[0];
   const ext = withoutQuery.split('.').pop()?.toLowerCase();
@@ -124,8 +73,7 @@ async function uploadPrivate(
     throw error;
   }
 
-  // IMPORTANT:
-  // DB stores stable Storage reference, NOT temporary signed URL.
+  // The DB stores the stable private-media:// reference, never a temporary signed URL.
   return `${PRIVATE_PREFIX}${path}`;
 }
 
@@ -139,8 +87,9 @@ function privatePathFromReference(reference: string): string | null {
   return path.length > 0 ? path : null;
 }
 
-export const storageService: StorageService = {
-  async uploadJobPhoto(uid, localUri) {
+export const storageService = {
+  // Legacy public job photos (new ones go to private-media).
+  async uploadJobPhoto(uid: string, localUri: string): Promise<string> {
     const path = `${uid}/${createFilename(localUri)}`;
 
     return uploadPublic(
@@ -150,7 +99,8 @@ export const storageService: StorageService = {
     );
   },
 
-  async uploadUserMedia(uid, localUri, kind) {
+  // Public Provider media.
+  async uploadUserMedia(uid: string, localUri: string, kind: UserMediaKind): Promise<string> {
     const path = `${kind}/${uid}/${createFilename(localUri)}`;
 
     return uploadPublic(
@@ -160,12 +110,8 @@ export const storageService: StorageService = {
     );
   },
 
-  async uploadPrivateChatImage(
-    customerId,
-    providerId,
-    uploaderId,
-    localUri,
-  ) {
+  // Private chat image.
+  async uploadPrivateChatImage(customerId: string, providerId: string, uploaderId: string, localUri: string): Promise<string> {
     const path =
       `chat/${customerId}/${providerId}/${uploaderId}/` +
       createFilename(localUri);
@@ -173,11 +119,8 @@ export const storageService: StorageService = {
     return uploadPrivate(path, localUri);
   },
 
-  async uploadPrivateCompletionPhoto(
-    jobId,
-    uploaderId,
-    localUri,
-  ) {
+  // Private completion/rating image.
+  async uploadPrivateCompletionPhoto(jobId: string, uploaderId: string, localUri: string): Promise<string> {
     const path =
       `completion/${jobId}/${uploaderId}/` +
       createFilename(localUri);
@@ -185,11 +128,8 @@ export const storageService: StorageService = {
     return uploadPrivate(path, localUri);
   },
 
-  async uploadPrivateJobPhoto(
-    jobId,
-    uploaderId,
-    localUri,
-  ) {
+  // Readable by the job's customer, its assigned provider, and any provider while pending.
+  async uploadPrivateJobPhoto(jobId: string, uploaderId: string, localUri: string): Promise<string> {
     const path =
       `job/${jobId}/${uploaderId}/` +
       createFilename(localUri);
@@ -197,13 +137,16 @@ export const storageService: StorageService = {
     return uploadPrivate(path, localUri);
   },
 
-  async uploadPrivateVerificationSelfie(uid, localUri) {
+  // Owner writes; owner or admin reads.
+  async uploadPrivateVerificationSelfie(uid: string, localUri: string): Promise<string> {
     const path = `verification/${uid}/${createFilename(localUri)}`;
 
     return uploadPrivate(path, localUri);
   },
 
-  async getDisplayUrl(reference) {
+  // Converts private-media://... into a temporary signed URL.
+  // Normal http/public URLs pass through unchanged.
+  async getDisplayUrl(reference: string): Promise<string> {
     const privatePath = privatePathFromReference(reference);
 
     // Legacy/current public URL.
@@ -229,7 +172,7 @@ export const storageService: StorageService = {
     return data.signedUrl;
   },
 
-  isPrivateReference(reference) {
+  isPrivateReference(reference?: string | null): boolean {
     return Boolean(
       reference &&
         reference.startsWith(PRIVATE_PREFIX),

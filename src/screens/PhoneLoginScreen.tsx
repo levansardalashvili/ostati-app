@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -10,7 +10,7 @@ import { Reveal } from '../components/Reveal';
 import { TextField } from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme';
 import { authService, getAuthErrorMessage } from '../services/authService';
-import { userService } from '../services/userService';
+import { loadSignedInUser } from '../utils/signInSession';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
@@ -19,17 +19,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PhoneLogin'>;
 
 const PHONE_RE = /^5\d{8}$/;
 
-// #107 — ტელეფონის ნომრით შესვლა (როლი აქ არ სჭირდება — LoginScreen.tsx-ის
-// იგივე პრინციპით, რეალურ ანგარიშში როლი უკვე `users`-შია).
-//
-// Task — დარეგისტრირებული ანგარიშისთვის login აღარ ითხოვს ახალ SMS-კოდს:
-// ტელეფონი+პაროლი პირდაპირ შედის (authService.signInWithPhonePassword),
-// LoginScreen.tsx-ის (email) იგივე ერთსაფეხურიან ნაკადით — ცალკე
-// OTP-ვერიფიკაციის ეკრანი (PhoneLoginVerify) ამის შემდეგ საჭირო აღარ იყო,
-// მთლიანად მოცილებულია. `completeSignIn`-ის სხეული აქ LoginScreen.tsx-ის
-// იგივე ლოგიკის ცალკე ასლია (კოდბაზის დამკვიდრებული "დუბლირება
-// აბსტრაქციაზე" პრინციპით — GoogleCompleteScreen-ის RegisterScreen-თან
-// დუბლირების იგივე მაგალითი).
+// Phone + password login (no SMS). Hidden while PHONE_AUTH_ENABLED is false.
 export function PhoneLoginScreen({ navigation }: Props) {
   const { setProfile } = useCustomerProfile();
   const { setProfile: setProviderProfile } = useProviderProfile();
@@ -52,36 +42,9 @@ export function PhoneLoginScreen({ navigation }: Props) {
       setError('ავტორიზაცია ვერ დასრულდა — სცადე თავიდან.');
       return;
     }
-    const record = await userService.getUserRecord(user.uid);
-    if (!record) {
-      await authService.signOut();
-      setError('ეს ანგარიში ჯერ არ არის დარეგისტრირებული — ჯერ დარეგისტრირდი.');
-      return;
-    }
-    if (record.suspended) {
-      await authService.signOut();
-      setError(`თქვენი ანგარიში შეჩერებულია: ${record.suspensionReason ?? 'წესების დარღვევის გამო'}`);
-      return;
-    }
-    if (record.role === 'provider') {
-      setProviderProfile({ firstName: record.firstName, lastName: record.lastName });
-      const providerProfile = await userService.getProviderProfileRecord(user.uid);
-      if (providerProfile) setProviderProfile(providerProfile);
-      navigation.reset({ index: 0, routes: [{ name: 'ProviderHome' }] });
-    } else {
-      setProfile({
-        firstName: record.firstName,
-        lastName: record.lastName,
-        email: record.email,
-        defaultAddress: record.defaultAddress,
-        phone: record.phone,
-        entrance: record.entrance,
-        apartment: record.apartment,
-        doorCode: record.doorCode,
-        isPrivateHouse: record.isPrivateHouse,
-      });
-      navigation.reset({ index: 0, routes: [{ name: 'CustomerHome' }] });
-    }
+    const result = await loadSignedInUser(user.uid, setProfile, setProviderProfile);
+    if ('error' in result) setError(result.error);
+    else navigation.reset({ index: 0, routes: [{ name: result.route }] });
   };
 
   const handleLogin = async () => {

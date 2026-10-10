@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Star, User } from 'lucide-react-native';
@@ -13,8 +13,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderReviews'>;
 
-// ProviderReviewsScreen — ყოველთვის საკუთარი, ავტორიზებული Provider-ის
-// (auth uid) შეფასებები, Supabase-ის `reviews`-იდან (#58).
+// My reviews, with a one-time reply.
 export function ProviderReviewsScreen({ navigation }: Props) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const avg = reviews.length ? reviews.reduce((s, r) => s + r.stars, 0) / reviews.length : 0;

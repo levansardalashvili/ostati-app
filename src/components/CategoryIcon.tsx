@@ -1,4 +1,3 @@
-import React from 'react';
 import { View } from 'react-native';
 import {
   Armchair,
@@ -21,11 +20,7 @@ import {
 import { radius } from '../theme';
 import { CATEGORIES } from '../data/categories';
 
-// ერთადერთი ცენტრალიზებული კატეგორია → Lucide ვექტორული აიქონის მაპინგი
-// მთელი აპისთვის (ემოჯის ნაცვლად) — Customer-ის და Provider-ის ეკრანები
-// ორივე ამ ერთსა და იმავე მაპინგს იყენებენ, პირდაპირ (CategoryIcon) ან
-// getCategoryIcon()-ის საშუალებით (როცა ფონის კონტეინერის ფორმა/ზომა
-// უკვე სხვაგან არის განსაზღვრული და მხოლოდ თავად აიქონია საჭირო).
+// Category id → Lucide icon, for the whole app.
 const CATEGORY_ICON_MAP: Record<string, LucideIcon> = {
   plumbing: Wrench,
   electrical: Zap,
@@ -46,10 +41,7 @@ const CATEGORY_ICON_MAP: Record<string, LucideIcon> = {
 
 const DEFAULT_ICON: LucideIcon = Wrench;
 
-// კატეგორია/სპეციალობის id-სთვის შესაბამისი Lucide აიქონის კომპონენტი —
-// გამოსაყენებელია, როცა უკვე არსებული ფონის კონტეინერის სტილში (ფორმა,
-// ზომა, border radius) მხოლოდ თავად აიქონის ჩასმაა საჭირო, `CategoryIcon`-ის
-// საკუთარი კონტეინერის გარეშე.
+// Just the icon, for callers that draw their own container.
 export function getCategoryIcon(categoryId: string): LucideIcon {
   return CATEGORY_ICON_MAP[categoryId] ?? DEFAULT_ICON;
 }
@@ -59,9 +51,7 @@ type Props = {
   size?: number;
 };
 
-// კატეგორიის ფერადი აიქონი (დიზაინის რეფერენსის CatIcon-ის მიხედვით) —
-// pastel ფონის კონტეინერი + ვექტორული Lucide აიქონი კატეგორიის dot ფერით
-// (ემოჯის ნაცვლად — "clean/modern icon system" რეფაქტორი).
+// Icon in a pastel container with the category color.
 export function CategoryIcon({ categoryId, size = 36 }: Props) {
   const category = CATEGORIES.find((c) => c.id === categoryId);
   if (!category) return null;

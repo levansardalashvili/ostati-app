@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AlertCircle } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
@@ -12,18 +12,12 @@ type Props = {
 
 const CODE_LENGTH = 6;
 
-// 6-ცალკე-ყუთიანი OTP-ველი (Phone*/ForgotPassword*VerifyScreen-ების
-// გაზიარებული, #170-ის ვიდეო-რეფერენსის სტილი). ერთი დამალული TextInput
-// იტევს რეალურ input-ს (native focus/keyboard/autofill-ისთვის), 6 ვიზუალური
-// ყუთი კი უბრალოდ value-ს თითო სიმბოლოს რენდერავს — 6 ცალკე ref/auto-advance
-// ლოგიკის გარეშე, გაცილებით მარტივი და საიმედო.
+// Six boxes over one hidden TextInput (native focus, keyboard and SMS autofill);
+// the boxes only display the value.
 export function OtpCodeInput({ value, onChangeText, onComplete, error }: Props) {
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
-  // `onComplete`-ის ერთხელ-გამოძახება ერთსა და იმავე 6-ციფრიან კოდზე —
-  // მომხმარებელს რომ არასწორი კოდის შემდეგ backspace-ით ერთი ციფრი
-  // წაეშალა და იგივე 6 ციფრი ხელახლა აეკრიფა, ორმაგი verify-ის ცდა არ
-  // გაეშვას.
+  // Fire onComplete once per code — retyping the same code must not verify twice.
   const firedForRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -112,8 +106,6 @@ const styles = StyleSheet.create({
     ...typography.h3,
     color: colors.foreground,
   },
-  // ვიზუალურად უხილავი, მაგრამ ფუნქციონალურად რეალური TextInput — native
-  // focus/keyboard/SMS-autofill მთლიანად მასზეა, ყუთები მხოლოდ ასახავენ.
   hiddenInput: {
     position: 'absolute',
     width: 1,

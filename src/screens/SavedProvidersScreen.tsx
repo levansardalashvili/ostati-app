@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AlertCircle, ChevronRight, Heart, MapPin, MessageCircle, Star } from 'lucide-react-native';
@@ -22,12 +22,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SavedProviders'>;
 
-// SavedProviders — Customer-ის შენახული (favorite) ოსტატები. ახალი ეკრანი
-// (ზიპში არ არსებობდა), მომხმარებლის მოთხოვნით: "თუ ერთხელ კარგი
-// ელექტრიკოსი იპოვა, მომავალში თავიდან აღარ მოძებნის". ❤️ ღილაკი
-// ViewProviderProfileScreen-ის header-შია, ეს ეკრანი მხოლოდ კითხულობს
-// FavoriteProvidersContext-ს — CustomerProfileScreen-ის "შენახული ოსტატები"
-// მენიუდან იხსნება.
+// Saved (❤️) providers.
 export function SavedProvidersScreen({ navigation }: Props) {
   const { favoriteIds, toggleFavorite } = useFavoriteProviders();
   const [allProviders, setAllProviders] = useState<Provider[]>([]);
@@ -44,8 +39,7 @@ export function SavedProvidersScreen({ navigation }: Props) {
         if (!cancelled) setAllProviders(real);
       })
       .catch(() => {
-        // "შენახული ოსტატები არ გაქვს"-ის ნაცვლად (რაც არასწორად
-        // ჩანდა ქსელის შეცდომისასაც) — ცალკე error-state.
+        // A load error must not look like an empty list.
         if (!cancelled) setLoadError(true);
       })
       .finally(() => {
@@ -58,8 +52,7 @@ export function SavedProvidersScreen({ navigation }: Props) {
   const saved = allProviders.filter((p) => favoriteIds.has(p.id));
 
   const openProfile = (id: string) => navigation.navigate('ViewProviderProfile', { id });
-  // "ცივი ჩატის → job-ის შექმნის" ხვრელის ფიქსი — StartJobChatSheet.tsx-ის
-  // თავზე სრული მიზეზი (ViewProviderProfileScreen-ის იგივე ცვლილება).
+  // "მიწერა" goes through StartJobChatSheet.
   const [startChatProvider, setStartChatProvider] = useState<Provider | null>(null);
   const openChat = (p: Provider) => setStartChatProvider(p);
   const openChatWithJob = (jobId: string | null, draftMessage?: string) => {

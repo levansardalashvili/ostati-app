@@ -1,4 +1,3 @@
-import React from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
@@ -13,14 +12,7 @@ type Props = {
   submitting?: boolean;
 };
 
-// OfferPriceSheet — Provider-ის "დაინტერესების" ფასის prompt, ორიგინალად
-// მხოლოდ ProviderJobDetailScreen-ზე იყო (#16); #72-ის მიხედვით ეს ფასი
-// სავალდებულო, კონკრეტული რიცხვი გახდა (აღარ არის არასავალდებულო
-// "თუ გინდა, მიუთითე"), ამიტომ Job Feed-ის ბარათების "დაინტ. ვარ"
-// ერთი-შეხებით ღილაკსაც სჭირდება იგივე prompt (მანამდე ფასის გარეშე,
-// პირდაპირ აგზავნიდა ინტერესს) — გატანილია საერთო კომპონენტად, რომ
-// ProviderJobDetailScreen/ProviderHomeScreen/ProviderJobFeedScreen
-// სამივემ ერთი და იგივე ვიზუალი გამოიყენონ.
+// Mandatory price prompt for expressing interest.
 export function OfferPriceSheet({ visible, price, onChangePrice, onSubmit, onClose, submitting }: Props) {
   const priceNum = Number(price);
   const valid = price.length > 0 && priceNum > 0;

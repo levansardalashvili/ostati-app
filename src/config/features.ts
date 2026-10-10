@@ -1,3 +1,2 @@
-// ტელეფონით რეგისტრაცია/შესვლა (#107). SMS-პროვაიდერი ჯერ არ არის ჩართული,
-// ამიტომ ღილაკები დამალულია. ეკრანები და კოდი უცვლელია — ჩასართავად true.
+// Phone sign-up/login is hidden until an SMS provider is connected; screens are kept — set true to enable.
 export const PHONE_AUTH_ENABLED = false;

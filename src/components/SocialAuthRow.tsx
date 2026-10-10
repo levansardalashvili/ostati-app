@@ -1,4 +1,3 @@
-import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Phone } from 'lucide-react-native';
@@ -17,10 +16,7 @@ type Props = {
   onPhone: () => void;
 };
 
-// ტელეფონი / Google / Apple — მრგვალი აიქონ-ღილაკების რიგი, ვიდეო-რეფერენსის
-// (Facebook/Google/Apple) იგივე სტილით — ჩვენს აპში Facebook-ის ნაცვლად
-// ტელეფონია (#107, Facebook საერთოდ არ არის დაშვებული auth მეთოდად).
-// Login-სა და Register-ს შორის გაზიარებული, რომ ორივეგან იდენტური იყოს.
+// Phone / Google / Apple round buttons (Login and Register).
 export function SocialAuthRow({
   onGoogle,
   gLoading,

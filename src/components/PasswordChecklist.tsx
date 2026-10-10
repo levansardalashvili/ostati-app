@@ -1,4 +1,3 @@
-import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
@@ -17,8 +16,7 @@ function Row({ ok, label }: { ok: boolean; label: string }) {
   );
 }
 
-// პაროლის მოთხოვნების checklist — ResetPasswordScreen-ის გაზიარებული
-// (email-იც, ტელეფონიც), #170-ის ვიდეო-რეფერენსის სტილი.
+// Password rules checklist (ResetPasswordScreen).
 export function PasswordChecklist({ password, confirmPassword }: Props) {
   const lengthOk = password.length >= 8;
   const matchOk = !!confirmPassword && password === confirmPassword;

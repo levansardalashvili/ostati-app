@@ -13,9 +13,7 @@ const WIDTH = 48;
 const HEIGHT = 26;
 const THUMB = 18;
 
-// მორგებული toggle switch (დიზაინის რეფერენსის availability toggle-ის
-// მიხედვით) — გამოიყენება Provider Home-ის ხელმისაწვდომობის toggle-სა და
-// Notification Settings-ის toggle-ებში.
+// Toggle switch.
 export function Switch({ value, onValueChange, activeColor = colors.success, testID }: Props) {
   const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
 

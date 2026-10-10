@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check } from 'lucide-react-native';
@@ -13,11 +13,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegistrationSuccess'>;
 
-// რეგისტრაციის ეზარდის ბოლო, არა-ინტერაქციული "ფანჯარა" — Welcome-ის
-// (#170) იგივე ბრენდის ვიზუალი (BrandMark), აქ პერსონალიზებული მისალმებით
-// + წარმატების ბეჯით, ორივე როლისთვის (Provider/Customer-ის საკუთარი
-// Setup-ის დასასრული ამ ეკრანზე `navigation.reset`-ავს, ძველი პირდაპირი
-// Home-ზე reset-ის ნაცვლად). ავტომატურად გადადის შესაბამის Home-ზე.
+// Short welcome after setup, then continues to the right Home.
 export function RegistrationSuccessScreen({ navigation, route }: Props) {
   const { role } = route.params;
   const reduceMotion = useReduceMotion();

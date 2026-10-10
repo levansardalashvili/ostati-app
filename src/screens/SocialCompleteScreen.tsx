@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check } from 'lucide-react-native';
@@ -15,28 +15,28 @@ import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
 import type { RootStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'AppleComplete'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'SocialComplete'>;
 
-// #107 — Apple-ის ანგარიშით პროფილის დასრულება, GoogleCompleteScreen.tsx-ის
-// ზუსტი სარკე (ცალკე კონკრეტული ეკრანი, არა გაზიარებული "SocialComplete" —
-// კოდბაზის დამკვიდრებული პატერნით). ერთადერთი რეალური განსხვავება: Apple
-// `fullName`/`email`-ს მხოლოდ **პირველივე** ავტორიზაციაზე აბრუნებს —
-// `authService.getCurrentUser()`-იდან ხელახლა ამოღება შეუძლებელია (მეორედ
-// `null` იქნება), ამიტომ ეს მონაცემი route param-ითაა გადმოცემული
-// (RegisterScreen-ის Apple-ღილაკის handler-იდან, პირდაპირ signInWithApple()-ის
-// დაბრუნებული მნიშვნელობიდან).
-export function AppleCompleteScreen({ navigation, route }: Props) {
-  const { role, appleFullName } = route.params;
+// Finish the profile after Google/Apple sign-in (the auth itself already
+// happened on RegisterScreen). Name/email: Google from the session; Apple only
+// returns the name on the very first authorization, so it comes as a route param.
+// Providers don't give an address here — the work area is picked in ProviderSetup.
+export function SocialCompleteScreen({ navigation, route }: Props) {
+  const { role, provider, appleFullName } = route.params;
   const isProvider = role === 'provider';
+  const isApple = provider === 'apple';
+  const providerLabel = isApple ? 'Apple' : 'Google';
   const { setProfile } = useCustomerProfile();
   const { setProfile: setProviderProfile } = useProviderProfile();
 
-  const appleUser = authService.getCurrentUser();
-  const firstName = appleFullName?.givenName?.trim() || '';
-  const lastName = appleFullName?.familyName?.trim() || '';
+  const sessionUser = authService.getCurrentUser();
+  const [googleFirst, ...googleRest] = (sessionUser?.displayName?.trim() || 'ახალი მომხმარებელი').split(' ');
+  const firstName = (isApple ? appleFullName?.givenName : googleFirst)?.trim() || '';
+  const lastName = (isApple ? appleFullName?.familyName : googleRest.join(' '))?.trim() || '';
   const displayName = [firstName, lastName].filter(Boolean).join(' ') || 'ახალი მომხმარებელი';
-  const appleEmail = appleUser?.email ?? '';
-  const initials = `${firstName.charAt(0)}${lastName.charAt(0) || ''}`.toUpperCase() || 'A';
+  const email = sessionUser?.email ?? '';
+  const phone = sessionUser?.phone ?? '';
+  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || providerLabel.charAt(0);
 
   const [address, setAddress] = useState('');
   const [addressDetails, setAddressDetails] = useState<AddressDetails>({
@@ -71,20 +71,20 @@ export function AppleCompleteScreen({ navigation, route }: Props) {
         (!addressDetails.isPrivateHouse && (!addressDetails.entrance.trim() || !addressDetails.apartment.trim())))
     )
       return;
-    if (!appleUser) {
-      setSubmitError('Apple სესია ვერ მოიძებნა — დაბრუნდი და სცადე თავიდან.');
+    if (!sessionUser) {
+      setSubmitError(`${providerLabel} სესია ვერ მოიძებნა — დაბრუნდი და სცადე თავიდან.`);
       return;
     }
     setLoading(true);
     try {
       const defaultAddress = isProvider ? '' : address.trim();
-      await userService.createUserRecord(appleUser.uid, {
+      await userService.createUserRecord(sessionUser.uid, {
         role,
         firstName,
         lastName,
-        email: appleEmail,
+        email,
         defaultAddress,
-        phone: appleUser.phone ?? '',
+        phone,
         entrance: isProvider ? '' : addressDetails.entrance,
         apartment: isProvider ? '' : addressDetails.apartment,
         doorCode: isProvider ? '' : addressDetails.doorCode,
@@ -97,9 +97,9 @@ export function AppleCompleteScreen({ navigation, route }: Props) {
         setProfile({
           firstName,
           lastName,
-          email: appleEmail,
+          email,
           defaultAddress,
-          phone: '',
+          phone,
           entrance: addressDetails.entrance,
           apartment: addressDetails.apartment,
           doorCode: addressDetails.doorCode,
@@ -125,13 +125,13 @@ export function AppleCompleteScreen({ navigation, route }: Props) {
         <Text style={styles.title}>დაასრულე პროფილის შექმნა</Text>
         <Text style={styles.subtitle}>დაგვჭირდება კიდევ რამდენიმე ინფორმაცია.</Text>
 
-        <View style={styles.appleCard}>
-          <Text style={styles.appleCardLabel}>Apple-ის ანგარიშიდან</Text>
-          <View style={styles.appleCardRow}>
+        <View style={styles.accountCard}>
+          <Text style={styles.accountCardLabel}>{providerLabel}-ის ანგარიშიდან</Text>
+          <View style={styles.accountCardRow}>
             <Avatar initials={initials} size={52} />
-            <View style={styles.appleCardText}>
-              <Text style={styles.appleCardName}>{displayName}</Text>
-              {!!appleEmail && <Text style={styles.appleCardEmail}>{appleEmail}</Text>}
+            <View style={styles.accountCardText}>
+              <Text style={styles.accountCardName}>{displayName}</Text>
+              {!!email && <Text style={styles.accountCardEmail}>{email}</Text>}
             </View>
             <View style={styles.checkBadge}>
               <Check size={13} color={colors.success} strokeWidth={3} />
@@ -152,7 +152,7 @@ export function AppleCompleteScreen({ navigation, route }: Props) {
               value={address}
               onChangeText={setAddress}
               onBlur={() => setTouched(true)}
-              placeholder="მაგ. ჭავჭავაძე 48"
+              placeholder="მაგ. ჭავჭავაძის 48"
               error={addressError}
             />
             <View style={styles.entranceRow}>
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     marginBottom: spacing.lg,
   },
-  appleCard: {
+  accountCard: {
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
@@ -215,26 +215,26 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
-  appleCardLabel: {
+  accountCardLabel: {
     ...typography.small,
     color: colors.mutedForeground,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     marginBottom: spacing.sm,
   },
-  appleCardRow: {
+  accountCardRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
   },
-  appleCardText: {
+  accountCardText: {
     flex: 1,
   },
-  appleCardName: {
+  accountCardName: {
     ...typography.bodyMedium,
     color: colors.foreground,
   },
-  appleCardEmail: {
+  accountCardEmail: {
     ...typography.caption,
     color: colors.mutedForeground,
   },

@@ -9,11 +9,7 @@ export type Review = {
 };
 
 // დასრულებული სამუშაოს ფოტო
-export type RatingPhoto = {
-  id: number;
-  bg: string;
-  uri?: string;
-};
+export type RatingPhoto = { id: number; uri?: string };
 
 // Customer-ის მიერ job-ის დასრულებისას გაგზავნილი შეფასების ფორმა
 export type RatingData = {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AddressAutocompleteField } from './AddressAutocompleteField';
 import { BottomSheet } from './BottomSheet';
@@ -21,51 +21,20 @@ const DESCRIPTION_MIN = 20;
 const DESCRIPTION_MAX = 500;
 
 type Props = {
-  // `null` = დამალული. Provider-ის ცვლილება ("მიწერა"-ზე ხელახლა
-  // დაჭერა სხვა ბარათზე) ავტომატურად უბრუნებს სვეტს საწყის state-ს
-  // (იხ. ქვემოთ `useEffect`).
+  // null = hidden; a different provider resets the form.
   provider: Provider | null;
   onClose: () => void;
-  // ახლად შექმნილი+გამოქვეყნებული job-ის id, ან `null` (როცა ამ
-  // Provider-თან საუბარი უკვე არსებობს — ახალი job აღარ იქმნება,
-  // გამომძახებელი ჩატს ძველებურად, `jobId` route param-ის გარეშე ხსნის;
-  // `ChatConversationScreen`-ის საკუთარი `findLatestSharedJobId` fallback
-  // მაინც სცდის მისი "დეტ. ნახვა"-ს ბმულის ამოხსნას). მეორე პარამეტრი —
-  // წინასწარშედგენილი პირველი შეტყობინების ტექსტი (ახალ job-ზე), რომ
-  // Provider-მდე ცხადად მივიდეს "ეს კონკრეტულად თქვენთვისაა" — მხოლოდ
-  // ჩატის composer-ში ივსება, არ იგზავნება.
+  // jobId of the new job, or null when a conversation already exists (no new job).
+  // draftMessage: the first message, returned only if sending it failed.
   onReady: (jobId: string | null, draftMessage?: string) => void;
-  // "ხელახლა დაქირავება" — always create a new private job, even though a
-  // conversation with this Provider already exists.
+  // Rehire: always create a new private job, even if a conversation exists.
   forceNew?: boolean;
 };
 
-// ახალი, "ცივი" ჩატი (Provider-ის საჯარო პროფილიდან/"შენახული
-// ოსტატებიდან" პირდაპირ "მიწერა", განცხადების გარეშე) აქამდე job_posts-ში
-// არაფერს არ ტოვებდა კვალს — Customer-სა და Provider-ს შეეძლოთ მთლიანი
-// ფასის შეთანხმება უბრალო ტექსტში ჩაეტარებინათ, job-ის რეალურად
-// შექმნის/დასრულების/შეფასების ციკლის გვერდის ავლით (მოთხოვნა: "ეს
-// სამუშაო რეალურად ხო არ შეუქმნია მომხმარებელს, ვერც შეფასებას
-// დაუწერს"). Research (Thumbtack/TaskRabbit) — ორივეს საერთო პრინციპი,
-// რომ ჩატი/შეთავაზება ყოველთვის კონკრეტულ posted request-ს/booking-ს
-// უკავშირდება, არასდროს "უჩუმრად". ეს sheet ზუსტად ამ ხარვეზს ხურავს:
-// "მიწერა"-ზე დაჭერისას (ან რეალურად ეძებს უკვე არსებულ, ჯერ-კიდევ-ღია
-// საერთო job-ს (`findLatestSharedJobId`) — რომ ხელახალ "მიწერაზე" ყოველ
-// ჯერზე ახალი, დუბლირებული job არ შეიქმნას — ან, თუ ვერაფერი მოიძებნა,
-// მოკლე ფორმით (კატეგორია **აღარ ერჩევა** — ცხადია Provider-ის საკუთარი
-// კატეგორიიდან, `Provider.category`, უკვე #60-ის მიხედვით სწორ
-// CATEGORIES-id-ზეა map-ილი, ეს ჩატიც ხომ სწორედ ამ ერთ, კონკრეტულ
-// Provider-ს ეხება — task: "ოსტატს ისედაც აქვს კატეგორია მითითებული";
-// აღწერა 20+ სიმბოლო; მისამართი — Customer-ის პროფილის default-ით
-// წინასწარშევსებული, მაგრამ **რედაქტირებადი** ამ ერთი job-ისთვის,
-// `AddressAutocompleteField`-ით, PostJobScreen-ის იგივე UX) ქმნის და
-// მაშინვე აქვეყნებს **რეალურ**, `create_job()`/`finalize_job_publish()`-ზე
-// აგებულ job-ს (100% იგივე RPC-ები, რასაც PostJobScreen იყენებს) —
-// ჩატი ამის შემდეგ **ყოველთვის** `jobId`-ითაა მიბმული, ისევე როგორც
-// PostJob-იდან ან Job Feed-იდან წამოსული ჩატები, ასე რომ არსებული
-// სტრუქტურირებული ფასის-შეთავაზების/დასრულების/შეფასების მთელი
-// მექანიზმი (#2/#47/#92/#97-#98) ამ ნაკადზეც ავტომატურად, ცვლილების
-// გარეშე მუშაობს.
+// "მიწერა" to a provider: a chat must belong to a real job (else price, completion and
+// rating would be bypassed). If no conversation exists yet, this short form creates and
+// publishes a private job (same RPCs as PostJob; category = the provider's) and sends
+// the first message.
 export function StartJobChatSheet({ provider, onClose, onReady, forceNew = false }: Props) {
   const { profile } = useCustomerProfile();
   const visible = !!provider;
@@ -74,7 +43,7 @@ export function StartJobChatSheet({ provider, onClose, onReady, forceNew = false
   const [description, setDescription] = useState('');
   const [address, setAddress] = useState('');
   const [district, setDistrict] = useState('');
-  // თარიღი და დრო სავალდებულოა (როგორც PostJobScreen-ზე) — ოსტატს უნდა ჰქონდეს კონკრეტული დაგეგმილი დრო
+  // Date and time are required (as on PostJob).
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState('');
   const [timeOpen, setTimeOpen] = useState(false);
@@ -82,18 +51,8 @@ export function StartJobChatSheet({ provider, onClose, onReady, forceNew = false
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  // Provider-ის ყოველ ახალ გახსნაზე — ჯერ ვამოწმებთ, ამ Provider-თან
-  // საერთოდ არსებობს თუ არა ადრინდელი საუბარი (`hasExistingConversation`,
-  // `messages`-ის (customer_id, provider_id) წყვილზე) — თუ დიახ, ვთვლით,
-  // რომ job პირველივე "მიწერაზე" უკვე შეიქმნა და ახალ ფორმას აღარ
-  // ვაჩვენებთ (მეორედ იგივე Provider-ისთვის "მიწერაზე" დაჭერისას ორმაგი,
-  // დუბლირებული job რომ არ შეიქმნას). **განზრახ არ** ვცდილობთ იმ job-ის
-  // ზუსტ id-ს (job_responses/`provider_id`-ზე დაფუძნებული
-  // `findLatestSharedJobId` ისევ `false`-ს დააბრუნებდა, სანამ ამ job-ზე
-  // Provider-ს რეალური პასუხი/მინიჭება არ ექნება) — უბრალოდ `jobId`
-  // route param-ის გარეშე ვხსნით ჩატს, ისევე, როგორც ეს ბმული ადრეც
-  // მუშაობდა (`ChatConversationScreen`-ის საკუთარი fallback ცდილობს
-  // ამოხსნას მოგვიანებით, თუ/როცა შესაძლებელი გახდება).
+  // An existing conversation means a job was already created on the first "მიწერა" —
+  // open the chat without a new form (avoids duplicate jobs).
   useEffect(() => {
     if (!provider) {
       setDescription('');
@@ -128,8 +87,7 @@ export function StartJobChatSheet({ provider, onClose, onReady, forceNew = false
           onReady(null);
         }
       } catch {
-        // ვერაფრის პოვნა/ქსელის ჩავარდნა — უბრალოდ ახალი job-ის ფორმას
-        // ვაჩვენებთ, კრიტიკული არაფერი არ დაკარგულა.
+        // Nothing found / network error → just show the form.
       } finally {
         if (!cancelled) setChecking(false);
       }
@@ -165,7 +123,7 @@ export function StartJobChatSheet({ provider, onClose, onReady, forceNew = false
     try {
       const uid = authService.getCurrentUser()?.uid;
       if (!uid) throw new Error('არ ხარ ავტორიზებული.');
-      const job = await jobService.createCustomerJob(uid, {
+      const job = await jobService.createCustomerJob({
         category: provider.category,
         description: description.trim(),
         address: address.trim(),
@@ -176,15 +134,8 @@ export function StartJobChatSheet({ provider, onClose, onReady, forceNew = false
       });
       await jobService.setJobDistrict(job.id, district);
       const published = await jobService.finalizeJobPublish(job.id);
-      // Provider-მდე job "ცხადად" რომ მივიდეს ("ეს job კონკრეტულად
-      // თქვენთვისაა", არა ზოგადი "ახალი job თქვენს არეალში" ბრადქასტი) —
-      // მომხმარებლის აშკარა მოთხოვნით ეს პირველი შეტყობინება ახლა
-      // **რეალურად, ავტომატურად იგზავნება** (არა მხოლოდ წინასწარ ივსება
-      // composer-ში) — ჩვეულებრივი ჩატის შეტყობინებაა, ამიტომ Provider-ს
-      // ავტომატურად მიუვა push/in-app შეტყობინებაც (`handle_new_message`
-      // trigger, უცვლელი). გაგზავნის ჩავარდნისას (ქსელი) job/ჩატი მაინც
-      // იხსნება — `draftMessage`-ის fallback-ით composer-ში ვაცხოვნებთ
-      // ტექსტს, რომ არაფერი არ დაიკარგოს.
+      // Send the first message right away (triggers the provider's notification).
+      // If it fails, the job and chat still open and the text stays in the composer.
       try {
         await chatService.sendRealMessage(
           uid,

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Briefcase } from 'lucide-react-native';
@@ -17,14 +17,12 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProviderJobFeed'>;
 
-// ProviderJobFeed — Home-ის "ყველას ნახვა"-ს სრული ვერსია (ProviderHomeScreen-ის
-// 5-ცალიანი ჩამონათვალის გარეშე). იგივე ბარათი, საერთო
-// providerFeedFilters/ProviderFeedJobCard-იდან.
+// Full job feed (Home shows 5).
 export function ProviderJobFeedScreen({ navigation }: Props) {
   const [interests, setInterests] = useState<Set<string>>(new Set());
   const [filtered, setFiltered] = useState<FeedJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  // false — მხოლოდ ჩემი სპეციალობის კატეგორიები (0098), true — ყველა ღია განცხადება
+  // false = only my professions' categories (and areas), true = every open job
   const [showAll, setShowAll] = useState(false);
 
   useFocusEffect(
@@ -32,13 +30,7 @@ export function ProviderJobFeedScreen({ navigation }: Props) {
       let cancelled = false;
       setIsLoading(true);
       const uid = authService.getCurrentUser()?.uid;
-      // Task — `get_open_provider_feed()` RPC-ს `authenticated` role სჭირდება
-      // (grant-ის დონეზეც, `SET search_path`-ის auth.uid()-checkis
-      // გვერდით) — ადრე ეს fetch უპირობოდ ეშვებოდა, სესიის მზადყოფნის
-      // გარეშეც (მაგ. logout-ის navigation.reset-ის შუალედში ეს ეკრანი
-      // ჯერ კიდევ focused-ია), რაც "permission denied for function
-      // get_open_provider_feed" (42501) uncaught rejection-ს იწვევდა —
-      // `uid`-ის სხვა ორ query-ის იგივე დაცვის ქვეშ ჩავაგდე, პლუს `.catch()`.
+      // Only with a session — the feed RPC is authenticated-only (logout reset races).
       Promise.all([
         uid ? jobService.getOpenProviderFeedPosts(!showAll) : Promise.resolve([]),
         uid ? quoteService.listMyResponseJobIds(uid) : Promise.resolve(new Set<string>()),

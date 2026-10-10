@@ -4,37 +4,11 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { supabase } from './supabaseClient';
 
-// pushTokenService — ერთადერთი ადგილი, სადაც push permission/token
-// logic ცხოვრობს (task: "Do not scatter push-token logic across many
-// screens"). არ არის React hook/component — მხოლოდ სუფთა ფუნქციები,
-// ისევე როგორც userService/jobService/... — react-side wiring
-// (auth-state-ზე რეაქცია, tap-listener) ცალკე, `PushNotificationsBootstrap`
-// კომპონენტშია (src/components/PushNotificationsBootstrap.tsx).
-//
-// ორივე Supabase-write RPC-ით ხდება (`register_push_token`/
-// `deactivate_push_token`, supabase/migrations/0037) — არა პირდაპირი
-// `.insert()`/`.upsert()` — RPC-ს user_id ყოველთვის `auth.uid()`-იდანაა,
-// client-ს არ შეუძლია სხვისთვის token-ის დარეგისტრირება (მიუხედავად
-// იმისა, თუ ვის ეკუთვნოდა ეს ტოკენი მანამდე — გაზიარებული/ხელახლა
-// გამოყენებული მოწყობილობის შემთხვევა, RPC-ის საკუთარი კომენტარი).
+// All push permission/token logic lives here (React wiring: PushNotificationsBootstrap).
+// Writes go through RPCs, which take user_id from auth.uid().
 
-// ერთადერთი, module-level cache-ი — "ეს device-ი რას აგზავნის ამჟამად"
-// — deactivateCurrentToken()-ს სჭირდება ეს (logout-ისას), ხელახლა
-// getExpoPushTokenAsync()-ის გამოძახების/scope-ის გართულების გარეშე.
+// This device's token, needed to deactivate it on logout.
 let cachedDeviceToken: string | null = null;
-
-export interface PushTokenService {
-  // Permission + token + Supabase registration, ერთად. უსაფრთხოდ
-  // no-op-ობს simulator/emulator-ზე (Device.isDevice === false) და
-  // EAS projectId-ის არარსებობისას — არცერთი crash-ს არ იწვევს, მხოლოდ
-  // ჩუმად ჩერდება (task: "gracefully handle simulator/emulator...
-  // do not crash if permissions are denied").
-  registerForPushNotifications(uid: string): Promise<void>;
-  // Logout — ამ device-ის ტოკენს აქტიურობას აშორებს (არა შლის) Supabase-ში.
-  // authService.signOut()-იდან იძახება, სესიის დახურვამდე (auth.uid()-ს
-  // RPC-ს სჭირდება).
-  deactivateCurrentToken(): Promise<void>;
-}
 
 async function ensureAndroidChannel() {
   if (Platform.OS !== 'android') return;
@@ -46,10 +20,7 @@ async function ensureAndroidChannel() {
   });
 }
 
-// Permission — თუ სტატუსი უკვე 'denied'-ია, აღარასდროს ვთხოვთ ხელახლა
-// (task: "do not repeatedly prompt after denial") — OS-იც ისედაც
-// ბლოკავს ხელახალ prompt-ს Android 13+/iOS-ზე, მაგრამ ეს დამატებით
-// ხელს უშლის ჩვენც ზედმეტი `requestPermissionsAsync()`-ის გამოძახებას.
+// Don't ask again after a denial.
 async function ensurePermission(): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();
   if (current.status === 'granted') return true;
@@ -58,17 +29,14 @@ async function ensurePermission(): Promise<boolean> {
     const requested = await Notifications.requestPermissionsAsync();
     return requested.status === 'granted';
   }
-  // 'denied', but canAskAgain === true (iOS-ის ერთ-ერთი კონკრეტული
-  // შემთხვევა) — მაინც ერთხელ ვცდით.
   const requested = await Notifications.requestPermissionsAsync();
   return requested.status === 'granted';
 }
 
-export const pushTokenService: PushTokenService = {
-  async registerForPushNotifications(uid) {
+export const pushTokenService = {
+  // Silent no-op on emulators, without an EAS projectId, or when permission is denied.
+  async registerForPushNotifications(): Promise<void> {
     try {
-      // Physical-device მოთხოვნა — Expo push token-ს simulator/emulator
-      // საერთოდ ვერ გასცემს (task: "handle physical-device requirement").
       if (!Device.isDevice) return;
 
       const granted = await ensurePermission();
@@ -76,11 +44,6 @@ export const pushTokenService: PushTokenService = {
 
       await ensureAndroidChannel();
 
-      // EAS projectId — app.json-ს/eas.json-ს უნდა ჰქონდეს ეს (task:
-      // "Do not manually hardcode project IDs if Expo config can provide
-      // them safely") — თუ პროექტი ჯერ არ არის EAS-თან დაკავშირებული
-      // (`eas init`), ეს არასდროს არსებობს და getExpoPushTokenAsync
-      // ისვრის; ჩუმად ვჩერდებით, აპს არ ვაჩერებთ.
       const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
       if (!projectId) {
         console.warn('[push] EAS projectId ვერ მოიძებნა — გაუშვი `eas init`, რომ push token-ის გამოთხოვა იმუშაოს.');
@@ -99,13 +62,13 @@ export const pushTokenService: PushTokenService = {
       });
       if (error) throw error;
     } catch (err) {
-      // Push registration არასდროს არ უნდა შეაფერხოს ავტორიზაცია/აპის
-      // გახსნა — ჩუმად ჩუმდება, error-ს მხოლოდ console-ში ტოვებს.
+      // Never blocks sign-in or app start.
       console.warn('[push] registerForPushNotifications ჩავარდა:', err);
     }
   },
 
-  async deactivateCurrentToken() {
+  // Called from signOut before the session ends (the RPC needs auth.uid()).
+  async deactivateCurrentToken(): Promise<void> {
     if (!cachedDeviceToken) return;
     try {
       const { error } = await supabase.rpc('deactivate_push_token', { p_expo_push_token: cachedDeviceToken });

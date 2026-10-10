@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Clock, Shield, ShieldCheck, XCircle } from 'lucide-react-native';
@@ -14,13 +14,8 @@ import {
   type ProviderProfileState,
 } from '../state/ProviderProfileContext';
 
-// Provider verification REQUEST card — Task 3. Status-aware section for
-// ProviderProfileScreen, driven entirely by `provider_profiles.verification_status`
-// (RLS-locked, supabase/migrations/0025) and the request metadata added in
-// 0035. This card can only ever move unverified/rejected -> pending, via
-// `userService.requestProviderVerification()` (SECURITY DEFINER RPC) — it
-// never writes verification_status directly, and there is no path here for
-// a Provider to set themselves 'verified' or clear a rejection.
+// Verification request card. Can only move unverified/rejected → pending via the RPC;
+// never writes verification_status itself.
 type Props = {
   profile: ProviderProfileState;
   onUpdated: (patch: Partial<ProviderProfileState>) => void;
@@ -34,9 +29,7 @@ export function VerificationRequestCard({ profile, onUpdated, onEditProfile }: P
   const status = profile.verificationStatus ?? 'unverified';
   const eligibility = getVerificationEligibility(profile);
 
-  // Task — მოთხოვნას ახლა თან ახლავს live სელფი (წინა-კამერით), რომელსაც
-  // ადმინი ხელით ადარებს პროფილის საჯარო ფოტოსთან (VerificationQueue.tsx-ში
-  // უკვე ჩანს) — ავტომატური KYC/liveness-პროვაიდერის (ფასიანი) ნაცვლად.
+  // Front-camera selfie; the admin compares it with the profile photo by hand.
   const takeSelfie = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
@@ -65,12 +58,7 @@ export function VerificationRequestCard({ profile, onUpdated, onEditProfile }: P
       await userService.requestProviderVerification(selfiePath);
       setConfirmOpen(false);
       setSelfieUri(null);
-      // წარმატების შემდეგ ჭეშმარიტი მდგომარეობა ბაზიდან ისევ იტვირთება
-      // (task-ის მოთხოვნა — "refresh provider profile/status after
-      // success"); თუ ეს კონკრეტული re-fetch ჩავარდა (RPC თავად მაინც
-      // წარმატებით დასრულდა), ლოკალურად ვასახავთ იმას, რაც RPC-მ სერვერზე
-      // უსათუოდ დაწერა — UI არასდროს არ რჩება ძველ, staleuc "unverified"/
-      // "rejected" მდგომარეობაზე გაყინული.
+      // Re-read the real status; if that read fails, assume pending (the RPC succeeded).
       const fresh = await userService.getProviderProfileRecord(uid).catch(() => null);
       if (fresh) {
         onUpdated(fresh);

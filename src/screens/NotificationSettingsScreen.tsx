@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -11,9 +11,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'NotificationSettings'>;
 
-// key — სტაბილური იდენტიფიკატორი, Supabase-ის `notification_preferences.prefs`
-// jsonb-ის key (Task 3) — label ტექსტი (ან სიაში ადგილი) ვერასდროს
-// გამოსადეგია storage key-დ, რადგან თარგმანი/დალაგება შეიძლება შეიცვალოს.
+// key = the stored preference key (= notifications.type); never use the label.
 const CUSTOMER_TOGGLES: { key: string; label: string }[] = [
   { key: 'new_interest', label: 'ახალი ინტერესი ჩემს მოთხოვნაზე' },
   { key: 'new_chat_message', label: 'ახალი შეტყობინება ჩატში' },
@@ -30,12 +28,7 @@ const PROVIDER_TOGGLES: { key: string; label: string }[] = [
   { key: 'verification_status_change', label: 'ვერიფიკაციის შედეგი' },
 ];
 
-// NotificationSettings — ზუსტად ზიპის App.tsx-ის NotificationSettings-ის
-// მიხედვით (ვიზუალურად უცვლელი). toggle-ების მდგომარეობა Task 3-ის
-// მიხედვით რეალურად Supabase-ზეა (`notification_preferences`) — ეკრანის
-// გახსნისას აღდგება, გადარჩება logout/login/app restart-საც. ნაგულისხმევად
-// ყველა ჩართულია (მომხმარებელს არასდროს გამორთვია) — missing key ბაზაში
-// ნიშნავს "ჯერ არასდროს შეხებია", არა "გამორთული".
+// Push toggles, saved in notification_preferences. A missing key means enabled.
 export function NotificationSettingsScreen({ navigation, route }: Props) {
   const { role } = route.params;
   const toggles = role === 'customer' ? CUSTOMER_TOGGLES : PROVIDER_TOGGLES;

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Trash2, X, type LucideIcon } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../theme';
@@ -20,7 +19,7 @@ export function MediaPreviewModal({ item, icon: Icon, onClose, onDelete }: Props
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={[styles.card, { backgroundColor: item.bg }]} onPress={() => {}}>
+        <Pressable style={styles.card} onPress={() => {}}>
           {item.uri ? (
             <SecureStorageImage reference={item.uri} style={styles.cardImage} />
           ) : (
@@ -59,6 +58,7 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   card: {
+    backgroundColor: colors.muted,
     width: '100%',
     maxWidth: 220,
     aspectRatio: 1,

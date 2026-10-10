@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MessageCircle, Search } from 'lucide-react-native';
@@ -23,11 +23,7 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 > & { role: Role };
 
-// D1 — ჩატების სია / Inbox (product-spec.md; დიზაინის რეფერენსის
-// ChatsList-ის მიხედვით). `conversations` ცხრილიდან (#68) — Bottom Tab-ის
-// ეკრანები session-ის განმავლობაში მონტირებული რჩება, ამიტომ `useFocusEffect`
-// (არა plain `useEffect`), ტაბზე დაბრუნებისას ახალი შეტყობინება/ჩატი
-// განახლდეს.
+// Chat list from `conversations`; refreshed on focus (tabs stay mounted).
 export function ChatsListScreen({ navigation, role }: Props) {
   const { handleScroll } = useTabBarScroll();
   const [query, setQuery] = useState('');

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { Circle, Svg } from 'react-native-svg';
 import { colors } from '../theme';
@@ -14,9 +14,7 @@ type Props = {
   delay?: number;
 };
 
-// აპის ლოგო — ლურჯი „დახატვადი“ რგოლი + ბრენდის ნიშანი, გატანილია
-// WelcomeScreen-იდან (#170), რომ სხვა ეკრანებმაც (RegistrationSuccessScreen)
-// იგივე ბრენდის ვიზუალი გაიზიარონ დუბლირების გარეშე.
+// App logo with the drawn ring (Welcome, RegistrationSuccess).
 export function BrandMark({ size = 116, delay = 300 }: Props) {
   const reduceMotion = useReduceMotion();
   const ringProgress = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;

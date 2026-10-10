@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
@@ -18,19 +18,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerEditProfile'>;
 
-// CustomerEditProfile — ზუსტად ზიპის App.tsx-ის CustomerEditProfile-ის
-// მიხედვით. წარმატებულ შენახვაზე მონაცემები იწერება CustomerProfileContext-ში
-// (მყისიერი UI feedback) და პარალელურად Supabase-ის `users` ცხრილში
-// (userService.updateUserRecord) — რომ ცვლილება რეალურად შენარჩუნდეს, არა
-// მხოლოდ ამ სესიაში.
-//
-// Profile-fix pass — root-cause fix: ეს ეკრანი ადრე შეგნებულად აგდებდა
-// პირველ "შენახვას" (`attemptRef.current === 0` → ყოველთვის setSaveError(true),
-// Supabase-ისკენ საერთოდ არ მიდიოდა), მხოლოდ დემონსტრაციული/საცდელი
-// error-state-ის საჩვენებლად ადრეულ ეტაპზე დარჩენილი scaffold — არა
-// რეალური ბაგი async sequencing-ში/state-ში/Supabase-ში. მოცილებულია
-// მთლიანად — handleSave ახლა რეალურ Supabase-ის ოპერაციას პირველივე
-// დაჭერისას იძახებს, ხელოვნური setTimeout/attemptRef-ის გარეშე.
+// Edit the customer profile: Context updates at once, `users` is saved in the background.
 export function CustomerEditProfileScreen({ navigation }: Props) {
   const { profile, setProfile } = useCustomerProfile();
   const [firstName, setFirstName] = useState(profile.firstName);
@@ -44,7 +32,6 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  // Keyboard "შემდეგი"-ის ჯაჭვი — RegisterScreen.tsx-ის იგივე ფიქსი.
   const lastNameRef = useRef<TextInput>(null);
   const addressRef = useRef<TextInput>(null);
 
@@ -71,9 +58,7 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
       try {
         await userService.updateUserRecord(uid, patch);
       } catch {
-        // ლოკალურ Context-ში ცვლილება უკვე ასახულია — Supabase-ის
-        // ჩავარდნისას UI-ს არ ვბლოკავთ, უბრალოდ ჩუმად რჩება
-        // შემდეგ სინქრონიზაციამდე (მომავალში: retry/queue).
+        // A failed save doesn't block the UI (ponytail: no retry queue; add one if saves get lost).
       }
     }
     setIsSaving(false);
@@ -83,10 +68,7 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader title="პროფილის რედაქტირება" onBack={() => navigation.goBack()} />
-      {/* Android's native window-resize silently no-ops under edge-to-edge
-          rendering (Expo SDK 52+ default) — without this, the address
-          field + save footer below it would be hidden behind the
-          keyboard, same bug as ChatConversationScreen's composer. */}
+      {/* 'height' on Android: edge-to-edge makes the native resize a no-op. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <KeyboardAwareForm
         avoidKeyboard={false}
@@ -141,9 +123,7 @@ export function CustomerEditProfileScreen({ navigation }: Props) {
               <View>
                 <Text style={styles.infoLabel}>ანგარიშის ინფორმაცია</Text>
                 <View style={styles.infoCard}>
-                  {/* #107 — ტელეფონის OTP-ით რეგისტრირებულ ანგარიშებს
-                      email არ აქვთ (`''`) — ორივე ველი პირობითია, არა
-                      უპირობოდ ცარიელი "ელ. ფოსტა" row-ის ჩვენება. */}
+                  {/* Email or phone — whichever the account has. */}
                   {!!profile.email && (
                     <>
                       <Text style={styles.infoCardLabel}>ელ. ფოსტა</Text>
@@ -246,10 +226,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs + 2,
     paddingHorizontal: 2,
   },
-  // Task — ProviderEditProfileScreen-ის იგივე ხარვეზი (absolute footer
-  // ScrollView-ის ბოლო კონტენტს "ეფინებოდა", scroll-ითაც ვერასდროს
-  // ჩანდა; Android-ის keyboard-avoid auto-scroll-საც არასწორად ითვლიდა).
-  // ჩვეულებრივი flex sibling — იგივე ფიქსი, აქაც.
+  // Plain flex footer, not absolute.
   footer: {
     backgroundColor: colors.card,
     borderTopWidth: 1,

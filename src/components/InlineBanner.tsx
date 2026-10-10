@@ -18,9 +18,7 @@ const CONFIG: Record<BannerType, { bg: string; border: string; text: string; ico
   warning: { bg: colors.warningBackground, border: '#FDE68A', text: colors.warning, icon: AlertCircle },
 };
 
-// InlineBanner — success/error/warning ხაზოვანი შეტყობინება (ზიპის
-// App.tsx-ის InlineBanner-ის მიხედვით) — გამოიყენება ფორმის შენახვის
-// შეცდომების ჩვენებისთვის (Edit Profile ეკრანები).
+// Inline success/error/warning message.
 export function InlineBanner({ type, msg, action, onAction }: Props) {
   const cfg = CONFIG[type];
   const Icon = cfg.icon;

@@ -1,11 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Animated, StyleProp, ViewStyle } from 'react-native';
 
-// წვრილი წითელი წერტილი (tab-bar-ის წაუკითხავი ჩატის ინდიკატორი, #68) —
-// mount-ზე pop-in scale ანიმაციით, ხმამაღალი "ჩაშენების" ნაცვლად. Component
-// მთელი lifecycle-ის მანძილზე conditionally (un)mount-დება (`unreadChats >
-// 0 && !focused && <PopBadge/>`) — ამიტომ mount თავად "გამოჩენის" მომენტია,
-// ცალკე imperative trigger არ სჭირდება.
+// Unread dot that pops in on mount (it is mounted only while there is something unread).
 export function PopBadge({ style }: { style: StyleProp<ViewStyle> }) {
   const scale = useRef(new Animated.Value(0)).current;
 

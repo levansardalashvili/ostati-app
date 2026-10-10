@@ -16,8 +16,7 @@ type Props = {
   onPress: () => void;
 };
 
-// პროფილის მენიუს რიგი (დიზაინის რეფერენსის Customer/ProviderProfile-ის
-// მენიუს item-ების მიხედვით) — გამოიყენება E1/E2-ში.
+// Profile menu row.
 export function ProfileMenuRow({ icon: Icon, label, iconBg, iconColor, badge, badgeVariant = 'solid', onPress }: Props) {
   const { scale, onPressIn, onPressOut } = usePressScale(0.98);
 

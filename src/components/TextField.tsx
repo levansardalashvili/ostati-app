@@ -26,29 +26,16 @@ type Props = {
   icon?: IconComponent;
   keyboardType?: KeyboardTypeOptions;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
-  // #107 — OtpCodeInput-ისთვის (6-ციფრიანი კოდი), ტელეფონის ნომრის
-  // ველისთვის და ა.შ. არასავალდებულო, დანარჩენ ყველა არსებულ
-  // გამომძახებელზე ეფექტი არ აქვს (`undefined` = შეუზღუდავი, უცვლელი).
   maxLength?: number;
-  // E2E (Maestro) support — some screens have two fields with the same
-  // placeholder (e.g. password/confirm-password both show "••••••••"),
-  // which text-based selectors can't disambiguate.
+  // for Maestro: some fields share a placeholder
   testID?: string;
-  // Task — წითელი "*" ველის ლეიბლის გვერდით, სავალდებულო ველების
-  // მკაფიო ვიზუალური მონიშვნისთვის (მომხმარებლის მოთხოვნით).
+  // red * next to the label
   required?: boolean;
-  // Keyboard "შემდეგი"-ით შემდეგ ველზე გადასვლა — ამის გარეშე, თუ
-  // შემდეგი ველი კლავიატურის მიღმა აღმოჩნდება (ეკრანის ბოლოში),
-  // მომხმარებელს არანაირი გზა არ რჩება მასთან მისასვლელად (ტაპი
-  // შეუძლებელია ჰიდირებულ ელემენტზე) — ნაპოვნი რეალური ბაგი
-  // რეგისტრაციის ფორმაში (ელ.ფოსტის მერე მისამართის ველი).
   returnKeyType?: ReturnKeyTypeOptions;
   onSubmitEditing?: () => void;
 };
 
-// საერთო ტექსტური ველი — label, არასავალდებულო წამყვანი აიქონი,
-// პაროლის ჩვენება/დამალვა, error/helper ტექსტი (app-states.md-ის
-// ვალიდაციის სტილის მიხედვით).
+// Text field: label, optional icon, password toggle, error/helper text.
 export const TextField = React.forwardRef<TextInput, Props>(function TextField({
   label,
   value,

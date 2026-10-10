@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -13,13 +13,7 @@ import { usePressScale } from '../utils/usePressScale';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerCategories'>;
 
-// CustomerCategories — "ყველა სერვისი" ღილაკის გვერდი: ყველა სერვისის
-// კატეგორიის ბადე. კატეგორიაზე დაჭერით იხსნება CustomerCategoryScreen —
-// იმ კატეგორიის ოსტატების სია.
-//
-// Task 6 (audit) — სია/სახელი/რიგითობა/აქტიურობა ბექენდიდანაა
-// (`categories`, supabase/migrations/0043); bg/dot ფერები კვლავ
-// ლოკალურია (`src/data/categories.ts`, დიზაინის ტოკენი, არა backend-მონაცემი).
+// All categories grid → CustomerCategoryScreen. Data from the backend, colors local.
 export function CustomerCategoriesScreen({ navigation }: Props) {
   const [categoryList, setCategoryList] = useState<CategoryRecord[]>(() => categoryService.getCached());
   useEffect(() => {

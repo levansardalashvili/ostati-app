@@ -1,4 +1,3 @@
-import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -31,10 +30,7 @@ const ROLES: {
   },
 ];
 
-// A2 — როლის არჩევის ეკრანი (product-spec.md; ტაპზე მაშინვე გრძელდება,
-// დიზაინის რეფერენსის RoleSelectScreen-ის მიხედვით). Login/Register-ის
-// იგივე curved-header (#167/#168) — brand default-ზეა ("ოსტატო"), რადგან
-// როლი ჯერ არჩეული არაა.
+// Pick the role before registering.
 export function RoleSelectScreen({ navigation }: Props) {
   const handleSelect = (role: Role) => {
     navigation.navigate('Register', { role });

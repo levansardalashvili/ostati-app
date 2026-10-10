@@ -1,4 +1,3 @@
-import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ChevronRight, MapPin, MessageCircle, Star } from 'lucide-react-native';
 import { Avatar } from './Avatar';
@@ -10,10 +9,7 @@ import type { Provider } from '../types/provider';
 import { isNewProvider } from '../utils/providerRank';
 import { usePressScale } from '../utils/usePressScale';
 
-// გატანილია CustomerHomeScreen-იდან (Task: "ტოპ ოსტატები" + სრული სია
-// screen-ი ერთსა და იმავე ბარათს იზიარებენ, Provider-ის fetching/
-// ranking-ის დუბლირების გარეშე — ProviderFeedJobCard-ის იგივე პრინციპი,
-// #29). ვიზუალურად უცვლელი.
+// Provider card (Home top list, full list, category list).
 export function ProviderCard({
   provider,
   onOpenProfile,
@@ -231,9 +227,7 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.mutedForeground,
   },
-  // Task — "პროფილის ნახვა"/"მიწერა" ორივე თანაბრად გადანაწილებული
-  // (flex: 1 თითო), თითოეული საკუთარ ნახევარში ცენტრირებული (ჰორიზონტალურადაც,
-  // ვერტიკალურადაც — ადრე მარცხნივ იყო `alignSelf: 'flex-start'`-ით).
+  // Two equal halves, each centered.
   providerActionRow: {
     flexDirection: 'row',
     alignItems: 'center',

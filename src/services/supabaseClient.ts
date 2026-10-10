@@ -1,15 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
-// Task 2 — მოცილებულია ჰარდქოდილი URL/anon key წყაროდან. Expo-ს
-// `EXPO_PUBLIC_*` პრეფიქსი ავტომატურად ჩაისმევა build-ზე (`.env`-იდან,
-// SDK 49+-ის ჩაშენებული ქცევა, დამატებითი Metro/app.json-კონფიგურაცია
-// არ სჭირდება) — `.env.example` აჩვენებს ფორმატს, ნამდვილი მნიშვნელობები
-// `.env`-შია (`.gitignore`-ით დაცული, ვერასდროს commit-დება). anon key
-// (განსხვავებით service_role key-სგან) დანიშნულებით საჯაროა — ის ისედაც
-// ყოველ client bundle-შია ჩაშენებული და უსაფრთხოებას RLS უზრუნველყოფს,
-// არა key-ის საიდუმლოება — მაგრამ მაინც env-ში გატანა სწორი პრაქტიკაა
-// (გარემოებს შორის გადართვა, წყაროში აღარ "წერია" კონკრეტული პროექტი).
+// From .env (EXPO_PUBLIC_*, inlined at build). The anon key is public by design — RLS protects the data.
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 

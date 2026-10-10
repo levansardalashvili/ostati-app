@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ChevronRight, DoorOpen } from 'lucide-react-native';
 import { BottomSheet } from './BottomSheet';
@@ -18,20 +18,12 @@ type Props = {
   address: string;
   value: AddressDetails;
   onChange: (value: AddressDetails) => void;
-  // Task — ველი-ღილაკის წითელი ჩარჩო, თუ მშობელმა submit-ზე entrance
-  // ცარიელად დატოვებული იპოვა (DistrictPickerField-ის იგივე კონვენცია).
+  // red border when the parent's submit found it incomplete
   error?: boolean;
 };
 
-// შესასვლელი/ბინა/კარის კოდი — ინლაინ ველების ნაცვლად ცალკე BottomSheet-ში
-// (მომხმარებლის მოთხოვნა, Bolt Food-ის "ახალი მისამართი" sheet-ის
-// მაგალითით) — ველი-ღილაკი აჩვენებს შევსებულ შეჯამებას, დაჭერაზე იხსნება
-// sheet მისამართის შეჯამებით + ველებით. "შესასვლელი" სავალდებულოა
-// (მომხმარებლის მოთხოვნით — ოსტატს ეხმარება ზუსტი ადგილმდებარეობის
-// დადგენაში), **გარდა** "კერძო სახლი" toggle-ის — კერძო სახლს შესასვლელი/
-// ბინა არ გააჩნია, ამიტომ toggle-ის ჩართვაზე ორივე ველი იმალება და
-// სავალდებულოობაც მოიხსნება. "ბინა"/"კარის კოდი" ორივე ყოველთვის
-// არასავალდებულოა.
+// Entrance / apartment / door code in a sheet. Entrance and apartment are required
+// unless "კერძო სახლი" is on (then hidden); the door code is optional.
 export function AddressDetailsField({ address, value, onChange, error }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<AddressDetails>(value);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { usePop } from '../utils/usePop';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -47,11 +47,7 @@ const EMPTY_PROVIDER: Provider = {
   specialties: [],
 };
 
-// ViewProviderProfile — ოსტატის საჯარო პროფილი Customer-ის თვალით. Provider-ისთვისაც
-// გამოიყენება საკუთარი პროფილის "თვალით" წინასწარი ნახვისთვის — ამ
-// შემთხვევაში ❤️ ღილაკი არ ჩანს (საკუთარი თავის "შენახვა" აზრი არ აქვს),
-// `p.id === auth uid`-ით ვარკვევთ (#71 — ProviderProfileScreen-ის preview
-// ახლა რეალურ, ავტორიზებულ uid-ს ხსნის, არა mock 'p1'-ს).
+// A provider's public profile. Also the provider's own preview — no ❤️ then.
 export function ViewProviderProfileScreen({ navigation, route }: Props) {
   const [p, setP] = useState<Provider>(EMPTY_PROVIDER);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -72,14 +68,12 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
               if (!cancelled) setReviews(r);
             })
             .catch(() => {
-              // შეფასებების ჩატვირთვის ჩავარდნისას პროფილს მაინც ვაჩვენებთ,
-              // მხოლოდ "შეფასებები" სექცია რჩება ცარიელი.
+              // Reviews failing to load must not hide the profile.
             });
         }
       })
       .catch(() => {
-        // Provider ვერ ჩაიტვირთა — ცარიელ (EMPTY_PROVIDER) მდგომარეობაზე
-        // ვრჩებით loading-ის მოხსნის შემდეგ, ეკრანი დაკიდებული აღარ რჩება.
+        // Load failed — stay on the empty state but stop loading.
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -103,9 +97,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
     setToastMessage(willBeFavorite ? 'ოსტატი დამატებულია რჩეულებში' : 'ოსტატი წაშლილია რჩეულებიდან');
   };
 
-  // "ცივი ჩატის → job-ის შექმნის" ხვრელის ფიქსი — "მიწერა" აღარ ხსნის
-  // ჩატს პირდაპირ, job-ის გარეშე (StartJobChatSheet.tsx-ის თავზე სრული
-  // მიზეზი). `startChatProvider` — null მალავს sheet-ს.
+  // "მიწერა" goes through StartJobChatSheet; null hides it.
   const [startChatProvider, setStartChatProvider] = useState<Provider | null>(null);
   const handleChat = () => setStartChatProvider(p);
   const openChatWithJob = (jobId: string | null, draftMessage?: string) => {
@@ -121,13 +113,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
     });
   };
 
-  // ერთი მუდმივი JSX ხე loading→loaded გადასვლისას (არა ორი ცალკე `return`
-  // სხვადასხვა SafeAreaView-ით) — Fabric-ის (RN-ის ახალი render engine)
-  // ცნობილი crash-ი ("addViewAt: failed to insert view" / "child already
-  // has a parent") სწორედ მაშინ ხდება, როცა ერთი კომპონენტის ორ render-ს
-  // შორის მთელი ზედა-დონის ხე იცვლება navigation-transition-ის დროს —
-  // ეს განსაკუთრებით ხშირია, როცა fetch თითქმის მყისიერად სრულდება
-  // (screen mount-ისთანავე).
+  // One persistent JSX tree for loading→loaded (two returns crash Fabric).
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -229,7 +215,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
             <Text style={styles.sectionTitle}>სერთიფიკატები</Text>
             <View style={styles.mediaRow}>
               {p.certificates.map((c) => (
-                <Pressable key={c.id} style={[styles.mediaThumb, { backgroundColor: c.bg }]} onPress={() => setPreviewCert(c)}>
+                <Pressable key={c.id} style={styles.mediaThumb} onPress={() => setPreviewCert(c)}>
                   <Award size={20} color="rgba(100,116,139,0.5)" />
                 </Pressable>
               ))}
@@ -242,7 +228,7 @@ export function ViewProviderProfileScreen({ navigation, route }: Props) {
             <Text style={styles.sectionTitle}>ნამუშევრები</Text>
             <View style={styles.mediaRow}>
               {p.portfolio.map((ph) => (
-                <Pressable key={ph.id} style={[styles.mediaThumb, { backgroundColor: ph.bg }]} onPress={() => setPreviewPortfolio(ph)}>
+                <Pressable key={ph.id} style={styles.mediaThumb} onPress={() => setPreviewPortfolio(ph)}>
                   <ImageIcon size={20} color="rgba(100,116,139,0.5)" />
                 </Pressable>
               ))}
@@ -565,6 +551,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   mediaThumb: {
+    backgroundColor: colors.muted,
     width: 64,
     height: 64,
     borderRadius: radius.md,
@@ -691,9 +678,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginLeft: 42,
   },
-  // Task — იგივე absolute-footer ხარვეზი (იხ. ProviderEditProfileScreen) —
-  // ScrollView-ის ბოლო სექციები (მაგ. reviews) footer-ის მიღმა/ქვემოთ
-  // რჩებოდა, scroll-ითაც ვერასდროს ჩანდა. ჩვეულებრივი flex sibling.
+  // Plain flex footer, not absolute.
   footer: {
     backgroundColor: colors.card,
     borderTopWidth: 1,

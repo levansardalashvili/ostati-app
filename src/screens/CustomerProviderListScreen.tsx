@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Check, ChevronDown, MapPin, Search, X } from 'lucide-react-native';
@@ -22,33 +22,14 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerProviderList'>;
 
-// CustomerProviderList — CustomerHomeScreen-ის "ტოპ ოსტატები შენს
-// არეალში" სექციის "ყველას ნახვა"-ს სრული ვერსია (ProviderJobFeedScreen-ის
-// იგივე "Home-ზე 5 + სრული სია ცალკე ეკრანზე" პრინციპი, #29). Provider-ის
-// fetching (`userService.listRealProviders`) და რანჟირება
-// (`providerRankScore`) იმავე გაზიარებულ სერვისს/util-ს იძახებს, რასაც
-// Home — არაფერი არ არის დუბლირებული, უბრალოდ იმავე ფუნქციების ხელახალი
-// გამოძახება, ისევე როგორც Job Feed-ის Home/Full-სია წყვილს შორის.
-// არეალის ფილტრი (Home-იდან მოცილებული) აქ ცოცხლდება, კატეგორია/ძებნასთან
-// ერთად.
+// All providers (Home shows the top 5), with category and area filters.
 export function CustomerProviderListScreen({ navigation }: Props) {
   const { profile } = useCustomerProfile();
   const [search, setSearch] = useState('');
-  // Task — კატეგორიების ჩამონათვალი (chip-row, მრავალარჩევანი) ჩანაცვლდა
-  // ერთარჩევანიანი dropdown-ით (მომხმარებლის მოთხოვნით) — იგივე
-  // "ველი-ღილაკი + BottomSheet სია" პატერნი, რასაც PostJobScreen-ის
-  // საკუთარი კატეგორიის dropdown იყენებს (#23/#39).
+  // One category, picked from a sheet.
   const [selCategory, setSelCategory] = useState<string | null>(null);
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
-  // Task — ძველი, გრძელი თბილისის რაიონების chip-სია (`TBILISI_AREAS`)
-  // ჩანაცვლდა თავისუფალი ტექსტის ძებნით — Provider-ის `areas` მთელი
-  // საქართველოს მოიცავს (georgiaRegions.ts, #9), chip-სია კი ამის მხოლოდ
-  // მცირე ნაწილს (თბილისი) აჩვენებდა — "გორი"-ს ტიპის საქალაქო/რეგიონული
-  // არეალი საერთოდ ვერასდროს მოიძებნებოდა. "ყველა არეალი"/"ჩემი არეალი"
-  // chip-ები დარჩა (მომხმარებლის დაზუსტებით) — ორივე ახლა უბრალოდ ამ
-  // ერთი `areaSearch`-ის მოსახერხებელი პრესეტია (არა ცალკე, დამოუკიდებელი
-  // filter-მდგომარეობა): "ყველა არეალი" ასუფთავებს ძებნის ველს, "ჩემი
-  // არეალი" კი ავსებს მას მომხმარებლის საკუთარი, ამოხსნილი რაიონით.
+  // Area is a text search (areas cover all of Georgia); the "all" / "mine" chips just set it.
   const [areaSearch, setAreaSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -80,12 +61,7 @@ export function CustomerProviderListScreen({ navigation }: Props) {
     return providers
       .filter((p) => {
         if (selCategory && !p.categories.includes(selCategory)) return false;
-        // Task — `.includes()` (ნებისმიერ ადგილას substring) მცდარად
-        // ემთხვეოდა "გორი"-ს ძებნას "სამგორი"-სთან (თბილისის რაიონი,
-        // sql-ით დადასტურებული: `areas::text ilike '%გორი%'` აბრუნებდა
-        // მხოლოდ "სამგორი"-ს მქონე Provider-ებს) — `.startsWith()` ამ
-        // კონკრეტულ collision-ს გამორიცხავს, დანარჩენი პრეფიქსული ძებნა
-        // (მაგ. "ვაკ" → "ვაკე") უცვლელად მუშაობს.
+        // startsWith, not includes: "გორი" must not match "სამგორი".
         if (areaQuery && !p.areas.some((a) => a.toLowerCase().startsWith(areaQuery))) return false;
         if (search.trim()) {
           const q = search.toLowerCase();
@@ -110,8 +86,7 @@ export function CustomerProviderListScreen({ navigation }: Props) {
   const handleOpenProvider = (id: string) => {
     navigation.navigate('ViewProviderProfile', { id });
   };
-  // "ცივი ჩატის → job-ის შექმნის" ხვრელის ფიქსი — StartJobChatSheet.tsx-ის
-  // თავზე სრული მიზეზი (ViewProviderProfileScreen-ის იგივე ცვლილება).
+  // "მიწერა" goes through StartJobChatSheet.
   const [startChatProvider, setStartChatProvider] = useState<Provider | null>(null);
   const handleOpenChat = (provider: Provider) => setStartChatProvider(provider);
   const openChatWithJob = (jobId: string | null, draftMessage?: string) => {

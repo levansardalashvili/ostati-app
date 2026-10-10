@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -34,8 +33,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProviderSetup'>;
 
 const ABOUT_MAX = 300;
 
-// A4 — პროფილის შევსება (Provider) (product-spec.md; დიზაინის რეფერენსის
-// ProviderSetupScreen-ის მიხედვით)
+// Mandatory provider setup (no skip): profession, area, experience; photos optional.
 export function ProviderSetupScreen({ navigation }: Props) {
   const { profile: providerProfile, setProfile } = useProviderProfile();
   const [specialty, setSpecialty] = useState<SpecialtyOption[]>([]);
@@ -43,8 +41,7 @@ export function ProviderSetupScreen({ navigation }: Props) {
   const [areas, setAreas] = useState<string[]>([]);
   const [about, setAbout] = useState('');
   const [loading, setLoading] = useState(false);
-  // ლოკალური URI (#65) — Storage-ში იტვირთება "პროფილის შექმნა"-ზე
-  // დაჭერისას, certificates/portfolio-ს იგივე "ატვირთვა შენახვისას" პრინციპით.
+  // Local URI; uploaded on save.
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [certificates, setCertificates] = useState<MediaItem[]>([]);
   const [portfolio, setPortfolio] = useState<MediaItem[]>([]);
@@ -52,26 +49,16 @@ export function ProviderSetupScreen({ navigation }: Props) {
   const [previewPortfolio, setPreviewPortfolio] = useState<MediaItem | null>(null);
   const [sqmPrices, setSqmPrices] = useState<Record<string, string>>({});
   const [saveError, setSaveError] = useState(false);
-  // Task — მომსახურების პირობებზე დათანხმება RegisterScreen-იდან (პირველი
-  // გვერდი) ამ, მეორე გვერდზეა გადმოტანილი Provider-ისთვის — ლოგიკურად
-  // მხოლოდ მას შემდეგ, რაც ყველა სავალდებულო ველია შევსებული (იხ.
-  // `requiredFieldsFilled` ქვემოთ), შეიძლება მისი მონიშვნა.
+  // Terms checkbox enabled only once the required fields are filled.
   const [agreed, setAgreed] = useState(false);
 
-  // კვ.მ-ზე ფასიანი სპეციალობები, provider-ის შერჩეულთაგან — ერთი ველი
-  // თითო სპეციალობაზე, საერთო მნიშვნელობის ნაცვლად (მომხმარებლის მოთხოვნით).
+  // One per-m² price field per profession priced that way.
   const sqmSpecialties = specialty.filter((s) => categoryService.isSqmPriced(s.id));
 
-  // პროფილის შევსება სავალდებულოა — "გამოტოვება" შესაძლებლობა განზრახ
-  // არ არსებობს (მომხმარებლის მოთხოვნით). სერთიფიკატები/ნამუშევრები
-  // არასავალდებულოა და canSave-ს არ მოქმედებს. Task — გამოცდილებაც
-  // დაემატა სავალდებულო სიას (მანამდე canSave-ს არ ამოწმებდა).
   const requiredFieldsFilled = specialty.length > 0 && areas.length > 0 && !!experience;
   const canSave = requiredFieldsFilled && agreed;
 
-  // რეალური კამერა/გალერეის picker (#62) — ლოკალური URI მაშინვე ემატება
-  // ბადეს (მყისიერი preview), Storage-ში ატვირთვა კი შენახვისას ხდება
-  // (handleContinue), ერთხელ, ყველა ფოტოსთვის ერთად.
+  // Picked photos show immediately; all upload once on save.
   const pickMedia = async (source: 'camera' | 'gallery', setItems: React.Dispatch<React.SetStateAction<MediaItem[]>>) => {
     const perm =
       source === 'camera'
@@ -83,7 +70,7 @@ export function ProviderSetupScreen({ navigation }: Props) {
         ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
         : await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
     if (!result.canceled && result.assets[0]) {
-      setItems((prev) => [...prev, { ...nextMediaItem(prev), uri: result.assets[0].uri }]);
+      setItems((prev) => [...prev, { ...nextMediaItem(), uri: result.assets[0].uri }]);
     }
   };
 
@@ -188,11 +175,7 @@ export function ProviderSetupScreen({ navigation }: Props) {
         <Text style={styles.title}>შექმენი ოსტატის პროფილი</Text>
       </View>
 
-      {/* Android's native window-resize silently no-ops under edge-to-edge
-          rendering (Expo SDK 52+ default) — without this, the "ჩემ
-          შესახებ" textarea + submit footer below it would be hidden
-          behind the keyboard, same bug as ChatConversationScreen's
-          composer. */}
+      {/* 'height' on Android: edge-to-edge makes the native resize a no-op. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <KeyboardAwareForm
         avoidKeyboard={false}
@@ -499,10 +482,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     gap: spacing.sm + 2,
   },
-  // Task — RegisterScreen.tsx-ის იგივე ვიზუალი (termsRow/checkbox/
-  // checkboxChecked/termsText/termsLink) — მხოლოდ დამატებული
-  // `checkboxDisabled`, სავალდებულო ველების შევსებამდე მონიშვნის
-  // დასაბლოკად.
   termsRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

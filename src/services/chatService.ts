@@ -3,77 +3,6 @@ import { notificationService } from './notificationService';
 import type { ChatEntry, ChatMsg, OfferStatus } from '../types/chat';
 import type { Role } from '../types/user';
 
-export interface ChatService {
-  // Supabase-ის `messages` ცხრილი (#57/#59/#66/#68) — ტექსტი, Realtime,
-  // structured "offer", სურათი. "საუბრის" იდენტობა ცალკე `conversations`
-  // ცხრილის (#68) გარეშეა მოდელირებული — უბრალოდ (customer_id, provider_id)
-  // წყვილი, რომ ყველა არსებული "ჩატი" ღილაკის navigation call site
-  // უცვლელი დარჩეს (chatId კვლავ "მეორე მხარის id"-ია).
-  //
-  // #73 — sendReal*-ს აღარ სჭირდება ChatParticipants პარამეტრი: `messages`-ის
-  // insert-ის შემდეგ ყველაფერს (conversations-ის ატომური upsert +
-  // მიმღების შეტყობინება) `on_message_insert_notify` trigger აკეთებს
-  // ერთსა და იმავე ტრანზაქციაში (supabase/migrations/0020) — ის
-  // მონაწილეთა სახელებს/ინიციალებს პირდაპირ `users`/`provider_profiles`-იდან
-  // კითხულობს (SECURITY DEFINER), კლიენტის მტკიცებას აღარ ენდობა.
-  listRealMessages(customerId: string, providerId: string, myUid: string): Promise<ChatMsg[]>;
-  // Cold-chat → job creation gap fix (StartJobChatSheet.tsx) — before
-  // showing the quick "რისი გაკეთება გჭირდებათ?" form, we check whether
-  // this Customer/Provider pair has ANY message history already (not
-  // `findLatestSharedJobId`'s narrower "assigned or job_responses"
-  // check, which stays `false` right after a fresh quick-job is created
-  // and published — no assignment/interest has happened yet). A
-  // pre-existing conversation means a job was very likely already
-  // created for it the first time "მიწერა" was tapped — re-showing the
-  // form on every repeat visit to the same Provider's profile would spam
-  // job_posts with duplicate open jobs.
-  hasExistingConversation(customerId: string, providerId: string): Promise<boolean>;
-  // `jobId` (StartJobChatSheet.tsx-ის auto-sent პირველი შეტყობინება) —
-  // იგივე პრინციპი, რაც offer-ის `job_id`-ს ჰქონდა (#49): ტექსტურ
-  // შეტყობინებაზეც job_id-ის მიმაგრება საშუალებას აძლევს
-  // `findLatestSharedJobId()`-ს დაუყოვნებლივ, სანდოდ ამოიცნოს "რომელ
-  // job-ს ეხება ეს კონკრეტული საუბარი" — Provider-ის რაიმე
-  // პასუხის/მინიჭების ლოდინის გარეშეც.
-  sendRealMessage(customerId: string, providerId: string, senderId: string, text: string, jobId?: string): Promise<ChatMsg>;
-  // `jobId` — second hardening pass, item 5 (supabase/migrations/0049):
-  // ყოველ ფასის შეთავაზებას ახლა თან ახლავს, რომელ job-ს ეხება,
-  // `respond_to_chat_offer`-ის (customer_id, provider_id)-დან
-  // "გამოცნობის" ნაცვლად.
-  sendRealOffer(
-    customerId: string,
-    providerId: string,
-    senderId: string,
-    amount: number,
-    comment: string | undefined,
-    jobId: string,
-  ): Promise<ChatMsg>;
-  sendRealImage(customerId: string, providerId: string, senderId: string, imageUrl: string, jobId?: string): Promise<ChatMsg>;
-  respondToRealOffer(messageId: string, status: Extract<OfferStatus, 'accepted' | 'declined'>): Promise<void>;
-  subscribeToMessages(
-    customerId: string,
-    providerId: string,
-    myUid: string,
-    onMessage: (msg: ChatMsg) => void,
-  ): () => void;
-
-  // `conversations` ცხრილი (#68) — ჩატების სიის (ChatsListScreen) რეალური
-  // მონაცემი. ცალკე ცხრილია (არა `messages`-იდან on-the-fly აგრეგირებული),
-  // რადგან "ბოლო შეტყობინება + წაუკითხავის რაოდენობა თითო საუბარზე"
-  // PostgREST-ის უბრალო query-ით არ გამოითვლება — ინახება/ნახლდება ატომურად,
-  // `messages`-ის INSERT trigger-ის მხრიდან (#73, `on_message_insert_notify`,
-  // supabase/migrations/0020) — აღარ არის ცალკე კლიენტის read-modify-write.
-  listMyConversations(myUid: string, myRole: Role): Promise<ChatEntry[]>;
-  // Task 4 (security audit) — `mark_conversation_read` RPC-ს იძახებს,
-  // საკუთარი unread counter-ის auth.uid()-იდან თავად დგინდება სერვერზე.
-  markConversationRead(customerId: string, providerId: string): Promise<void>;
-
-  // Tab-bar-ის წაუკითხავი-ჩატის წითელი წერტილისთვის (CustomerTabs/
-  // ProviderTabs) — ნებისმიერი `conversations`-ის row-ის ცვლილებაზე (ახალი
-  // შეტყობინება/წაკითხვა) ხელახლა ითვლის და აბრუნებს callback-ს, რომ
-  // badge-იც ცოცხალი იყოს, არა მხოლოდ mount-ის მომენტში გამოთვლილი.
-  subscribeToUnreadCount(myUid: string, myRole: Role, onChange: (count: number) => void): () => void;
-}
-
 type MessageRow = {
   id: string;
   customer_id: string;
@@ -141,8 +70,10 @@ function fromMessageRow(row: MessageRow, myUid: string): ChatMsg {
   return { id: row.id, type: 'text', from, text: row.text, t, state: 'read', jobId: row.job_id ?? undefined };
 }
 
-export const chatService: ChatService = {
-  async listRealMessages(customerId, providerId, myUid) {
+export const chatService = {
+  // A conversation is the (customer_id, provider_id) pair; chatId = the other side's id.
+  // The messages INSERT trigger updates conversations and notifies the recipient.
+  async listRealMessages(customerId: string, providerId: string, myUid: string): Promise<ChatMsg[]> {
     const { data, error } = await supabase
       .from('messages')
       .select('*')
@@ -152,7 +83,8 @@ export const chatService: ChatService = {
     if (error) throw error;
     return (data as MessageRow[]).map((row) => fromMessageRow(row, myUid));
   },
-  async hasExistingConversation(customerId, providerId) {
+  // Any message history with this provider? (StartJobChatSheet uses it to avoid creating duplicate jobs.)
+  async hasExistingConversation(customerId: string, providerId: string): Promise<boolean> {
     const { data, error } = await supabase
       .from('messages')
       .select('id')
@@ -162,7 +94,8 @@ export const chatService: ChatService = {
     if (error) throw error;
     return !!data && data.length > 0;
   },
-  async sendRealMessage(customerId, providerId, senderId, text, jobId) {
+  // jobId tags the message so findLatestSharedJobId knows which job the chat is about.
+  async sendRealMessage(customerId: string, providerId: string, senderId: string, text: string, jobId?: string): Promise<ChatMsg> {
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -178,7 +111,8 @@ export const chatService: ChatService = {
     if (error) throw error;
     return fromMessageRow(data as MessageRow, senderId);
   },
-  async sendRealOffer(customerId, providerId, senderId, amount, comment, jobId) {
+  // Every offer is tied to a job.
+  async sendRealOffer(customerId: string, providerId: string, senderId: string, amount: number, comment: string | undefined, jobId: string): Promise<ChatMsg> {
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -197,7 +131,7 @@ export const chatService: ChatService = {
     if (error) throw error;
     return fromMessageRow(data as MessageRow, senderId);
   },
-  async sendRealImage(customerId, providerId, senderId, imageUrl, jobId) {
+  async sendRealImage(customerId: string, providerId: string, senderId: string, imageUrl: string, jobId?: string): Promise<ChatMsg> {
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -214,20 +148,13 @@ export const chatService: ChatService = {
     if (error) throw error;
     return fromMessageRow(data as MessageRow, senderId);
   },
-  async respondToRealOffer(messageId, status) {
-    // Task 4 (audit) — RPC-only, supabase/migrations/0042. Accepting also
-    // atomically syncs the canonical `job_responses.offered_price` when
-    // exactly one still-open job connects this Customer/Provider pair —
-    // a plain column-scoped `.update()` could never do that safely. The
-    // client's own optimistic UI update (respondToOffer, ChatConversationScreen)
-    // is unaffected — it already treats this as fire-and-forget.
+  async respondToRealOffer(messageId: string, status: Extract<OfferStatus, 'accepted' | 'declined'>): Promise<void> {
+    // RPC-only: accepting also syncs job_responses.offered_price and selects the provider.
     const { error } = await supabase.rpc('respond_to_chat_offer', { p_message_id: messageId, p_response: status });
     if (error) throw error;
   },
-  subscribeToMessages(customerId, providerId, myUid, onMessage) {
-    // შემთხვევითი suffix (notificationService.subscribeToUnreadCount-ის
-    // იგივე მიზეზით) — topic-ის collision-ის თავიდან ასაცილებლად, თუ ეს
-    // ეკრანი ორჯერ აღმოჩნდება mounted (მაგ. navigation-ის race).
+  subscribeToMessages(customerId: string, providerId: string, myUid: string, onMessage: (msg: ChatMsg) => void): () => void {
+    // Random suffix: two mounted screens must not share a channel topic.
     const channel = supabase
       .channel(`messages-${customerId}-${providerId}-${Math.random().toString(36).slice(2)}`)
       .on(
@@ -246,7 +173,8 @@ export const chatService: ChatService = {
     };
   },
 
-  async listMyConversations(myUid, myRole) {
+  // conversations holds the last message + unread counters (kept by the messages trigger).
+  async listMyConversations(myUid: string, myRole: Role): Promise<ChatEntry[]> {
     const column = myRole === 'customer' ? 'customer_id' : 'provider_id';
     const { data, error } = await supabase
       .from('conversations')
@@ -266,23 +194,19 @@ export const chatService: ChatService = {
       online: false,
     }));
   },
-  async markConversationRead(customerId, providerId) {
-    // მოცილებულია direct client `.update()` — `conversations`-ს აღარ აქვს
-    // client-ისთვის INSERT/UPDATE grant (security audit, supabase/migrations/
-    // 0029) — RPC თავად ადგენს, `auth.uid()`-იდან გამომდინარე, საკუთარი
-    // unread counter-ის (customer_unread თუ provider_unread) გადატვირთვას,
-    // `myRole` პარამეტრი აღარ სჭირდება.
+  // RPC resets the caller's own unread counter.
+  async markConversationRead(customerId: string, providerId: string): Promise<void> {
     const { error } = await supabase.rpc('mark_conversation_read', {
       p_customer_id: customerId,
       p_provider_id: providerId,
     });
     if (error) throw error;
-    // ჩატის შეტყობინების (push/in-app) ავტომატური წაკითხულად მონიშვნა —
-    // წარუმატებლობა ჩატის გახსნას არ უნდა აფერხებდეს.
+    // Mark this chat's notifications read; never blocks opening the chat.
     notificationService.markChatNotificationsRead([customerId, providerId]).catch(() => {});
   },
 
-  subscribeToUnreadCount(myUid, myRole, onChange) {
+  // Live unread count for the tab badge.
+  subscribeToUnreadCount(myUid: string, myRole: Role, onChange: (count: number) => void): () => void {
     const column = myRole === 'customer' ? 'customer_id' : 'provider_id';
     const unreadColumn = myRole === 'customer' ? 'customer_unread' : 'provider_unread';
     const fetchCount = () => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight, Eye, EyeOff, Shield } from 'lucide-react-native';
@@ -13,8 +13,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProfileSettings'>;
 
-// ProfileSettings — "ანგარიშის პარამეტრები" (ზუსტად ზიპის App.tsx-ის
-// ProfileSettings-ის მიხედვით — მხოლოდ პაროლის შეცვლა).
+// Account settings: change password, delete account.
 export function ProfileSettingsScreen({ navigation }: Props) {
   const [pwSheetOpen, setPwSheetOpen] = useState(false);
   const [oldPw, setOldPw] = useState('');

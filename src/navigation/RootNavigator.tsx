@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { authService } from '../services/authService';
 import { categoryService } from '../services/categoryService';
 import { loadRankingConfig } from '../services/rankingConfigService';
-import { userService } from '../services/userService';
+import { loadSignedInUser } from '../utils/signInSession';
 import { useCustomerProfile } from '../state/CustomerProfileContext';
 import { useProviderProfile } from '../state/ProviderProfileContext';
 import { WelcomeScreen } from '../screens/WelcomeScreen';
@@ -16,8 +16,7 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { ForgotPasswordVerifyScreen } from '../screens/ForgotPasswordVerifyScreen';
 import { ResetPasswordScreen } from '../screens/ResetPasswordScreen';
-import { GoogleCompleteScreen } from '../screens/GoogleCompleteScreen';
-import { AppleCompleteScreen } from '../screens/AppleCompleteScreen';
+import { SocialCompleteScreen } from '../screens/SocialCompleteScreen';
 import { PhoneRegisterScreen } from '../screens/PhoneRegisterScreen';
 import { PhoneRegisterVerifyScreen } from '../screens/PhoneRegisterVerifyScreen';
 import { PhoneLoginScreen } from '../screens/PhoneLoginScreen';
@@ -54,24 +53,15 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 type BootRoute = 'Welcome' | 'CustomerHome' | 'ProviderHome' | 'ProviderSetup';
 
-// Task 1 — cold-start auth session restore. Supabase-ის session AsyncStorage-
-// იდან აღდგება ასინქრონულად (authService.waitForSession) — მანამ, სანამ ეს
-// არ დასრულდება, Stack-ს საერთოდ არ ვარენდერებთ (არა უბრალოდ "Welcome-ის
-// ჩვენება, მერე reset" — ეს ერთ ფრეიმზეც კი გამოაჩენდა Welcome-ს). თუ სესია
-// რეალურია, `users`-იდან role/profile იკითხება და Stack პირდაპირ სწორი
-// Home-ით იწყება (initialRouteName) — ზუსტად LoginScreen-ის completeSignIn-ის
-// იგივე ლოგიკა (role → Context-ის ჰიდრატაცია → სწორი Home).
+// Don't render the stack until the saved session is restored — then start
+// directly on the right screen (no Welcome flash).
 export function RootNavigator() {
   const [booting, setBooting] = useState(true);
   const [initialRoute, setInitialRoute] = useState<BootRoute>('Welcome');
   const { setProfile: setCustomerProfile } = useCustomerProfile();
   const { setProfile: setProviderProfile } = useProviderProfile();
 
-  // Task 6 (audit) — categoryService-ის cache-ის ადრეული "warm-up",
-  // session-restore-ისგან დამოუკიდებლად (booting-ს არ აყოვნებს/არ ეხება)
-  // — რომ `deriveJobTitle`-ის და კატეგორიის სიების პირველივე გამომძახებლებმა
-  // უკვე რეალური backend-მონაცემი დახვდეთ, არა მხოლოდ სტატიკური fallback.
-  // ჩავარდნაზე (ქსელი) categoryService თავადვე vardebა სტატიკურ fallback-ზე.
+  // Warm up categories and ranking config early; both fall back to static values offline.
   useEffect(() => {
     categoryService.listCategories().catch(() => {});
     loadRankingConfig();
@@ -84,40 +74,12 @@ export function RootNavigator() {
       try {
         const user = await authService.waitForSession();
         if (user) {
-          const record = await userService.getUserRecord(user.uid);
-          if (!record) {
-            // Auth session არსებობს, მაგრამ users-ში ჩანაწერი არ მოიძებნა
-            // (მაგ. რეგისტრაცია არასდროს დასრულებულა) — "ნახევრად
-            // authenticated" state-ს არ ვტოვებთ, უსაფრთხოდ ვსვამთ.
-            await authService.signOut().catch(() => {});
-          } else if (record.suspended) {
-            // ანგარიშის შეჩერება (0106) — cold-start-ზეც იგივე გეითი, რაც LoginScreen.completeSignIn-ს
-            await authService.signOut().catch(() => {});
-            Alert.alert('ანგარიში შეჩერებულია', record.suspensionReason ?? 'წესების დარღვევის გამო');
-          } else if (record.role === 'provider') {
-            setProviderProfile({ firstName: record.firstName, lastName: record.lastName });
-            // პროფილის row არარსებობა = სავალდებულო setup არ დასრულებულა (#13) —
-            // Home-ის ნაცვლად setup-ზე ვაბრუნებთ. ქსელის შეცდომა Home-ზე ტოვებს.
-            // ქსელის შეცდომა ≠ "row არ არსებობს": ამ შემთხვევაში Home-ზე ვრჩებით (undefined), setup-ზე არა
-            const providerProfile = await userService.getProviderProfileRecord(user.uid).catch(() => undefined);
-            if (providerProfile && !cancelled) setProviderProfile(providerProfile);
-            route = providerProfile === null ? 'ProviderSetup' : 'ProviderHome';
-          } else {
-            setCustomerProfile({
-              firstName: record.firstName,
-              lastName: record.lastName,
-              email: record.email,
-              defaultAddress: record.defaultAddress,
-              entrance: record.entrance,
-              apartment: record.apartment,
-              doorCode: record.doorCode,
-              isPrivateHouse: record.isPrivateHouse,
-            });
-            route = 'CustomerHome';
-          }
+          const result = await loadSignedInUser(user.uid, setCustomerProfile, setProviderProfile);
+          if ('route' in result) route = result.route;
+          else if (result.suspended) Alert.alert('ანგარიში შეჩერებულია', result.error);
         }
       } catch {
-        // ქსელის/Supabase-ის შეცდომა ბუტზე — უსაფრთხო fallback, Welcome.
+        // Error on boot → Welcome.
         route = 'Welcome';
       } finally {
         if (!cancelled) {
@@ -129,14 +91,7 @@ export function RootNavigator() {
     return () => {
       cancelled = true;
     };
-    // განზრახ მხოლოდ mount-ზე (ერთხელ) — ეს არის ერთჯერადი "cold start"
-    // ბუტსტრეპი, არა ცოცხალი auth-listener. `setCustomerProfile`/
-    // `setProviderProfile` (Context-იდან) არ არის memo-ილი — მათი
-    // reference ყოველ Context re-render-ზე იცვლება, ამიტომ dependency
-    // array-ში ჩასმა infinite-loop-ს გამოიწვევდა (setProfile-ის ყოველი
-    // გამოძახება ახალ Context-value-ს ქმნის → ეს Component-იც re-render-
-    // დება → ახალი setProfile reference → ეფექტი თავიდან ეშვება).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Mount only: the Context setters aren't memoized, so listing them would loop.
   }, []);
 
   if (booting) {
@@ -157,8 +112,7 @@ export function RootNavigator() {
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="ForgotPasswordVerify" component={ForgotPasswordVerifyScreen} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-      <Stack.Screen name="GoogleComplete" component={GoogleCompleteScreen} />
-      <Stack.Screen name="AppleComplete" component={AppleCompleteScreen} />
+      <Stack.Screen name="SocialComplete" component={SocialCompleteScreen} />
       <Stack.Screen name="PhoneRegister" component={PhoneRegisterScreen} />
       <Stack.Screen name="PhoneRegisterVerify" component={PhoneRegisterVerifyScreen} />
       <Stack.Screen name="PhoneLogin" component={PhoneLoginScreen} />
@@ -171,9 +125,7 @@ export function RootNavigator() {
         component={RegistrationSuccessScreen}
         options={{ animation: 'fade', gestureEnabled: false }}
       />
-      {/* CustomerHome/ProviderHome routes render the Bottom Tab navigators
-          (Home/ჩატები/პროფილი) — route names kept as-is so every existing
-          navigation.reset({routes:[{name:'CustomerHome'}]}) call still works. */}
+      {/* These routes host the tab navigators. */}
       <Stack.Screen name="CustomerHome" component={CustomerTabs} options={{ animation: 'fade' }} />
       <Stack.Screen name="ProviderHome" component={ProviderTabs} options={{ animation: 'fade' }} />
       <Stack.Screen name="ProviderJobDetail" component={ProviderJobDetailScreen} />

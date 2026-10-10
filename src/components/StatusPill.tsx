@@ -1,4 +1,3 @@
-import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius } from '../theme';
 import type { JobStatus } from '../types/job';
@@ -13,8 +12,7 @@ export type { JobStatus };
 // → "დადასტურებულია" → "დასრულებულია". შიდა ტიპის key-ები (`active` და ა.შ.)
 // უცვლელია — მხოლოდ ნაჩვენები ტექსტი შეიცვალა.
 const STATUS_MAP: Record<JobStatus, { label: string; bg: string; text: string; dot: string }> = {
-  // არასდროს არ უნდა გამოჩნდეს UI-ში ნორმალურ ნაკადში (listMyJobPosts
-  // გამორიცხავს, #53) — მხოლოდ ტიპის სისრულისთვის (Record<JobStatus, ...>).
+  // drafts aren't listed; here only to complete the Record
   draft: { label: 'დაუსრულებელი', bg: colors.muted, text: colors.mutedForeground, dot: colors.mutedForeground },
   active: { label: 'დადასტურებულია', bg: colors.successBackground, text: colors.success, dot: colors.success },
   pending: { label: 'მომლოდინე', bg: colors.warningBackground, text: colors.warning, dot: colors.warning },
@@ -35,7 +33,7 @@ const STATUS_MAP: Record<JobStatus, { label: string; bg: string; text: string; d
   cancelled: { label: 'გაუქმდა', bg: colors.dangerBackground, text: colors.destructive, dot: colors.destructive },
 };
 
-// Job-ის სტატუსის ბეჯი (დიზაინის რეფერენსის StatusPill-ის მიხედვით)
+// Job status badge.
 export function StatusPill({ status }: { status: JobStatus }) {
   const s = STATUS_MAP[status];
   return (

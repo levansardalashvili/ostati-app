@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Check } from 'lucide-react-native';
@@ -19,20 +19,11 @@ function getInitials(name: string) {
     .join('');
 }
 
-// A4 — პროფილის დასრულების ეკრანი (product-spec.md; დიზაინის რეფერენსის
-// CustomerSetupScreen-ის მიხედვით). ფოტოს დამატების ღილაკები აქედან
-// მოცილებულია — Customer-ის პროფილს (users ცხრილს/CustomerProfile ტიპს)
-// საერთოდ არ აქვს photo_url ველი, ისინი მხოლოდ ვიზუალურად ცვლიდნენ
-// ავატარს (initials-ს), არაფერს არ ინახავდნენ. Provider-ის საკუთარი
-// პროფილის ფოტო (#65) რეალურია, Customer-ისთვის ეს ჯერ არ აშენებულა.
+// Customer setup (last registration step). Customers have no profile photo.
 export function CustomerSetupScreen({ navigation, route }: Props) {
   const { userName } = route.params;
   const [loading, setLoading] = useState(false);
-  // Task — მომსახურების პირობების დათანხმება RegisterScreen-იდან (პირველი
-  // გვერდი) ამ, მეორე გვერდზეა გადმოტანილი — ProviderSetupScreen-ის
-  // იგივე პატერნის მიხედვით. ამ ეკრანს სავალდებულო ველი არ აქვს (userName
-  // უკვე route param-შია), ამიტომ checkbox დაუყოვნებლივ ხელმისაწვდომია,
-  // გეითინგის გარეშე.
+  // Terms checkbox (no required fields here, so it is enabled right away).
   const [agreed, setAgreed] = useState(false);
 
   const initials = getInitials(userName);
@@ -186,9 +177,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     gap: spacing.sm + 2,
   },
-  // Task — RegisterScreen.tsx-ის ყოფილი termsRow/checkbox/checkboxChecked/
-  // termsText/termsLink-ის იგივე ვიზუალი (ProviderSetupScreen.tsx-შიც
-  // იმეორებს ამ პატერნს).
   termsRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

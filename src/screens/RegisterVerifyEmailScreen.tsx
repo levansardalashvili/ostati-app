@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
@@ -16,12 +16,7 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterVerifyEmail'>;
 
-// Task — Email/Password რეგისტრაციის დადასტურების ბოლო ნაბიჯი.
-// `RegisterScreen`-ს უკვე მთელი პროფილი ხელთ აქვს (route params) — verify-ის
-// წარმატებაზე (სესია უკვე დადასტურებისთანავე აქტიურდება) პირდაპირ
-// `createUserRecord`-ს იძახებს, `PhoneRegisterVerifyScreen`-ის ზუსტად იგივე
-// პატერნით — `setNewPassword` აქ არ სჭირდება (email/password-ით `signUp()`
-// პაროლს უკვე ანგარიშის შექმნისთანავე აყენებს).
+// Verify the sign-up code, then create the users row (profile came as route params).
 export function RegisterVerifyEmailScreen({ navigation, route }: Props) {
   const { role, email, firstName, lastName, defaultAddress, entrance, apartment, doorCode, isPrivateHouse } =
     route.params;

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Animated, Pressable, StyleSheet, Text } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme';
 import { usePressScale } from '../utils/usePressScale';
@@ -12,9 +11,7 @@ type Props = {
   variant?: 'outline' | 'filled';
 };
 
-// მრავალარჩევანის ჩიპი (დიზაინის რეფერენსის area/category toggle ღილაკების
-// მიხედვით) — გამოიყენება Provider Setup-ის სამუშაო რაიონებში და Customer/
-// Provider Home-ის ფილტრებში (product-spec.md, C1).
+// Toggle chip for filters and multi-select.
 export function Chip({ label, selected, onPress, variant = 'outline' }: Props) {
   const { scale, onPressIn, onPressOut } = usePressScale(0.93);
 

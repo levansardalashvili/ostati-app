@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm } from '../components/KeyboardAwareForm';
@@ -15,9 +15,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ForgotPassword'>;
 
 const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
-// A3 — პაროლის აღდგენის ეზარდის 1/3 (email OTP, #170-ის ვიდეო-რეფერენსის
-// 3-ნაბიჯიანი სტილი — ძველი magic-link-ის ნაცვლად, რომელსაც აპში
-// დასრულების ეკრანი არასდროს ჰქონია).
+// Password reset 1/3: email → 6-digit code.
 export function ForgotPasswordScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [touched, setTouched] = useState(false);

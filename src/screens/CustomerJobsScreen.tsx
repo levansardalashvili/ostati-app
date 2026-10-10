@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FileText, MessageCircle, Plus } from 'lucide-react-native';
@@ -26,8 +26,7 @@ type Props = CompositeScreenProps<
 >;
 type Tab = 'active' | 'pending' | 'done';
 
-// ტაბის ლეიბლები StatusPill-ის ლეიბლებთან შესატყვისობაშია (#32). რიგი:
-// მომლოდინე → დადასტურებული → დასრულებული.
+// Labels match StatusPill.
 const TABS: { id: Tab; label: string }[] = [
   { id: 'pending', label: 'მომლოდინე' },
   { id: 'active', label: 'დადასტურებული' },
@@ -40,13 +39,7 @@ const EMPTY_TEXT: Record<Tab, string> = {
   done: 'დასრულებული სამუშაოები არ გაქვს',
 };
 
-// CustomerJobs — "ჩემი განცხადებები" (ყოფილი ზიპის CustomerJobs-ის
-// მიხედვით აშენებული ეკრანი). Bottom Tab-ის ("MyJobsTab") საკუთარი
-// ეკრანია — აღარ არის root-stack-ზე push-ილი (მომხმარებლის მოთხოვნით:
-// "მოთხოვნა"-ს მაგივრად ეს ტაბი პირდაპირ "ჩემი განცხადებები"-ს აჩვენებს,
-// პლუს ახალი განცხადების დამატების ღილაკი header-ში). Profile-ის "ჩემი
-// მოთხოვნები" მენიუც ამავე ტაბზე გადადის (CustomerProfileScreen.tsx),
-// push-ის ნაცვლად.
+// "My jobs" tab, with a "+" to post a new one.
 export function CustomerJobsScreen({ navigation }: Props) {
   const { handleScroll } = useTabBarScroll();
   const [tab, setTab] = useState<Tab>('pending');
@@ -54,10 +47,7 @@ export function CustomerJobsScreen({ navigation }: Props) {
   const [jobs, setJobs] = useState<CustomerJob[]>([]);
   const { getStatus } = useJobStatus();
 
-  // refetch ყოველ ჯერზე, როცა ეს ტაბი ფოკუსში ბრუნდება (მაგ. PostJobScreen-ზე
-  // ახალი მოთხოვნის გამოქვეყნების შემდეგ) — Bottom Tab-ის ეკრანები default-ად
-  // მთელი session-ის განმავლობაში მონტირებული რჩება, plain useEffect მხოლოდ
-  // ერთხელ, პირველ mount-ზე გაეშვებოდა.
+  // Refetch on focus — tabs stay mounted.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
@@ -82,11 +72,7 @@ export function CustomerJobsScreen({ navigation }: Props) {
     }, []),
   );
 
-  // "awaiting_customer_confirmation"/"confirmed_awaiting_rating"/"disputed" —
-  // job ჯერ კიდევ აქტიურ მუშაობშია ან დასრულების დადასტურების პროცესშია
-  // (არ არის საბოლოოდ "completed", სანამ შეფასება არ გაიგზავნება), ამიტომ
-  // "დადასტურებული" ტაბში რჩება (ორმხრივი დასრულების flow,
-  // JobStatusContext.tsx).
+  // Everything between selection and the rating stays in the "confirmed" tab.
   const items = jobs.filter((j) => {
     const status = getStatus(j.id) ?? j.status;
     if (tab === 'active') {
@@ -98,7 +84,7 @@ export function CustomerJobsScreen({ navigation }: Props) {
       );
     }
     if (tab === 'pending') return status === 'pending';
-    // გაუქმებულიც აქ ჩანს — ოსტატის გაუქმების შემდეგ განცხადება ხელახლა უნდა იყოს გასახსნელი (0097)
+    // Cancelled jobs show here too — they can be reopened.
     return status === 'completed' || status === 'cancelled';
   });
 
@@ -116,13 +102,7 @@ export function CustomerJobsScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Nav-fix pass, task 2 — same reasoning as ProviderMyJobsScreen.tsx:
-          MyJobsTab is a bottom tab, `backBehavior: 'history'` (CustomerTabs.tsx,
-          unchanged/default) means goBack() returns to whichever tab was
-          focused before this one — Profile in the "Profile → განცხადებები"
-          flow, without hardcoding that destination. The existing "+" post-job
-          button is preserved exactly (BackHeader's `right` slot), unstyled by
-          BackHeader itself. */}
+      {/* goBack returns to the previous tab (backBehavior 'history'). */}
       <BackHeader
         title="ჩემი განცხადებები"
         onBack={() => navigation.goBack()}

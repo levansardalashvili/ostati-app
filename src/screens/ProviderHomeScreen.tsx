@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bell, Briefcase, ChevronRight, Clock, MapPin, ShieldAlert } from 'lucide-react-native';
@@ -34,18 +34,13 @@ type Props = CompositeScreenProps<
 >;
 
 
-// Home-ზე მხოლოდ ბოლო 5 შესაბამისი მოთხოვნაა ჩანს — დანარჩენის სანახავად
-// "ყველას ნახვა" ხსნის სრულ Feed-ს (ProviderJobFeedScreen).
+// Latest 5 here; "See all" opens ProviderJobFeedScreen.
 const HOME_FEED_LIMIT = 5;
 
-// B1 — Provider Home (product-spec.md; დიზაინის რეფერენსის ProviderHome-ის
-// მიხედვით)
+// Provider home: availability, stats, current job, job feed.
 export function ProviderHomeScreen({ navigation }: Props) {
   const { handleScroll } = useTabBarScroll();
-  // `available` მხოლოდ push-შეტყობინებებზე მოქმედებს — Job Feed (`filtered`)
-  // მისგან დამოუკიდებელია და OFF-ის დროსაც ჩანს (მომხმარებლის მოთხოვნით).
-  // Task 2 — რეალურად Supabase-ზე (`provider_profiles.is_available`),
-  // აღდგება app restart-ის შემდეგაც.
+  // Availability only affects new-job notifications; the feed shows either way.
   const [available, setAvailable] = useState(true);
   const [availabilitySaving, setAvailabilitySaving] = useState(false);
   useEffect(() => {
@@ -87,12 +82,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
       let cancelled = false;
       setIsLoading(true);
       const uid = authService.getCurrentUser()?.uid;
-      // Task — `get_open_provider_feed()` RPC `authenticated`-ს ითხოვს —
-      // ადრე ეს fetch უპირობოდ ეშვებოდა, სესიის მზადყოფნის გარეშეც (მაგ.
-      // logout-ის navigation.reset-ის შუალედში), რაც "permission denied
-      // for function get_open_provider_feed" (42501) uncaught rejection-ს
-      // იწვევდა — დანარჩენი ორი query-ის იგივე `uid`-დაცვის ქვეშ ჩავაგდე,
-      // პლუს `.catch()`.
+      // Only with a session — the feed RPC is authenticated-only (logout reset races).
       Promise.all([
         uid ? jobService.getOpenProviderFeedPosts(true) : Promise.resolve([]),
         uid ? quoteService.listMyResponseJobIds(uid) : Promise.resolve(new Set<string>()),
@@ -114,16 +104,12 @@ export function ProviderHomeScreen({ navigation }: Props) {
     }, []),
   );
 
-  // "მიმდინარე სამუშაო" — job, რომელზეც Customer-მა სწორედ ეს Provider აირჩია.
-  // რეალურად job_posts.provider_id=me-ზეა აგებული (#69) — mock
-  // PROVIDER_FEED/CURRENT_PROVIDER_ID მექანიზმი (#30/#47) აღარ გამოიყენება.
-  // `completed`/`cancelled` სტატუსზე გადასვლის შემდეგ ეს ბარათი Home-ზეც
-  // აღარ ჩანს — აღარ არის "მიმდინარე".
+  // Current job: assigned to me and not finished/cancelled.
   const { getStatus } = useJobStatus();
   const currentJobCandidate =
     assignedJobs.find((j) => {
       const liveStatus = j.customerJobId ? (getStatus(j.customerJobId) ?? j.status) : j.status;
-      // confirmed_awaiting_rating = ორივე მხარემ დაადასტურა დასრულება — აღარ არის "მიმდინარე"
+      // confirmed_awaiting_rating is done from the provider's side.
       return liveStatus !== 'completed' && liveStatus !== 'cancelled' && liveStatus !== 'confirmed_awaiting_rating';
     }) ?? null;
   const currentJobStatus = currentJobCandidate?.customerJobId
@@ -139,10 +125,6 @@ export function ProviderHomeScreen({ navigation }: Props) {
     return notificationService.subscribeToUnreadCount(uid, setUnreadNotifCount);
   }, []);
 
-  // "ამ თვის სტატისტიკა" ბარათის რეალური მონაცემები (#71) — ადრე ჰარდქოდილი
-  // "14 სამ. / 2,840₾ შემოს. / 4.9★ შეფ." იყო. შემოსავლის სტატისტიკა
-  // ამოღებულია მთლიანად — აპში ფასის აგრეგაცია საერთოდ არ არსებობს (#35),
-  // ამიტომ ნამდვილი "შემოს." რიცხვი ფიზიკურად ვერ გამოითვლება.
   const [stats, setStats] = useState({ jobs: 0, rating: 0, reviews: 0 });
   useEffect(() => {
     const uid = authService.getCurrentUser()?.uid;
@@ -158,8 +140,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
       cancelled = true;
     };
   }, []);
-  // შემოსავალი = დასრულებული სამუშაოების შეთანხმებული ფასების ჯამი
-  // (job_posts.agreed_price, მხოლოდ საინფორმაციო — გადახდა აპში არ არის).
+  // Income = sum of agreed prices of completed jobs (informational — no payments in the app).
   const income = assignedJobs
     .filter((j) => j.status === 'completed')
     .reduce((sum, j) => sum + (j.agreedPrice ?? 0), 0);
@@ -226,11 +207,7 @@ export function ProviderHomeScreen({ navigation }: Props) {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
-        {/* Task — მომხმარებლის აშკარა მოთხოვნა: სანამ ოსტატი ვერიფიკაციას
-            არ გაივლის, ეს ბანერი მუდმივად ეჩვენება Home-ზე (გვერდის
-            პირველი, ყველაზე თვალშისაცემი ელემენტი, "როცა ანგარიშში შედის").
-            Real gate-ი (`express_interest()` RPC-ის შიგნით, 0084) ცალკეა —
-            ეს მხოლოდ ხილული შეხსენებაა, არა თავად ბლოკვის მექანიზმი. */}
+        {/* Reminder until verified; express_interest enforces it. */}
         {providerProfile.verificationStatus !== 'verified' && (
           <Pressable
             style={styles.verifyBanner}

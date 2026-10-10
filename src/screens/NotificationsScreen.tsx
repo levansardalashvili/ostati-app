@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Bell, Settings } from 'lucide-react-native';
@@ -17,8 +17,7 @@ import { usePressScale } from '../utils/usePressScale';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Notifications'>;
 
-// Notifications — საერთო ეკრანი Customer/Provider-ისთვის, `notifications`
-// ცხრილზე (#70) აგებული.
+// Notifications list (both roles).
 export function NotificationsScreen({ navigation, route }: Props) {
   const { role } = route.params;
   const [items, setItems] = useState<NotificationEntry[]>([]);

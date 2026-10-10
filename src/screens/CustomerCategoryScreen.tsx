@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search } from 'lucide-react-native';
@@ -17,12 +17,8 @@ import type { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerCategory'>;
 
-// CustomerCategory — ერთი კონკრეტული სერვისის კატეგორიის ოსტატების სია
-// (ზიპის App.tsx-ის CustomerCategory-ის მიხედვით, გასწორებული ბაგით —
-// ზიპში ეს ეკრანი ყველა ოსტატს უფილტრაციოდ აჩვენებდა).
+// Providers of one category.
 export function CustomerCategoryScreen({ navigation, route }: Props) {
-  // Task 6 (audit) — სახელი ბექენდიდანაა (`categoryService`, cache-ით/
-  // fallback-ით), ლოკალური `CATEGORIES.find`-ის ნაცვლად.
   const [categoryName, setCategoryName] = useState(() => categoryService.getCached().find((c) => c.id === route.params.id)?.name);
   useEffect(() => {
     let cancelled = false;
@@ -54,7 +50,7 @@ export function CustomerCategoryScreen({ navigation, route }: Props) {
     [allProviders, route.params.id],
   );
 
-  // StartJobChatSheet-ის wiring — CustomerProviderListScreen-ის იგივე (#99)
+  // "მიწერა" goes through StartJobChatSheet.
   const [startChatProvider, setStartChatProvider] = useState<Provider | null>(null);
   const openChatWithJob = (jobId: string | null, draftMessage?: string) => {
     if (!startChatProvider) return;

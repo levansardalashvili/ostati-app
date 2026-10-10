@@ -1,4 +1,3 @@
-import React from 'react';
 import { Circle, Path, Polygon, Svg } from 'react-native-svg';
 
 type Props = {

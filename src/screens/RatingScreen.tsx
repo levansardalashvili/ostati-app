@@ -1,5 +1,5 @@
-import React, { useEffect, useLayoutEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
 import { Image as ImageIcon, Star } from 'lucide-react-native';
@@ -24,16 +24,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'RatingScreen'>;
 const FEEDBACK_CHIPS = ['დროულად მოვიდა', 'კარგი კომუნიკაცია', 'ხარისხიანი სამუშაო', 'პროფესიონალი', 'სუფთად იმუშავა'];
 const STAR_LABELS = ['', 'ძალიან ცუდი', 'ცუდი', 'საშუალო', 'კარგი', 'შესანიშნავი'];
 
-// RatingScreen — "ოსტატის შეფასება" (ზუსტად ზიპის App.tsx-ის RatingScreen-ის
-// მიხედვით). დათანხმებული შეფასება navigation param-ით მოწოდებული `onRate`
-// callback-ით მიეწოდება CustomerJobDetailScreen-ს, რომელიც რეალურად წერს
-// Supabase-ის `reviews` ცხრილში (reviewService.submitReview) — ამ insert-ის
-// trigger-ი job-საც `completed`-ზე გადაჰყავს (#72, supabase/migrations/0015/0023).
-// შეფასება სავალდებულოა (მომხმარებლის მოთხოვნით): უკან დაბრუნება (header
-// ისარი, gesture, Android hardware back) დაბლოკილია მანამ, სანამ
-// შეფასება არ გაიგზავნება — "მოგვიანებით" ღილაკი განზრახ არ არსებობს.
-// გაგზავნის შემდეგ Customer პირდაპირ Customer Home-ზე ბრუნდება
-// (`navigation.reset`), არა CustomerJobDetailScreen-ზე უკან.
+// Mandatory rating: back is blocked until it is sent. onRate (from CustomerJobDetail)
+// saves it; the review insert completes the job. Afterwards go to Customer Home.
 export function RatingScreen({ navigation, route }: Props) {
   const { jobId, providerName, providerInitials, providerColor, providerId, onRate } = route.params;
 
@@ -61,7 +53,6 @@ export function RatingScreen({ navigation, route }: Props) {
     setChips((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
   };
 
-  // რეალური კამერა/გალერეის picker (#62) — ProviderSetup-ის იგივე პატერნით.
   const pickMedia = async (source: 'camera' | 'gallery') => {
     const perm =
       source === 'camera'
@@ -73,7 +64,7 @@ export function RatingScreen({ navigation, route }: Props) {
         ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
         : await ImagePicker.launchImageLibraryAsync({ quality: 0.6 });
     if (!result.canceled && result.assets[0]) {
-      setPhotos((prev) => [...prev, { ...nextMediaItem(prev), uri: result.assets[0].uri }]);
+      setPhotos((prev) => [...prev, { ...nextMediaItem(), uri: result.assets[0].uri }]);
     }
   };
 
@@ -84,11 +75,7 @@ export function RatingScreen({ navigation, route }: Props) {
     const uid = authService.getCurrentUser()?.uid;
     let uploadedPhotos = photos;
     if (uid && photos.length > 0) {
-      // `Promise.allSettled` — არა `Promise.all`: ერთი ფოტოს ატვირთვის
-      // ჩავარდნამ არ უნდა წაშალოს დანარჩენი უკვე წარმატებით ატვირთული
-      // ფოტოები (`Promise.all` მთლიანად reject-დებოდა პირველივე
-      // ჩავარდნაზე, რაც ქვემოთ ყველა ფოტოს კარგავდა, არა მხოლოდ
-      // ჩავარდნილს).
+      // allSettled: one failed photo must not drop the others.
       const results = await Promise.allSettled(
         photos.map(async (item) => {
           if (!item.uri || item.uri.startsWith('http') || storageService.isPrivateReference(item.uri)) {
@@ -98,9 +85,6 @@ export function RatingScreen({ navigation, route }: Props) {
           return { ...item, uri: privateReference };
         }),
       );
-      // ჩავარდნილი ცალკეული ფოტოები უბრალოდ გამოტოვებულია (ლოკალური
-      // file:// URI database-ში არ ჩაიწერება) — წარმატებულები კი
-      // ინახება, თუნდაც სხვა რომელიმემ ვერ იტვირთოს.
       uploadedPhotos = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
     }
     try {
@@ -114,8 +98,7 @@ export function RatingScreen({ navigation, route }: Props) {
         await reviewService.submitReview(jobId, uid, providerId, data);
       }
     } catch {
-      // ჩაწერა ვერ მოხერხდა — "მადლობას" არ ვაჩვენებთ, შეფასება უნდა გაიგზავნოს თავიდან
-      // უკვე ატვირთული ფოტოები state-ში ვინახავთ — ხელახალ ცდაზე თავიდან აღარ აიტვირთება
+      // Saving failed — no thank-you; keep the uploaded photos for the retry.
       setPhotos(uploadedPhotos);
       setSubmitError(true);
       setSubmitting(false);
@@ -158,11 +141,7 @@ export function RatingScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <BackHeader title="ოსტატის შეფასება" onBack={() => navigation.goBack()} showBack={false} />
-      {/* Android's native window-resize (`softwareKeyboardLayoutMode:
-          "resize"`, app.json) silently no-ops under edge-to-edge rendering
-          (default since Expo SDK 52+), so the review textarea + submit
-          footer below it would otherwise end up hidden behind the
-          keyboard — same bug as ChatConversationScreen's composer. */}
+      {/* 'height' on Android: edge-to-edge makes the native resize a no-op. */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <KeyboardAwareForm
         avoidKeyboard={false}
@@ -364,11 +343,7 @@ const styles = StyleSheet.create({
     minHeight: 96,
     textAlignVertical: 'top',
   },
-  // Task — იგივე absolute-footer ხარვეზი, რაც ProviderEditProfileScreen-ზე
-  // ნაპოვნია — ScrollView-ის ბოლო კონტენტს footer ეფინებოდა (scroll-ითაც
-  // ვერასდროს ჩანდა ბოლომდე) და Android-ის keyboard-avoid auto-scroll
-  // (კომენტარის textarea-სთვის) არასწორად ითვლიდა. ჩვეულებრივი flex
-  // sibling.
+  // Plain flex footer, not absolute.
   footer: {
     backgroundColor: colors.card,
     borderTopWidth: 1,
