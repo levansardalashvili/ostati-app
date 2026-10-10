@@ -7,6 +7,7 @@ import { BrandGlyph } from './BrandGlyph';
 import { Reveal } from './Reveal';
 import { colors, radius, spacing, typography } from '../theme';
 import { motion } from '../utils/motion';
+import { useKeyboardVisible } from '../utils/useKeyboardVisible';
 
 // ბორბლისებრი curved-header (ვიდეო-რეფერენსის ფორმა), აპის ერთი ლურჯი
 // აქცენტით (#2563EB→#1D4ED8, decision #5) — გაზიარებული Login/Register-ს შორის.
@@ -37,6 +38,22 @@ type Props = {
 
 export function CurvedAuthHeader({ subtitle, onBack, brand = 'ოსტატო', emoji }: Props) {
   const insets = useSafeAreaInsets();
+  const keyboardVisible = useKeyboardVisible();
+
+  // While typing the big header would eat a third of the screen — collapse it
+  // to a thin bar (back button only) so the field being filled stays visible.
+  if (keyboardVisible) {
+    return (
+      <View style={[styles.compactBar, { paddingTop: insets.top, height: insets.top + COMPACT_HEIGHT }]}>
+        {onBack ? (
+          <Pressable style={[styles.backButton, { top: insets.top + (COMPACT_HEIGHT - 36) / 2 }]} onPress={onBack}>
+            <ArrowLeft size={18} color="#FFFFFF" />
+          </Pressable>
+        ) : null}
+        <Text style={styles.compactBrand}>{brand}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.headerWrap}>
@@ -78,9 +95,22 @@ export function CurvedAuthHeader({ subtitle, onBack, brand = 'ოსტატო
   );
 }
 
+const COMPACT_HEIGHT = 52;
+
 const styles = StyleSheet.create({
   headerWrap: {
     width: '100%',
+  },
+  compactBar: {
+    width: '100%',
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactBrand: {
+    ...typography.bodyMedium,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   headerContent: {
     alignItems: 'center',

@@ -1,10 +1,14 @@
 import React, { createContext, useCallback, useContext, useRef } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, ScrollViewProps, TextInput } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, ScrollViewProps, TextInput } from 'react-native';
+import { KEYBOARD_SHOW_EVENT } from '../utils/useKeyboardVisible';
 
 type ScrollToInput = (input: TextInput | null) => void;
 const ScrollFormContext = createContext<ScrollToInput | null>(null);
 
-const EXTRA_OFFSET = 24;
+// space left between the focused field and the keyboard (room for the hint/next label)
+const EXTRA_OFFSET = 72;
+// wait for the keyboard animation, header collapse and KeyboardAvoidingView resize
+const SETTLE_MS = 250;
 
 type Props = ScrollViewProps & {
   children: React.ReactNode;
@@ -41,24 +45,37 @@ export function KeyboardAwareForm({
   ...rest
 }: Props) {
   const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
 
+  // RN's own scrollResponderScrollNativeHandleToKeyboard assumes the ScrollView
+  // starts at the top of the screen — with a header above it the field lands
+  // under the keyboard by the header's height. So measure the field in window
+  // coordinates against the keyboard's real top instead, and only after the
+  // keyboard (and any header collapse / KeyboardAvoidingView resize) has settled.
   const scrollToInput = useCallback<ScrollToInput>((input) => {
-    if (!input || !scrollRef.current) return;
-    // ერთი frame დაყოვნება — focus-ისა და keyboard-show ივენთების
-    // თანმიმდევრობა Android-ზე არასტაბილურია (თავად ScrollView-საც
-    // აქვს ანალოგიური setTimeout(0) fallback შიგნით, `_keyboardMetrics`-ის
-    // ჯერ-არ-დაყენებისთვის).
-    requestAnimationFrame(() => {
-      (
-        scrollRef.current as unknown as {
-          scrollResponderScrollNativeHandleToKeyboard?: (
-            node: TextInput,
-            offset?: number,
-            preventNegative?: boolean,
-          ) => void;
-        }
-      )?.scrollResponderScrollNativeHandleToKeyboard?.(input, EXTRA_OFFSET, true);
+    if (!input) return;
+    const run = () =>
+      setTimeout(() => {
+        const kb = Keyboard.metrics();
+        if (!kb || !scrollRef.current) return;
+        // visible bottom = keyboard top, or higher if a fixed footer (save button) sits above the keyboard
+        scrollRef.current.getNativeScrollRef()?.measureInWindow((_sx, sy, _sw, sh) => {
+          const visibleBottom = Math.min(kb.screenY, sy + sh);
+          input.measureInWindow((_x, y, _w, h) => {
+            const overflow = y + Math.min(h, visibleBottom - sy - EXTRA_OFFSET) + EXTRA_OFFSET - visibleBottom;
+            if (overflow > 0) scrollRef.current?.scrollTo({ y: scrollY.current + overflow, animated: true });
+          });
+        });
+      }, SETTLE_MS);
+    if (Keyboard.isVisible()) {
+      run();
+      return;
+    }
+    const sub = Keyboard.addListener(KEYBOARD_SHOW_EVENT, () => {
+      sub.remove();
+      run();
     });
+    setTimeout(() => sub.remove(), 1500);
   }, []);
 
   const body = (
@@ -68,7 +85,12 @@ export function KeyboardAwareForm({
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={contentContainerStyle}
         style={avoidKeyboard ? undefined : style}
+        scrollEventThrottle={16}
         {...rest}
+        onScroll={(e) => {
+          scrollY.current = e.nativeEvent.contentOffset.y;
+          rest.onScroll?.(e);
+        }}
       >
         {children}
       </ScrollView>
