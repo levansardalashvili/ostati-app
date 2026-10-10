@@ -3,6 +3,12 @@
     "name": "Ostato",
     "slug": "ostati-app",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/594079ed-bfc6-4787-be85-763f94051e54"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
