@@ -4,6 +4,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { Phone } from 'lucide-react-native';
 import { GoogleButton } from './GoogleButton';
 import { colors, radius, spacing, typography } from '../theme';
+import { PHONE_AUTH_ENABLED } from '../config/features';
 
 type Props = {
   onGoogle: () => void;
@@ -33,13 +34,15 @@ export function SocialAuthRow({
   return (
     <View>
       <View style={styles.row}>
-        <Pressable
-          onPress={onPhone}
-          accessibilityLabel="ტელეფონით გაგრძელება"
-          style={({ pressed }) => [styles.circle, pressed && styles.pressed]}
-        >
-          <Phone size={22} color={colors.foreground} />
-        </Pressable>
+        {PHONE_AUTH_ENABLED && (
+          <Pressable
+            onPress={onPhone}
+            accessibilityLabel="ტელეფონით გაგრძელება"
+            style={({ pressed }) => [styles.circle, pressed && styles.pressed]}
+          >
+            <Phone size={22} color={colors.foreground} />
+          </Pressable>
+        )}
 
         <GoogleButton variant="circle" loading={gLoading} onPress={onGoogle} />
 
