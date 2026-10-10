@@ -18,7 +18,7 @@ import { Button } from '../components/Button';
 import { ExperiencePickerField } from '../components/ExperiencePickerField';
 import { InlineBanner } from '../components/InlineBanner';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
-import { MediaUploadGrid, nextMediaItem, type MediaItem } from '../components/MediaUploadGrid';
+import { MediaUploadGrid, PhotoSourceSheet, nextMediaItem, type MediaItem } from '../components/MediaUploadGrid';
 import { ProgressBar } from '../components/ProgressBar';
 import { SpecialtyPickerField, type SpecialtyOption } from '../components/SpecialtyPickerField';
 import { SqmPriceField } from '../components/SqmPriceField';
@@ -96,7 +96,10 @@ export function ProviderSetupScreen({ navigation }: Props) {
       }),
     );
 
+  const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
+
   const pickProfilePhoto = async (source: 'camera' | 'gallery') => {
+    setPhotoSheetOpen(false);
     const perm =
       source === 'camera'
         ? await ImagePicker.requestCameraPermissionsAsync()
@@ -197,7 +200,8 @@ export function ProviderSetupScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.photoSection}>
-          <View style={styles.avatarWrap}>
+          {/* Tap the avatar → camera/gallery choice (same as ProviderEditProfile). */}
+          <Pressable testID="setup-photo-button" style={styles.avatarWrap} onPress={() => setPhotoSheetOpen(true)}>
             <View style={styles.avatar}>
               {photoUri ? (
                 <Image source={{ uri: photoUri }} style={styles.avatarImage} />
@@ -205,25 +209,23 @@ export function ProviderSetupScreen({ navigation }: Props) {
                 <User size={32} color={colors.primary} />
               )}
             </View>
-            <Pressable style={styles.cameraBadge} onPress={() => pickProfilePhoto('camera')}>
+            <View style={styles.cameraBadge}>
               <Camera size={13} color={colors.primaryForeground} />
-            </Pressable>
-          </View>
-          <View style={styles.photoActions}>
-            <Pressable style={styles.photoActionButton} onPress={() => pickProfilePhoto('camera')}>
-              <Camera size={12} color={colors.mutedForeground} />
-              <Text style={styles.photoActionText}>ფოტოს გადაღება</Text>
-            </Pressable>
-            <Pressable style={styles.photoActionButton} onPress={() => pickProfilePhoto('gallery')}>
-              <User size={12} color={colors.mutedForeground} />
-              <Text style={styles.photoActionText}>გალერეიდან არჩევა</Text>
-            </Pressable>
-          </View>
+            </View>
+          </Pressable>
+          <Text style={styles.photoActionText}>{photoUri ? 'ფოტოს შეცვლა' : 'ფოტოს დამატება'}</Text>
         </View>
+
+        <PhotoSourceSheet
+          visible={photoSheetOpen}
+          onClose={() => setPhotoSheetOpen(false)}
+          onCamera={() => pickProfilePhoto('camera')}
+          onGallery={() => pickProfilePhoto('gallery')}
+        />
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>
-            სპეციალიზაცია<Text style={styles.requiredMark}> *</Text>
+            პროფესია<Text style={styles.requiredMark}> *</Text>
           </Text>
           <Text style={styles.sectionHint}>აირჩიეთ თქვენი პროფესია</Text>
           <SpecialtyPickerField value={specialty} onChange={setSpecialty} />
@@ -232,7 +234,7 @@ export function ProviderSetupScreen({ navigation }: Props) {
         {sqmSpecialties.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>ფასი კვ.მ-ზე</Text>
-            <Text style={styles.sectionHint}>მიუთითე ფასი თითოეული სპეციალობისთვის ცალკე</Text>
+            <Text style={styles.sectionHint}>მიუთითე ფასი თითოეული პროფესიისთვის ცალკე</Text>
             <View style={{ gap: spacing.sm + 2 }}>
               {sqmSpecialties.map((s) => (
                 <SqmPriceField
@@ -437,24 +439,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  photoActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  photoActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.sm - 2,
-    borderRadius: radius.md,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
   photoActionText: {
     ...typography.small,
-    color: colors.mutedForeground,
+    color: colors.primary,
     fontWeight: '600',
   },
   section: {},

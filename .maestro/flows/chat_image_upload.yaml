@@ -104,7 +104,7 @@ appId: com.ostato.app
 - extendedWaitUntil:
     visible: ".*შექმენი ოსტატის პროფილი.*"
     timeout: 20000
-- tapOn: ".*აირჩიე სპეციალობა.*"
+- tapOn: ".*აირჩიე პროფესია.*"
 - tapOn: ".*სანტექნიკა.*"
 - tapOn: "^არჩევა$"
 - tapOn:

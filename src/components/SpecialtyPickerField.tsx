@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Briefcase, Check, ChevronRight, X } from 'lucide-react-native';
 import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
@@ -18,10 +18,10 @@ type Props = {
 
 const CUSTOM_PREFIX = 'custom:';
 
-// SpecialtyPickerField — ოსტატის სპეციალობის მრავალარჩევანი dropdown
-// (ველი + BottomSheet-ის checkbox სია), "სხვა" ვარიანტით — შეგიძლია
-// დაამატო რამდენიმე თავისუფალი ტექსტის პროფესიაც, თუ ჩამონათვალში არ
-// არის. Provider-ს შეუძლია რამდენიმე სპეციალობის არჩევა.
+// SpecialtyPickerField — ოსტატის პროფესიის მრავალარჩევანი dropdown
+// (ველი + BottomSheet-ის checkbox სია, მხოლოდ ადმინის კატეგორიებიდან).
+// თავისუფალი ტექსტის დამატება აღარ არის: სიაში თუ არ არის, ირჩევს „სხვა“-ს.
+// ძველი custom:* ჩანაწერები მხოლოდ წასაშლელად ჩანს.
 export function SpecialtyPickerField({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
   // ადმინ-პანელიდან მართული კატეგორიები (`categories`, is_active) — სპეციალობა = კატეგორია (#116)
@@ -30,8 +30,6 @@ export function SpecialtyPickerField({ value, onChange }: Props) {
     categoryService.listCategories().then(setCategoryList);
   }, []);
   const activeCategories = categoryList.filter((c) => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder);
-  const [customText, setCustomText] = useState('');
-  const [showCustomInput, setShowCustomInput] = useState(false);
 
   const isSelected = (id: string) => value.some((v) => v.id === id);
 
@@ -45,13 +43,6 @@ export function SpecialtyPickerField({ value, onChange }: Props) {
 
   const removeCustom = (id: string) => onChange(value.filter((v) => v.id !== id));
 
-  const addCustom = () => {
-    if (!customText.trim()) return;
-    onChange([...value, { id: `${CUSTOM_PREFIX}${Date.now()}`, label: customText.trim() }]);
-    setCustomText('');
-    setShowCustomInput(false);
-  };
-
   const customEntries = value.filter((v) => v.id.startsWith(CUSTOM_PREFIX));
   const summary = value.map((v) => v.label).join(', ');
 
@@ -60,14 +51,14 @@ export function SpecialtyPickerField({ value, onChange }: Props) {
       <Pressable style={styles.field} onPress={() => setOpen(true)}>
         <Briefcase size={16} color={colors.mutedForeground} />
         <Text style={[styles.fieldText, value.length === 0 && styles.fieldPlaceholder]} numberOfLines={1}>
-          {value.length > 0 ? summary : 'აირჩიე სპეციალობა'}
+          {value.length > 0 ? summary : 'აირჩიე პროფესია'}
         </Text>
         <ChevronRight size={16} color={colors.mutedForeground} />
       </Pressable>
 
       <BottomSheet visible={open} onClose={() => setOpen(false)}>
-        <Text style={styles.sheetTitle}>სპეციალობა</Text>
-        <Text style={styles.sheetHint}>შეგიძლია აირჩიო რამდენიმე</Text>
+        <Text style={styles.sheetTitle}>პროფესია</Text>
+        <Text style={styles.sheetHint}>შეგიძლია აირჩიო რამდენიმე. თუ შენი პროფესია სიაში არ არის, აირჩიე „სხვა“.</Text>
 
         <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
         {activeCategories.map((c) => {
@@ -86,26 +77,7 @@ export function SpecialtyPickerField({ value, onChange }: Props) {
             </Pressable>
           );
         })}
-        <Pressable style={styles.row} onPress={() => setShowCustomInput((v) => !v)}>
-          <View style={styles.checkbox} />
-          <Text style={styles.rowIcon}>❓</Text>
-          <Text style={styles.rowLabel}>სხვა პროფესია</Text>
-        </Pressable>
         </ScrollView>
-
-        {showCustomInput && (
-          <View style={styles.customWrap}>
-            <TextInput
-              value={customText}
-              onChangeText={setCustomText}
-              placeholder="მიუთითე შენი პროფესია"
-              placeholderTextColor={colors.mutedForeground}
-              style={styles.customInput}
-              autoFocus
-            />
-            <Button label="დამატება" onPress={addCustom} disabled={!customText.trim()} />
-          </View>
-        )}
 
         {customEntries.length > 0 && (
           <View style={styles.customChipRow}>
@@ -182,11 +154,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  rowIcon: {
-    fontSize: 18,
-    width: 24,
-    textAlign: 'center',
-  },
   rowIconWrap: {
     width: 24,
     alignItems: 'center',
@@ -197,18 +164,6 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     fontWeight: '500',
     flex: 1,
-  },
-  customWrap: {
-    marginTop: spacing.sm + 2,
-    gap: spacing.sm + 2,
-  },
-  customInput: {
-    ...typography.caption,
-    color: colors.foreground,
-    backgroundColor: colors.muted,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
   },
   customChipRow: {
     flexDirection: 'row',

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Camera, Image as ImageIcon, X, type LucideIcon } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, Plus, X, type LucideIcon } from 'lucide-react-native';
+import { BottomSheet } from './BottomSheet';
 import { colors, radius, spacing, typography } from '../theme';
 import { SecureStorageImage } from './SecureStorageImage';
 import { usePressScale } from '../utils/usePressScale';
@@ -34,12 +35,8 @@ type Props = {
   onRemove: (id: number) => void;
   onPreview: (item: MediaItem) => void;
   icon: LucideIcon;
-  addLabelPrimary?: string;
-  addLabelSecondary?: string;
-  // E2E (Maestro) support — a screen can render more than one grid (e.g.
-  // ProviderEditProfileScreen's certificates AND portfolio sections both
-  // say "გადაღება"/"გალერეა"), which text-based selectors can't
-  // disambiguate.
+  // E2E (Maestro) support — a screen can render more than one grid, so
+  // the add tile and the sheet options get `${testID}-add/-camera/-gallery`.
   testID?: string;
 };
 
@@ -54,18 +51,56 @@ export function MediaUploadGrid({
   onRemove,
   onPreview,
   icon: Icon,
-  addLabelPrimary = 'გადაღება',
-  addLabelSecondary = 'გალერეა',
   testID,
 }: Props) {
+  // One "დამატება" tile → camera/gallery choice sheet (takes less space than two tiles).
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const pick = (fn: () => void) => {
+    setSheetOpen(false);
+    fn();
+  };
   return (
     <View style={styles.row}>
       {items.map((item) => (
         <MediaThumb key={item.id} item={item} Icon={Icon} onPreview={() => onPreview(item)} onRemove={() => onRemove(item.id)} />
       ))}
-      <AddTile testID={testID && `${testID}-camera`} icon={Camera} label={addLabelPrimary} onPress={onAddCamera} />
-      <AddTile testID={testID && `${testID}-gallery`} icon={ImageIcon} label={addLabelSecondary} onPress={onAddGallery} />
+      <AddTile testID={testID && `${testID}-add`} icon={Plus} label="დამატება" onPress={() => setSheetOpen(true)} />
+      <PhotoSourceSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        onCamera={() => pick(onAddCamera)}
+        onGallery={() => pick(onAddGallery)}
+        testID={testID}
+      />
     </View>
+  );
+}
+
+// Camera/gallery choice — shared by MediaUploadGrid, PostJobScreen and ProviderSetupScreen.
+export function PhotoSourceSheet({
+  visible,
+  onClose,
+  onCamera,
+  onGallery,
+  testID,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onCamera: () => void;
+  onGallery: () => void;
+  testID?: string;
+}) {
+  return (
+    <BottomSheet visible={visible} onClose={onClose}>
+      <Pressable testID={testID && `${testID}-camera`} style={styles.sheetRow} onPress={onCamera}>
+        <Camera size={18} color={colors.foreground} />
+        <Text style={styles.sheetRowText}>ფოტოს გადაღება</Text>
+      </Pressable>
+      <Pressable testID={testID && `${testID}-gallery`} style={styles.sheetRow} onPress={onGallery}>
+        <ImageIcon size={18} color={colors.foreground} />
+        <Text style={styles.sheetRowText}>გალერეიდან არჩევა</Text>
+      </Pressable>
+    </BottomSheet>
   );
 }
 
@@ -168,6 +203,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  sheetRowText: {
+    ...typography.captionMedium,
+    color: colors.foreground,
   },
   addText: {
     ...typography.small,

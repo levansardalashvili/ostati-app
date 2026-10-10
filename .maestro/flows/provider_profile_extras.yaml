@@ -3,10 +3,9 @@ appId: com.ostato.app
 # Provider profile "extras" — four previously-untested pieces of the
 # Provider profile, all covered in one continuous flow since they share
 # the same account and mostly the same screens:
-#   1. Multi-select specialty + a custom "სხვა" entry (decision #8) —
-#      `SpecialtyPickerField` lets a Provider pick several built-in
-#      specialties plus free-text custom ones; no flow had ever selected
-#      more than one, or used "სხვა" at all.
+#   1. Multi-select profession (decision #8) — `SpecialtyPickerField`
+#      lets a Provider pick several categories, including "სხვა" (free-text
+#      professions were removed).
 #   2. `SqmPriceField` (decision #15, "ფასი კვ.მ-ზე") — only shown for
 #      specialties with `pricePerSqm: true` (e.g. "მღებავი"); never
 #      exercised since every other flow picks a non-sqm specialty
@@ -123,32 +122,30 @@ appId: com.ostato.app
 - runScript: ../scripts/fetch_otp.js
 - inputText: "${output.otp}"
 
-# --- Phase 2: ProviderSetupScreen — multi-select specialty + custom
-# "სხვა" entry + sqm price + profile photo + area. ------------------------
+# --- Phase 2: ProviderSetupScreen — multi-select profession incl.
+# "სხვა" + sqm price + profile photo + area. ------------------------
 - extendedWaitUntil:
     visible: ".*შექმენი ოსტატის პროფილი.*"
     timeout: 20000
-- tapOn: ".*აირჩიე სპეციალობა.*"
+- tapOn: ".*აირჩიე პროფესია.*"
 - tapOn: ".*სანტექნიკა.*"
 - tapOn: ".*შეღებვა.*"
+# Free-text professions were removed: a profession not in the list is "სხვა".
 - scrollUntilVisible:
-    element: ".*სხვა პროფესია.*"
+    element: "^სხვა$"
     direction: DOWN
-- tapOn: ".*სხვა პროფესია.*"
-- tapOn: ".*მიუთითე შენი პროფესია.*"
-- inputText: "დურგალი"
-# No hideKeyboard here: with the keyboard already resolved Maestro's hideKeyboard
-# sends Back, which closes this BottomSheet. The add button stays reachable.
-- tapOn: ".*დამატება.*"
-- assertVisible: ".*დურგალი.*"
+- assertNotVisible: ".*სხვა პროფესია.*"
+- tapOn: "^სხვა$"
 - tapOn: "^არჩევა$"
-- assertVisible: ".*დურგალი.*"
+- assertVisible: ".*შეღებვა, სხვა.*"
 
 - assertVisible: ".*ფასი კვ.მ-ზე.*"
 - tapOn: ".*ჩაწერეთ თანხა.*"
 - inputText: "45"
 - hideKeyboard
 
+- tapOn:
+    id: "setup-photo-button"
 - tapOn: ".*გალერეიდან არჩევა.*"
 - extendedWaitUntil:
     visible: "Recent"
@@ -181,7 +178,7 @@ appId: com.ostato.app
 - tapOn: ".*ნახე ჩემი პროფილი.*"
 - assertVisible: ".*სანტექნიკა.*"
 - assertVisible: ".*შეღებვა.*"
-- assertVisible: ".*დურგალი.*"
+- assertVisible: ".*სხვა.*"
 # (The public profile intentionally no longer shows a price section — removed in
 # 834b90a; the sqm price itself is still saved and edited privately.)
 - back
@@ -201,6 +198,8 @@ appId: com.ostato.app
 - hideKeyboard
 
 - tapOn:
+    id: "provider-edit-certificates-add"
+- tapOn:
     id: "provider-edit-certificates-gallery"
 - extendedWaitUntil:
     visible: "Recent"
@@ -213,6 +212,8 @@ appId: com.ostato.app
 # tap — give it a beat to fully settle first.
 - waitForAnimationToEnd
 
+- tapOn:
+    id: "provider-edit-portfolio-add"
 - tapOn:
     id: "provider-edit-portfolio-gallery"
 - extendedWaitUntil:

@@ -44,7 +44,7 @@ export function getVerificationEligibility(p: ProviderProfileState): Verificatio
   ];
   const missingLabels: string[] = [];
   if (!checks[0]) missingLabels.push('სახელი და გვარი');
-  if (!checks[1]) missingLabels.push('სპეციალობა');
+  if (!checks[1]) missingLabels.push('პროფესია');
   if (!checks[2]) missingLabels.push('სამუშაო არეალი');
   if (!checks[3]) missingLabels.push('პროფილის ფოტო');
   const percent = Math.round((checks.filter(Boolean).length / checks.length) * 100);

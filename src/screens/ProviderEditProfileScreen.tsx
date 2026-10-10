@@ -7,12 +7,11 @@ import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Avatar } from '../components/Avatar';
 import { BackHeader } from '../components/BackHeader';
-import { BottomSheet } from '../components/BottomSheet';
 import { Button } from '../components/Button';
 import { ExperiencePickerField } from '../components/ExperiencePickerField';
 import { InlineBanner } from '../components/InlineBanner';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
-import { MediaUploadGrid, nextMediaItem, type MediaItem } from '../components/MediaUploadGrid';
+import { MediaUploadGrid, PhotoSourceSheet, nextMediaItem, type MediaItem } from '../components/MediaUploadGrid';
 import { SpecialtyPickerField, type SpecialtyOption } from '../components/SpecialtyPickerField';
 import { SqmPriceField } from '../components/SqmPriceField';
 import { TextField } from '../components/TextField';
@@ -228,16 +227,12 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
           </View>
         </View>
 
-        <BottomSheet visible={photoSheetOpen} onClose={() => setPhotoSheetOpen(false)}>
-          <Pressable style={styles.photoSheetRow} onPress={() => pickProfilePhoto('gallery')}>
-            <ImageIcon size={18} color={colors.foreground} />
-            <Text style={styles.photoSheetRowText}>გალერიიდან არჩევა</Text>
-          </Pressable>
-          <Pressable style={styles.photoSheetRow} onPress={() => pickProfilePhoto('camera')}>
-            <Camera size={18} color={colors.foreground} />
-            <Text style={styles.photoSheetRowText}>ფოტოს გადაღება</Text>
-          </Pressable>
-        </BottomSheet>
+        <PhotoSourceSheet
+          visible={photoSheetOpen}
+          onClose={() => setPhotoSheetOpen(false)}
+          onCamera={() => pickProfilePhoto('camera')}
+          onGallery={() => pickProfilePhoto('gallery')}
+        />
 
         <View style={{ gap: spacing.lg }}>
           <View style={styles.nameRow}>
@@ -250,7 +245,7 @@ export function ProviderEditProfileScreen({ navigation }: Props) {
           </View>
 
           <View>
-            <Text style={styles.fieldLabel}>სპეციალობა</Text>
+            <Text style={styles.fieldLabel}>პროფესია</Text>
             <SpecialtyPickerField value={specialty} onChange={setSpecialty} />
           </View>
 
@@ -382,16 +377,6 @@ const styles = StyleSheet.create({
     borderColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  photoSheetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  photoSheetRowText: {
-    ...typography.captionMedium,
-    color: colors.foreground,
   },
   nameRow: {
     flexDirection: 'row',

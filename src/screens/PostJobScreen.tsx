@@ -15,16 +15,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareForm, ScrollAwareTextInput } from '../components/KeyboardAwareForm';
 import {
   AlertCircle,
-  Camera,
+  Plus,
   Check,
   ChevronRight,
-  Image as ImageIcon,
   Shield,
   X,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BackHeader } from '../components/BackHeader';
 import { BottomSheet } from '../components/BottomSheet';
+import { PhotoSourceSheet } from '../components/MediaUploadGrid';
 import { Button } from '../components/Button';
 import { getCategoryIcon } from '../components/CategoryIcon';
 import { DatePickerField } from '../components/DatePickerField';
@@ -68,6 +68,7 @@ export function PostJobScreen({ navigation, route }: Props) {
   // ფერადი mock კვადრატების ნაცვლად. Supabase Storage-ში იტვირთება
   // "გამოქვეყნება"-ზე დაჭერისას (#61).
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
   const [photoError, setPhotoError] = useState('');
   // მისამართი წინასწარ ივსება პროფილის default address-ით, მაგრამ აქ
   // ცვლილება არასდროს არ სცვლის თავად default address-ს (მხოლოდ ამ
@@ -394,18 +395,24 @@ export function PostJobScreen({ navigation, route }: Props) {
               </View>
             ))}
             {photos.length < MAX_PHOTOS && (
-              <>
-                <Pressable style={styles.photoAddButton} onPress={pickFromCamera}>
-                  <Camera size={18} color={colors.mutedForeground} />
-                  <Text style={styles.photoAddText}>გადაღება</Text>
-                </Pressable>
-                <Pressable style={styles.photoAddButton} onPress={pickFromGallery}>
-                  <ImageIcon size={18} color={colors.mutedForeground} />
-                  <Text style={styles.photoAddText}>გალერეა</Text>
-                </Pressable>
-              </>
+              <Pressable testID="post-job-photo-add" style={styles.photoAddButton} onPress={() => setPhotoSheetOpen(true)}>
+                <Plus size={18} color={colors.mutedForeground} />
+                <Text style={styles.photoAddText}>დამატება</Text>
+              </Pressable>
             )}
           </View>
+          <PhotoSourceSheet
+            visible={photoSheetOpen}
+            onClose={() => setPhotoSheetOpen(false)}
+            onCamera={() => {
+              setPhotoSheetOpen(false);
+              pickFromCamera();
+            }}
+            onGallery={() => {
+              setPhotoSheetOpen(false);
+              pickFromGallery();
+            }}
+          />
           {!!photoError && <FieldError message={photoError} />}
         </View>
         )}
